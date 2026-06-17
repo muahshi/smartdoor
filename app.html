@@ -85,7 +85,6 @@
         overflow: hidden;
       }
       .owner-panel {
-        display: block !important;
         overflow-y: auto;
         background: #050D18;
         padding: 32px;
@@ -460,7 +459,7 @@
 <!-- ════════════════════════════════════════
      DUAL PANEL LAYOUT
 ════════════════════════════════════════ -->
-<div class="dual-panel">
+<div class="dual-panel" id="dual-panel-root" data-mode="split">
 
   <!-- ══ LEFT: PHONE APP SHELL ══ -->
   <div class="app-shell">
@@ -499,7 +498,7 @@
     <!-- Tab bar (mobile) -->
     <div class="tab-bar" id="mobile-tab-bar">
       <button class="tab-btn active" data-tab="visitor" onclick="switchMobileTab('visitor',this)">📲 Visitor</button>
-      <button class="tab-btn" data-tab="dashboard" onclick="switchMobileTab('dashboard',this)">📊 Dashboard</button>
+      <button class="tab-btn" data-tab="dashboard" onclick="switchMobileTab('dashboard',this)">📊 Analytics</button>
       <button class="tab-btn" data-tab="settings" onclick="switchMobileTab('settings',this)">⚙️ Settings</button>
     </div>
 
@@ -583,11 +582,12 @@
       </div>
 
       <!-- AI Assistant -->
-      <div style="margin:0 16px 24px;padding:16px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:16px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <div style="margin:0 16px 24px;padding:16px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:16px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:-30%;right:-15%;width:140px;height:140px;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;position:relative;">
           <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,rgba(168,85,247,0.25),rgba(99,102,241,0.15));border:1px solid rgba(168,85,247,0.3);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🤖</div>
           <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.82rem;color:#fff;">AI Assistant</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.82rem;color:#fff;">AI Receptionist</div>
             <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);">Powered by Groq LLaMA-3</div>
           </div>
           <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
@@ -668,32 +668,50 @@
     <div class="view-area" id="tab-dashboard" style="display:none;padding:16px;">
 
       <!-- Owner greeting -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
         <div>
-          <div style="font-size:0.78rem;color:rgba(255,255,255,0.4);">Good morning,</div>
-          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;">Sharma Family 👋</div>
+          <div class="os-eyebrow" id="greeting-eyebrow">Good morning,</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.15rem;color:#fff;margin-top:2px;">Sharma Family 👋</div>
         </div>
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#00A2E8,#0078D7);display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🏠</div>
+        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#00A2E8,#0078D7);display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 4px 16px rgba(0,162,232,0.3);">🏠</div>
       </div>
 
-      <!-- Stats grid -->
-      <div id="dashboard-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <!-- Metric cards grid (6 metrics) -->
+      <div class="os-eyebrow" style="margin-bottom:8px;">Today's Overview</div>
+      <div id="dashboard-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
         <!-- Rendered by dashboard.js -->
       </div>
 
-      <!-- Weekly chart -->
+      <!-- Activity charts: weekly + monthly toggle -->
       <div class="dash-card" style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Weekly Scans</div>
-          <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);font-family:'Space Grotesk',sans-serif;">This week</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Visitor Activity</div>
+          <div style="display:flex;gap:4px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px;">
+            <button class="chart-range-btn active" data-range="weekly" onclick="DashboardModule.setChartRange('weekly', this)" style="padding:4px 10px;font-size:0.68rem;font-weight:700;border-radius:6px;border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;">Weekly</button>
+            <button class="chart-range-btn" data-range="monthly" onclick="DashboardModule.setChartRange('monthly', this)" style="padding:4px 10px;font-size:0.68rem;font-weight:700;border-radius:6px;border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;">Monthly</button>
+          </div>
         </div>
         <div id="weekly-chart"></div>
+        <div id="monthly-chart" style="display:none;"></div>
       </div>
 
       <!-- Intent breakdown -->
       <div class="dash-card" style="margin-bottom:12px;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;margin-bottom:12px;">AI Intent Breakdown</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">AI Intent Breakdown</div>
+          <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);">Last 30 days</div>
+        </div>
         <div id="intent-chart"></div>
+      </div>
+
+      <!-- QR Heatmap (placeholder / future-ready) -->
+      <div class="dash-card" style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">QR Scan Heatmap</div>
+          <span style="font-size:0.62rem;padding:2px 8px;border-radius:5px;background:rgba(168,85,247,0.12);color:#A855F7;font-weight:700;">PREVIEW</span>
+        </div>
+        <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-bottom:12px;">Scan density by hour, last 12 weeks</div>
+        <div id="qr-heatmap" class="heatmap-grid"></div>
       </div>
 
       <!-- Visitor Logs -->
@@ -827,7 +845,7 @@
       <div class="dash-card" style="margin-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Family Routing</div>
-          <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);">Priority order (max 4)</div>
+          <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);">Drag to reorder</div>
         </div>
         <div id="family-members-list" style="display:flex;flex-direction:column;gap:6px;"></div>
         <button id="add-member-btn" style="
@@ -891,16 +909,21 @@
           <div>
             <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Current Plan</div>
             <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1rem;color:#fff;">AI Pro ✨</div>
-            <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-top:2px;">₹799/year · Renews Jan 2025</div>
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-top:2px;" id="sub-renewal-line">₹799/year · Renews 14 Jan 2027</div>
           </div>
           <div style="padding:4px 10px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:6px;font-size:0.7rem;color:#22C55E;font-weight:700;font-family:'Space Grotesk',sans-serif;">ACTIVE</div>
         </div>
-        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;">
-          <span style="font-size:0.65rem;padding:2px 8px;border-radius:4px;background:rgba(0,162,232,0.08);color:rgba(0,162,232,0.7);">✓ AI Receptionist</span>
-          <span style="font-size:0.65rem;padding:2px 8px;border-radius:4px;background:rgba(0,162,232,0.08);color:rgba(0,162,232,0.7);">✓ Call Masking</span>
-          <span style="font-size:0.65rem;padding:2px 8px;border-radius:4px;background:rgba(0,162,232,0.08);color:rgba(0,162,232,0.7);">✓ Family Routing</span>
-          <span style="font-size:0.65rem;padding:2px 8px;border-radius:4px;background:rgba(0,162,232,0.08);color:rgba(0,162,232,0.7);">✓ Priority Support</span>
+        <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(0,0,0,0.15);border-radius:10px;">
+          <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">Days remaining</span>
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:0.95rem;color:#00A2E8;" id="sub-days-remaining">211 days</span>
         </div>
+        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;">
+          <span class="sub-feature-pill">✓ AI Receptionist</span>
+          <span class="sub-feature-pill">✓ Call Masking</span>
+          <span class="sub-feature-pill">✓ Family Routing</span>
+          <span class="sub-feature-pill">✓ Priority Support</span>
+        </div>
+        <button class="btn-primary" style="width:100%;justify-content:center;margin-top:14px;font-size:0.8rem;padding:10px;">Upgrade Plan</button>
       </div>
     </div>
     <!-- END SETTINGS TAB -->
@@ -913,7 +936,7 @@
       </button>
       <button class="bottom-nav-item" onclick="switchMobileTab('dashboard', null, this)">
         <span class="nav-icon">📊</span>
-        <span class="nav-label">Dashboard</span>
+        <span class="nav-label">Analytics</span>
       </button>
       <button class="bottom-nav-item" onclick="switchMobileTab('settings', null, this)">
         <span class="nav-icon">⚙️</span>
@@ -949,7 +972,7 @@
     <!-- Stats grid -->
     <div class="dash-section">
       <div class="dash-section-title">Today's Overview</div>
-      <div id="dashboard-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;"></div>
+      <div id="dashboard-stats" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
     </div>
 
     <!-- 3-column grid -->
@@ -991,7 +1014,7 @@
         <!-- Family Routing -->
         <div class="dash-section-title">Family Routing</div>
         <div class="dash-card">
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-bottom:8px;">Priority order (max 4 members)</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-bottom:8px;">Drag to reorder · Priority 1 rings first</div>
           <div id="family-members-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
           <button id="add-member-btn" style="
             width:100%;padding:7px;background:rgba(0,162,232,0.08);
@@ -1094,16 +1117,33 @@
           </div>
         </div>
 
-        <!-- Weekly Chart -->
-        <div class="dash-section-title">Weekly Activity</div>
+        <!-- Weekly/Monthly Chart -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="dash-section-title" style="margin-bottom:0;">Visitor Activity</div>
+          <div style="display:flex;gap:4px;background:rgba(255,255,255,0.04);border-radius:8px;padding:3px;">
+            <button class="chart-range-btn active" data-range="weekly" onclick="DashboardModule.setChartRange('weekly', this)" style="padding:3px 9px;font-size:0.65rem;font-weight:700;border-radius:6px;border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;">Weekly</button>
+            <button class="chart-range-btn" data-range="monthly" onclick="DashboardModule.setChartRange('monthly', this)" style="padding:3px 9px;font-size:0.65rem;font-weight:700;border-radius:6px;border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;">Monthly</button>
+          </div>
+        </div>
         <div class="dash-card" style="margin-bottom:16px;">
           <div id="weekly-chart"></div>
+          <div id="monthly-chart" style="display:none;"></div>
         </div>
 
         <!-- Intent Chart -->
         <div class="dash-section-title">AI Intent Breakdown</div>
         <div class="dash-card" style="margin-bottom:16px;">
           <div id="intent-chart"></div>
+        </div>
+
+        <!-- QR Heatmap -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div class="dash-section-title" style="margin-bottom:0;">QR Scan Heatmap</div>
+          <span style="font-size:0.6rem;padding:2px 7px;border-radius:5px;background:rgba(168,85,247,0.12);color:#A855F7;font-weight:700;">PREVIEW</span>
+        </div>
+        <div class="dash-card" style="margin-bottom:16px;">
+          <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);margin-bottom:10px;">Scan density by hour, last 12 weeks</div>
+          <div id="qr-heatmap-desktop" class="heatmap-grid"></div>
         </div>
 
         <!-- Security Timeline -->
@@ -1218,15 +1258,19 @@
 
     const ownerPanel = document.getElementById('owner-panel-desktop');
     const appShell = document.querySelector('.app-shell');
+    const dualPanel = document.getElementById('dual-panel-root');
 
     if (view === 'owner') {
       ownerPanel.style.display = 'block';
       appShell.style.display = 'none';
-      // Initialize dashboard
+      dualPanel.style.gridTemplateColumns = '1fr';
+      dualPanel.dataset.mode = 'owner';
       setTimeout(() => { if (window.DashboardModule) DashboardModule.init(); }, 100);
     } else {
       ownerPanel.style.display = 'none';
       appShell.style.display = 'flex';
+      dualPanel.style.gridTemplateColumns = '420px 1fr';
+      dualPanel.dataset.mode = 'visitor';
     }
   }
 
