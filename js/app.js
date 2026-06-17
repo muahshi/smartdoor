@@ -368,6 +368,7 @@ function setupAIAssistant() {
         if (d.action === 'Blocked') {
           showBlockedOverlay(d.response);
         } else if (d.priority === 'Critical') {
+          showPriorityAccessOverlay(d.response);
           highlightSOS();
         }
 
@@ -460,22 +461,30 @@ function appendIntentBadge(data) {
   const outputEl = document.getElementById('ai-output');
   if (!outputEl) return;
 
+  const confidencePct = Math.round((data.confidence || 0.8) * 100);
+
   const div = document.createElement('div');
   div.style.cssText = 'display:flex;justify-content:center;margin:8px 0;animation:slide-in-up 0.3s ease;';
   div.innerHTML = `
     <div style="
-      padding:6px 14px;border-radius:20px;
-      background:rgba(${hexToRgb(data.color)},0.12);
-      border:1px solid rgba(${hexToRgb(data.color)},0.35);
-      display:flex;align-items:center;gap:8px;
-      font-size:0.78rem;
+      padding:10px 14px;border-radius:14px;min-width:220px;
+      background:rgba(${hexToRgb(data.color)},0.1);
+      border:1px solid rgba(${hexToRgb(data.color)},0.3);
     ">
-      <span>${data.emoji}</span>
-      <span style="color:rgba(255,255,255,0.6);">Intent:</span>
-      <span style="color:${data.color};font-weight:700;font-family:'Space Grotesk',sans-serif;">${data.intent}</span>
-      <span style="color:rgba(255,255,255,0.3);">|</span>
-      <span style="color:rgba(255,255,255,0.5);">Priority:</span>
-      <span style="color:${data.color};font-weight:600;">${data.priority}</span>
+      <div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;">
+        <span>${data.emoji}</span>
+        <span style="color:rgba(255,255,255,0.6);">Intent:</span>
+        <span style="color:${data.color};font-weight:700;font-family:'Space Grotesk',sans-serif;">${data.intent}</span>
+        <span style="color:rgba(255,255,255,0.3);">|</span>
+        <span style="color:rgba(255,255,255,0.5);">${data.priority}</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+        <span style="font-size:0.65rem;color:rgba(255,255,255,0.4);">Confidence</span>
+        <span style="font-size:0.68rem;color:${data.color};font-weight:700;font-family:'Space Grotesk',sans-serif;">${confidencePct}%</span>
+      </div>
+      <div class="confidence-track">
+        <div class="confidence-fill" style="width:${confidencePct}%;background:${data.color};"></div>
+      </div>
     </div>
   `;
   outputEl.appendChild(div);
@@ -499,7 +508,39 @@ function showBlockedOverlay(message) {
       text-align:center;box-shadow:0 0 40px rgba(239,68,68,0.2);
     ">
       <div style="font-size:3rem;margin-bottom:16px;">🚫</div>
-      <div style="color:#EF4444;font-size:1.1rem;font-weight:700;margin-bottom:8px;font-family:'Space Grotesk',sans-serif;">Request Blocked</div>
+      <div style="color:#EF4444;font-size:1.1rem;font-weight:700;margin-bottom:8px;font-family:'Space Grotesk',sans-serif;">Access Restricted</div>
+      <div style="color:rgba(255,255,255,0.6);font-size:0.88rem;line-height:1.6;">${message}</div>
+      <button onclick="this.parentElement.parentElement.remove()" style="
+        margin-top:20px;padding:10px 24px;
+        background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);
+        color:#EF4444;border-radius:10px;cursor:pointer;font-weight:600;
+        font-family:'Space Grotesk',sans-serif;font-size:0.88rem;
+      ">Understood</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 6000);
+}
+
+function showPriorityAccessOverlay(message) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:500;
+    background:rgba(239,68,68,0.1);
+    backdrop-filter:blur(4px);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    animation:slide-in-up 0.3s ease;padding:24px;
+  `;
+  overlay.innerHTML = `
+    <div style="
+      background:rgba(14,27,42,0.95);
+      border:1px solid rgba(239,68,68,0.5);
+      border-radius:24px;padding:32px;max-width:340px;width:100%;
+      text-align:center;box-shadow:0 0 50px rgba(239,68,68,0.25);
+      animation:glow-pulse 1.2s ease-in-out infinite;
+    ">
+      <div style="font-size:3rem;margin-bottom:16px;">🚨</div>
+      <div style="color:#EF4444;font-size:1.1rem;font-weight:700;margin-bottom:8px;font-family:'Space Grotesk',sans-serif;">Priority Access Granted</div>
       <div style="color:rgba(255,255,255,0.6);font-size:0.88rem;line-height:1.6;">${message}</div>
       <button onclick="this.parentElement.parentElement.remove()" style="
         margin-top:20px;padding:10px 24px;
