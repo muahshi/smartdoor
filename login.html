@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Door — Owner Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100dvh;
+      background: #080F1A;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,162,232,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 28px;
+      padding: 40px 32px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #00A2E8, #0078D7);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+    .logo-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff, #00A2E8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 32px;
+    }
+    .field {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 8px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    input {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 1rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      letter-spacing: 2px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      border-color: rgba(0,162,232,0.5);
+      background: rgba(0,162,232,0.05);
+    }
+    input::placeholder {
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 0.5px;
+      font-weight: 400;
+    }
+    .pin-row {
+      display: flex;
+      gap: 10px;
+    }
+    .pin-digit {
+      flex: 1;
+      text-align: center;
+      font-size: 1.4rem;
+      padding: 16px 8px;
+      letter-spacing: 0;
+    }
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      cursor: pointer;
+    }
+    .remember-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 0;
+      padding: 0;
+    }
+    .remember-row span {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.5);
+      user-select: none;
+    }
+    .btn-login {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #00A2E8, #0078D7);
+      border: none;
+      border-radius: 14px;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: 'Space Grotesk', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-login:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,162,232,0.35); }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .error-msg {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      color: #EF4444;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .plate-hint {
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.25);
+      margin-top: 6px;
+    }
+    .ai-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: dot-blink 1.2s ease-in-out infinite; }
+    .ai-dot:nth-child(2) { animation-delay: 0.2s; }
+    .ai-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-blink { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1)} }
+  </style>
+</head>
+<body>
+
+<!-- CONFIG: Injected at build time or by server -->
+<script>
+  window.__SD_CONFIG__ = {
+    supabaseUrl:  'YOUR_SUPABASE_URL',   // Replace
+    supabaseAnon: 'YOUR_SUPABASE_ANON_KEY', // Replace
+  };
+</script>
+
+<div class="login-card">
+  <div class="logo">
+    <div class="logo-icon">🚪</div>
+    <span class="logo-text">Smart Door</span>
+  </div>
+
+  <h1>Owner Login</h1>
+  <p class="subtitle">Enter your Plate ID and 4-digit PIN to access your dashboard</p>
+
+  <div class="field">
+    <label>Plate ID</label>
+    <input type="text" id="plate-id-input" placeholder="SD-ABX9K7" maxlength="10" autocomplete="off" spellcheck="false">
+    <p class="plate-hint">Found on your Smart Door nameplate or welcome email</p>
+  </div>
+
+  <div class="field">
+    <label>4-Digit PIN</label>
+    <div class="pin-row">
+      <input type="password" class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]">
+    </div>
+  </div>
+
+  <label class="remember-row">
+    <input type="checkbox" id="remember-device">
+    <span>Remember this device for 30 days</span>
+  </label>
+
+  <button class="btn-login" id="login-btn">
+    🔐 Login to Dashboard
+  </button>
+
+  <div class="error-msg" id="error-msg"></div>
+</div>
+
+<script type="module">
+  import { loginOwner, isTrustedDevice } from './services/auth.js';
+
+  const plateInput  = document.getElementById('plate-id-input');
+  const pinDigits   = document.querySelectorAll('.pin-digit');
+  const loginBtn    = document.getElementById('login-btn');
+  const errorMsg    = document.getElementById('error-msg');
+  const rememberChk = document.getElementById('remember-device');
+
+  // ── Auto-uppercase plate ID
+  plateInput.addEventListener('input', () => {
+    plateInput.value = plateInput.value.toUpperCase();
+  });
+
+  // ── PIN digit auto-advance
+  pinDigits.forEach((digit, i) => {
+    digit.addEventListener('input', () => {
+      digit.value = digit.value.replace(/[^0-9]/g, '');
+      if (digit.value && i < pinDigits.length - 1) {
+        pinDigits[i + 1].focus();
+      }
+    });
+    digit.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' && !digit.value && i > 0) {
+        pinDigits[i - 1].focus();
+      }
+    });
+  });
+
+  // ── Check trusted device
+  const trust = isTrustedDevice();
+  if (trust.trusted && trust.plateId) {
+    plateInput.value = trust.plateId;
+    rememberChk.checked = true;
+    pinDigits[0].focus();
+  }
+
+  // ── Login
+  loginBtn.addEventListener('click', handleLogin);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleLogin(); });
+
+  async function handleLogin() {
+    const plateId = plateInput.value.trim().toUpperCase();
+    const pin     = Array.from(pinDigits).map(d => d.value).join('');
+
+    errorMsg.style.display = 'none';
+
+    if (!plateId || plateId.length < 8) {
+      showError('Please enter a valid Plate ID (e.g. SD-ABX9K7)');
+      plateInput.focus();
+      return;
+    }
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+      showError('Please enter your complete 4-digit PIN');
+      pinDigits[0].focus();
+      return;
+    }
+
+    loginBtn.disabled  = true;
+    loginBtn.innerHTML = `<span class="ai-dot"></span><span class="ai-dot"></span><span class="ai-dot"></span>`;
+
+    const result = await loginOwner(plateId, pin, rememberChk.checked);
+
+    if (result.success) {
+      loginBtn.innerHTML = '✅ Login successful!';
+      setTimeout(() => { window.location.href = '/app.html'; }, 600);
+    } else {
+      showError(result.error || 'Login failed. Please try again.');
+      loginBtn.disabled  = false;
+      loginBtn.innerHTML = '🔐 Login to Dashboard';
+      // Clear PIN
+      pinDigits.forEach(d => { d.value = ''; });
+      pinDigits[0].focus();
+    }
+  }
+
+  function showError(msg) {
+    errorMsg.textContent    = msg;
+    errorMsg.style.display  = 'block';
+  }
+</script>
+
+</body>
+</html>
