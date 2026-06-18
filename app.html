@@ -412,6 +412,14 @@
 
 <body>
 
+<!-- CONFIG: Injected at build time or by server — required by services/supabase.js -->
+<script>
+  window.__SD_CONFIG__ = {
+    supabaseUrl:  'YOUR_SUPABASE_URL',   // Replace
+    supabaseAnon: 'YOUR_SUPABASE_ANON_KEY', // Replace
+  };
+</script>
+
 <!-- ════════════════════════════════════════
      DESKTOP HEADER (shown on desktop only)
 ════════════════════════════════════════ -->
@@ -1240,8 +1248,8 @@
 
 <!-- ════════ SCRIPTS ════════ -->
 <script src="js/groq.js"></script>
-<script src="js/dashboard.js"></script>
-<script src="js/app.js"></script>
+<script type="module" src="js/dashboard.js"></script>
+<script type="module" src="js/app.js"></script>
 
 <script>
   // ── Desktop view switcher ──
@@ -1368,7 +1376,11 @@
   });
 
   // ── Expose triggerSOS globally ──
-  window.triggerSOS = triggerSOS || function() { showModal('sos-active-modal'); };
+  // app.js is now an ES module (deferred) and already sets window.triggerSOS
+  // itself once it loads. This classic inline script runs earlier (during
+  // parsing), so we guard with typeof to avoid a ReferenceError in that
+  // brief window, rather than referencing the bare identifier directly.
+  window.triggerSOS = (typeof triggerSOS !== 'undefined') ? triggerSOS : function() { showModal('sos-active-modal'); };
 </script>
 </body>
 </html>
