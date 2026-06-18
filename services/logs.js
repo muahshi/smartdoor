@@ -74,13 +74,28 @@ export async function getTodayStats(ownerId) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const { data, error } = await supabase
-      .from('visitor_logs')
-      .select('event_type, ai_intent')
-      .eq('owner_id', ownerId)
-      .gte('created_at', todayStart.toISOString());
+    const [logsRes, callsRes, messagesRes] = await Promise.allSettled([
+      supabase
+        .from('visitor_logs')
+        .select('event_type, ai_intent')
+        .eq('owner_id', ownerId)
+        .gte('created_at', todayStart.toISOString()),
+      // Phase 5 — calls now live in call_logs, counted here instead of visitor_logs
+      supabase
+        .from('call_logs')
+        .select('call_status')
+        .eq('owner_id', ownerId)
+        .gte('created_at', todayStart.toISOString()),
+      // Phase 5 — voice/text/emergency messages now live in message_logs
+      supabase
+        .from('message_logs')
+        .select('message_type')
+        .eq('owner_id', ownerId)
+        .gte('created_at', todayStart.toISOString()),
+    ]);
 
-    if (error) throw error;
+    if (logsRes.status === 'rejected' || logsRes.value.error) throw (logsRes.value?.error || logsRes.reason);
+    const data = logsRes.value.data;
 
     const stats = {
       todayScans:    0,
@@ -94,13 +109,23 @@ export async function getTodayStats(ownerId) {
     data.forEach(log => {
       switch (log.event_type) {
         case 'qr_scan':       stats.todayScans++;    break;
-        case 'call_attempt':  stats.callsRouted++;   break;
-        case 'voice_message': stats.voiceMessages++; break;
         case 'bell_ring':     stats.bellRings++;     break;
         case 'spam_blocked':  stats.blockedSpam++;   break;
-        case 'sos':           stats.sosEvents++;     break;
+        // call_attempt / voice_message / sos are intentionally NOT counted
+        // here anymore — Phase 5 moved them to call_logs / message_logs below.
       }
     });
+
+    if (callsRes.status === 'fulfilled' && !callsRes.value.error) {
+      stats.callsRouted += callsRes.value.data.filter(c => c.call_status === 'completed').length;
+    }
+
+    if (messagesRes.status === 'fulfilled' && !messagesRes.value.error) {
+      messagesRes.value.data.forEach(m => {
+        if (m.message_type === 'voice') stats.voiceMessages++;
+        else if (m.message_type === 'emergency') stats.sosEvents++;
+      });
+    }
 
     // Intent breakdown
     const intentBreakdown = {};
