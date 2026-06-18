@@ -16,7 +16,8 @@
 import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from './services/auth.js';
 import { getLogs, getTodayStats, getWeeklyData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from './services/logs.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from './services/security.js';
-import { getSubscription } from './services/subscriptions.js';
+import { getSubscription, getRenewalInfo } from './services/subscriptions.js';
+import { getOrderSummary, subscribeToOrderTracking } from './services/orders.js';
 import { getCommunicationLogs, subscribeToCommunicationLogs } from './services/communication.js';
 import { getVoiceNoteUrl } from './services/voiceNotes.js';
 
@@ -35,6 +36,7 @@ const DashboardModule = (() => {
     weeklyData: [0, 0, 0, 0, 0, 0, 0],
     intentBreakdown: {},
     subscription: null,
+    orderSummary: null,          // Phase 6: latest order tracking
     _realtimeUnsubs: [],
   };
 
@@ -90,6 +92,21 @@ const DashboardModule = (() => {
     setupSecurityTimeline();
     updateSubscriptionDays();
 
+    // Phase 6: Order tracking card dikhao agar order hai
+    if (state.orderSummary && state.orderSummary.manufacturingStatus !== 'delivered') {
+      const trackCard = document.getElementById('order-tracking-card');
+      if (trackCard) trackCard.style.display = 'block';
+
+      // Live tracking subscribe karo
+      const unsub = subscribeToOrderTracking(state.orderSummary.orderId, (event) => {
+        state.orderSummary.events.push(event);
+        state.orderSummary.trackingStatus = event.event_type;
+        _renderOrderTrackingCard();
+        showToast(`📦 ${event.event_label}`, 'info');
+      });
+      state._realtimeUnsubs.push(unsub);
+    }
+
     // Update owner name display
     _updateOwnerNameUI();
 
@@ -100,7 +117,7 @@ const DashboardModule = (() => {
   async function _loadAllData() {
     const ownerId = state.owner.id;
 
-    const [logsResult, statsResult, weeklyResult, rulesResult, familyResult, subResult, commsResult] = await Promise.allSettled([
+    const [logsResult, statsResult, weeklyResult, rulesResult, familyResult, subResult, commsResult, orderResult] = await Promise.allSettled([
       getLogs(ownerId, { limit: 20 }),
       getTodayStats(ownerId),
       getWeeklyData(ownerId),
@@ -108,6 +125,7 @@ const DashboardModule = (() => {
       getFamilyMembers(ownerId),
       getSubscription(ownerId),
       getCommunicationLogs(ownerId, { limit: 20 }),
+      getOrderSummary(ownerId),   // Phase 6: latest order
     ]);
 
     // Visitor logs
@@ -170,6 +188,11 @@ const DashboardModule = (() => {
     // Subscription
     if (subResult.status === 'fulfilled' && subResult.value.success) {
       state.subscription = subResult.value.subscription;
+    }
+
+    // Phase 6: Latest order summary
+    if (orderResult.status === 'fulfilled' && orderResult.value.success) {
+      state.orderSummary = orderResult.value.summary;
     }
   }
 
@@ -719,18 +742,88 @@ const DashboardModule = (() => {
     els.forEach(el => { el.innerHTML = html; });
   }
 
-  // ────────── SUBSCRIPTION: DAYS REMAINING ──────────
+  // ────────── SUBSCRIPTION: DAYS REMAINING + RENEWAL LINE ──────────
   function updateSubscriptionDays() {
-    const daysEl = document.getElementById('sub-days-remaining');
+    const daysEl    = document.getElementById('sub-days-remaining');
+    const renewalEl = document.getElementById('sub-renewal-line');
+
     if (!daysEl) return;
 
     if (state.subscription?.daysLeft !== undefined) {
       daysEl.textContent = `${state.subscription.daysLeft} days`;
+
+      // Renewal line update karo
+      if (renewalEl && state.subscription.expiry_date) {
+        const expiryDate  = new Date(state.subscription.expiry_date);
+        const price       = state.subscription.planPrice || 999;
+        const renewalText = `₹${price}/year · Renews ${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        renewalEl.textContent = renewalText;
+      }
+
+      // Expiry warning color
+      if (state.subscription.daysLeft <= 7) {
+        daysEl.style.color = '#EF4444';
+      } else if (state.subscription.daysLeft <= 30) {
+        daysEl.style.color = '#F59E0B';
+      }
     } else {
-      const renewalDate = new Date('2027-01-14T00:00:00');
-      const daysLeft    = Math.max(0, Math.ceil((renewalDate - Date.now()) / 86400000));
-      daysEl.textContent = `${daysLeft} days`;
+      // Fallback — no subscription yet (order pending)
+      if (state.orderSummary) {
+        daysEl.textContent = 'Activates on delivery';
+        daysEl.style.color = '#00A2E8';
+        if (renewalEl) renewalEl.textContent = `Order ${state.orderSummary.orderNumber} · In progress`;
+      } else {
+        daysEl.textContent = '—';
+        if (renewalEl) renewalEl.textContent = 'No active subscription';
+      }
     }
+
+    // Order tracking section update karo
+    _renderOrderTrackingCard();
+  }
+
+  // ────────── ORDER TRACKING CARD ──────────
+  function _renderOrderTrackingCard() {
+    const container = document.getElementById('order-tracking-card');
+    if (!container || !state.orderSummary) return;
+
+    const o       = state.orderSummary;
+    const events  = o.events || [];
+    const lastEv  = events[events.length - 1];
+    const progress = o.progress || 0;
+
+    container.innerHTML = `
+      <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📦 Order Status</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">${o.orderNumber || '—'}</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);margin-top:2px;">${lastEv?.event_label || _statusLabel(o.manufacturingStatus)}</div>
+        </div>
+        <div style="font-size:0.72rem;padding:3px 8px;border-radius:6px;font-weight:700;font-family:'Space Grotesk',sans-serif;${_statusBadge(o.manufacturingStatus)}">${_statusLabel(o.manufacturingStatus).toUpperCase()}</div>
+      </div>
+      <div style="width:100%;height:4px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;margin-bottom:8px;">
+        <div style="width:${progress}%;height:100%;background:linear-gradient(90deg,#00A2E8,#22C55E);border-radius:4px;transition:width 0.8s ease;"></div>
+      </div>
+      ${o.plateId ? `<div style="font-size:0.72rem;color:rgba(255,255,255,0.4);">Plate ID: <span style="color:#00A2E8;font-weight:700;font-family:'Space Grotesk',sans-serif;">${o.plateId}</span></div>` : ''}
+    `;
+  }
+
+  function _statusLabel(status) {
+    const labels = {
+      queued:       'In Queue',
+      in_production:'In Production',
+      packed:       'Packed',
+      dispatched:   'Shipped',
+      delivered:    'Delivered',
+    };
+    return labels[status] || status || 'Processing';
+  }
+
+  function _statusBadge(status) {
+    if (status === 'delivered')    return 'background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#22C55E;';
+    if (status === 'dispatched')   return 'background:rgba(0,162,232,0.15);border:1px solid rgba(0,162,232,0.3);color:#00A2E8;';
+    if (status === 'in_production') return 'background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#F59E0B;';
+    return 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);';
   }
 
   // ────────── TOAST ──────────
