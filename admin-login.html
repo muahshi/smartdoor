@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Door — Admin Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0A0F1C;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --accent: #FF4500;
+      --accent2: #FF6B35;
+      --text: #F0F4FF;
+      --muted: #7B8BB2;
+    }
+    body {
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 0%, rgba(255,69,0,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 40% at 80% 100%, rgba(255,107,53,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 32px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; }
+    .badge {
+      display: inline-block;
+      background: rgba(255,69,0,0.15);
+      border: 1px solid rgba(255,69,0,0.3);
+      color: var(--accent2);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      padding: 3px 8px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    p.sub { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .field { margin-bottom: 16px; }
+    input[type=email], input[type=password], input[type=text] {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus { border-color: rgba(255,69,0,0.5); }
+    .totp-row {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,193,7,0.08);
+      border: 1px solid rgba(255,193,7,0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #FFC107;
+    }
+    .totp-row.show { display: flex; }
+    .btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg {
+      display: none;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #FCA5A5;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .error-msg.show { display: block; }
+    .footer-note {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">🔐</div>
+    <span class="logo-text">Smart Door</span>
+  </div>
+  <div class="badge">⚡ Admin Super Panel</div>
+
+  <h1>Staff Access Only</h1>
+  <p class="sub">Restricted to authorised Smart Door team members.</p>
+
+  <div id="errorMsg" class="error-msg"></div>
+
+  <div class="field">
+    <label>Work Email</label>
+    <input type="email" id="email" placeholder="you@smartdoor.in" autocomplete="email">
+  </div>
+
+  <div class="field">
+    <label>Password</label>
+    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+
+  <div class="totp-row" id="totpRow">
+    🔑 <div style="flex:1">
+      <div style="font-weight:600;margin-bottom:4px">2FA Required</div>
+      <input type="text" id="totpCode" placeholder="Enter 6-digit code" maxlength="6" style="background:transparent;border:none;outline:none;color:#FFC107;font-size:18px;letter-spacing:4px;width:100%;font-family:monospace">
+    </div>
+  </div>
+
+  <button class="btn" id="loginBtn" onclick="handleLogin()">Sign In to Admin Panel</button>
+
+  <div class="footer-note">
+    🔒 All admin actions are logged and monitored.<br>
+    Unauthorized access is a violation of Smart Door policy.
+  </div>
+</div>
+
+<script type="module">
+  import { adminLogin, getAdminSession } from './services/admin.js';
+
+  // If already logged in, redirect
+  const existingSession = getAdminSession();
+  if (existingSession) {
+    window.location.href = '/admin.html';
+  }
+
+  window.handleLogin = async function() {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const totpCode = document.getElementById('totpCode').value.trim();
+    const btn = document.getElementById('loginBtn');
+    const errEl = document.getElementById('errorMsg');
+
+    if (!email || !password) {
+      showError('Please enter your email and password.');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    errEl.classList.remove('show');
+
+    const result = await adminLogin(email, password, totpCode || null);
+
+    if (result.success) {
+      btn.textContent = '✓ Redirecting…';
+      setTimeout(() => { window.location.href = '/admin.html'; }, 400);
+    } else {
+      // Check if 2FA required
+      if (result.requires2FA) {
+        document.getElementById('totpRow').classList.add('show');
+        document.getElementById('totpCode').focus();
+        showError('2FA code required. Check your authenticator app.');
+      } else {
+        showError(result.error || 'Login failed. Please try again.');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Admin Panel';
+    }
+  };
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  // Enter key support
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.handleLogin();
+  });
+</script>
+
+</body>
+</html>
