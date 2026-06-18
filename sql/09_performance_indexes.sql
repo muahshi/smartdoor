@@ -4,7 +4,7 @@
 --
 -- Run AFTER all previous migrations (01–08).
 -- Additive only — safe to run on existing data.
--- Estimated execution time on 100k rows: < 30 seconds (CONCURRENTLY).
+-- Estimated execution time on 100k rows: < 60 seconds.
 -- ============================================================
 
 -- ────────────────────────────────────────────────────────────
@@ -12,41 +12,41 @@
 -- ────────────────────────────────────────────────────────────
 
 -- users — plate_id is the primary lookup key for login
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_plate_id
+CREATE INDEX IF NOT EXISTS idx_users_plate_id
   ON users(plate_id);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_phone
+CREATE INDEX IF NOT EXISTS idx_users_phone
   ON users(phone);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email
+CREATE INDEX IF NOT EXISTS idx_users_email
   ON users(email)
   WHERE email IS NOT NULL;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_auth_user_id
+CREATE INDEX IF NOT EXISTS idx_users_auth_user_id
   ON users(auth_user_id)
   WHERE auth_user_id IS NOT NULL;
 
 -- plates — qr_slug is hit on every QR scan (highest traffic query)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_plates_qr_slug
+CREATE INDEX IF NOT EXISTS idx_plates_qr_slug
   ON plates(qr_slug);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_plates_owner_id
+CREATE INDEX IF NOT EXISTS idx_plates_owner_id
   ON plates(owner_id);
 
 -- Partial index: active plates only (most QR lookups filter status='active')
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_plates_qr_slug_active
+CREATE INDEX IF NOT EXISTS idx_plates_qr_slug_active
   ON plates(qr_slug)
   WHERE status = 'active';
 
 -- subscriptions — frequently queried by owner + status
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_subscriptions_owner_id
+CREATE INDEX IF NOT EXISTS idx_subscriptions_owner_id
   ON subscriptions(owner_id);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_subscriptions_owner_active
+CREATE INDEX IF NOT EXISTS idx_subscriptions_owner_active
   ON subscriptions(owner_id, status)
   WHERE status = 'active';
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_subscriptions_expiry_date
+CREATE INDEX IF NOT EXISTS idx_subscriptions_expiry_date
   ON subscriptions(expiry_date)
   WHERE status = 'active';
 
@@ -55,19 +55,19 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_subscriptions_expiry_date
 -- ────────────────────────────────────────────────────────────
 
 -- Dashboard live feed: owner_id + created_at DESC
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_visitor_logs_owner_created
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_owner_created
   ON visitor_logs(owner_id, created_at DESC);
 
 -- Event type filtering (stats queries)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_visitor_logs_owner_event_type
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_owner_event_type
   ON visitor_logs(owner_id, event_type, created_at DESC);
 
 -- plate_id lookup (for visitor-side rate limiting)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_visitor_logs_plate_id
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_plate_id
   ON visitor_logs(plate_id, created_at DESC);
 
 -- AI intent analytics
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_visitor_logs_ai_intent
+CREATE INDEX IF NOT EXISTS idx_visitor_logs_ai_intent
   ON visitor_logs(owner_id, ai_intent)
   WHERE ai_intent IS NOT NULL;
 
@@ -75,11 +75,11 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_visitor_logs_ai_intent
 -- SECTION 3: VOICE NOTES
 -- ────────────────────────────────────────────────────────────
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_voice_notes_owner_created
+CREATE INDEX IF NOT EXISTS idx_voice_notes_owner_created
   ON voice_notes(owner_id, created_at DESC);
 
 -- Unheard notes badge count
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_voice_notes_owner_unheard
+CREATE INDEX IF NOT EXISTS idx_voice_notes_owner_unheard
   ON voice_notes(owner_id, is_heard)
   WHERE is_heard = FALSE;
 
@@ -87,7 +87,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_voice_notes_owner_unheard
 -- SECTION 4: FAMILY MEMBERS
 -- ────────────────────────────────────────────────────────────
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_family_members_owner_priority
+CREATE INDEX IF NOT EXISTS idx_family_members_owner_priority
   ON family_members(owner_id, priority ASC)
   WHERE is_active = TRUE;
 
@@ -97,27 +97,27 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_family_members_owner_priority
 
 -- One row per owner — unique constraint already exists via UNIQUE column,
 -- but a covering index speeds up QR visitor lookup
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_security_rules_owner_id
+CREATE INDEX IF NOT EXISTS idx_security_rules_owner_id
   ON security_rules(owner_id);
 
 -- ────────────────────────────────────────────────────────────
 -- SECTION 6: COMMUNICATION TABLES
 -- ────────────────────────────────────────────────────────────
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_call_logs_owner_created
+CREATE INDEX IF NOT EXISTS idx_call_logs_owner_created
   ON call_logs(owner_id, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_call_logs_plate_id
+CREATE INDEX IF NOT EXISTS idx_call_logs_plate_id
   ON call_logs(plate_id, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_call_logs_status
+CREATE INDEX IF NOT EXISTS idx_call_logs_status
   ON call_logs(call_status)
   WHERE call_status IN ('initiated', 'ringing', 'in_progress');
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_message_logs_owner_created
+CREATE INDEX IF NOT EXISTS idx_message_logs_owner_created
   ON message_logs(owner_id, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_message_logs_plate_type
+CREATE INDEX IF NOT EXISTS idx_message_logs_plate_type
   ON message_logs(plate_id, message_type, created_at DESC);
 
 -- ────────────────────────────────────────────────────────────
@@ -125,58 +125,58 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_message_logs_plate_type
 -- ────────────────────────────────────────────────────────────
 
 -- check_rate_limit() RPC uses plate_id + action_type + created_at
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_rate_limit_events_lookup
+CREATE INDEX IF NOT EXISTS idx_rate_limit_events_lookup
   ON rate_limit_events(plate_id, action_type, created_at DESC);
 
 -- ────────────────────────────────────────────────────────────
 -- SECTION 8: COMMERCE / ORDERS
 -- ────────────────────────────────────────────────────────────
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_owner_id
+CREATE INDEX IF NOT EXISTS idx_orders_owner_id
   ON orders(owner_id);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_payment_status
+CREATE INDEX IF NOT EXISTS idx_orders_payment_status
   ON orders(payment_status, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_customer_email
+CREATE INDEX IF NOT EXISTS idx_orders_customer_email
   ON orders(customer_email, created_at DESC)
   WHERE customer_email IS NOT NULL;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_order_number
+CREATE INDEX IF NOT EXISTS idx_orders_order_number
   ON orders(order_number);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_order_id
+CREATE INDEX IF NOT EXISTS idx_payments_order_id
   ON payments(order_id);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_provider_payment_id
+CREATE INDEX IF NOT EXISTS idx_payments_provider_payment_id
   ON payments(provider_payment_id)
   WHERE provider_payment_id IS NOT NULL;
 
 -- Idempotency: one captured payment per provider_payment_id
-CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS idx_payments_captured_unique
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_captured_unique
   ON payments(provider_payment_id)
   WHERE status = 'captured' AND provider_payment_id IS NOT NULL;
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tracking_events_order_id
+CREATE INDEX IF NOT EXISTS idx_tracking_events_order_id
   ON tracking_events(order_id, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_manufacturing_order_id
+CREATE INDEX IF NOT EXISTS idx_manufacturing_order_id
   ON manufacturing(order_id);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_manufacturing_status
+CREATE INDEX IF NOT EXISTS idx_manufacturing_status
   ON manufacturing(production_status, created_at DESC);
 
 -- ────────────────────────────────────────────────────────────
 -- SECTION 9: AUDIT / NOTIFICATIONS
 -- ────────────────────────────────────────────────────────────
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_owner_action
+CREATE INDEX IF NOT EXISTS idx_audit_logs_owner_action
   ON audit_logs(owner_id, action, created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_created_at
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
   ON audit_logs(created_at DESC);
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notifications_owner_unread
+CREATE INDEX IF NOT EXISTS idx_notifications_owner_unread
   ON notifications(owner_id, is_read, created_at DESC)
   WHERE is_read = FALSE;
 
