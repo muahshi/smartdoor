@@ -216,39 +216,71 @@ CREATE INDEX IF NOT EXISTS idx_error_logs_category_created
 -- ────────────────────────────────────────────────────────────
 
 -- Ensure PIN hash is never stored as plain text (must be bcrypt: starts with $2)
-ALTER TABLE users
-  ADD CONSTRAINT IF NOT EXISTS chk_users_pin_hash_bcrypt
-  CHECK (pin_hash = 'UNSET' OR pin_hash LIKE '$2%');
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_users_pin_hash_bcrypt'
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT chk_users_pin_hash_bcrypt
+      CHECK (pin_hash = 'UNSET' OR pin_hash LIKE '$2%');
+  END IF;
+END $$;
 
 -- Ensure product_type is always one of valid values
-ALTER TABLE orders
-  ADD CONSTRAINT IF NOT EXISTS chk_orders_product_type
-  CHECK (product_type IN ('acrylic', 'stainless', 'teakwood'));
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_orders_product_type'
+  ) THEN
+    ALTER TABLE orders ADD CONSTRAINT chk_orders_product_type
+      CHECK (product_type IN ('acrylic', 'stainless', 'teakwood'));
+  END IF;
+END $$;
 
-ALTER TABLE plates
-  ADD CONSTRAINT IF NOT EXISTS chk_plates_product_type
-  CHECK (product_type IN ('acrylic', 'stainless', 'teakwood'));
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_plates_product_type'
+  ) THEN
+    ALTER TABLE plates ADD CONSTRAINT chk_plates_product_type
+      CHECK (product_type IN ('acrylic', 'stainless', 'teakwood'));
+  END IF;
+END $$;
 
 -- Ensure payment amounts are positive
-ALTER TABLE payments
-  ADD CONSTRAINT IF NOT EXISTS chk_payments_amount_positive
-  CHECK (amount > 0);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_payments_amount_positive'
+  ) THEN
+    ALTER TABLE payments ADD CONSTRAINT chk_payments_amount_positive
+      CHECK (amount > 0);
+  END IF;
+END $$;
 
-ALTER TABLE orders
-  ADD CONSTRAINT IF NOT EXISTS chk_orders_total_positive
-  CHECK (total_amount > 0);
-
--- Ensure subscription expiry is in the future when created
--- (Soft constraint — triggers not used to keep things simple)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_orders_total_positive'
+  ) THEN
+    ALTER TABLE orders ADD CONSTRAINT chk_orders_total_positive
+      CHECK (total_amount > 0);
+  END IF;
+END $$;
 
 -- Ensure plate_id format: SD-XXXXXX
-ALTER TABLE plates
-  ADD CONSTRAINT IF NOT EXISTS chk_plates_plate_id_format
-  CHECK (plate_id ~ '^SD-[A-Z0-9]{6}$');
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_plates_plate_id_format'
+  ) THEN
+    ALTER TABLE plates ADD CONSTRAINT chk_plates_plate_id_format
+      CHECK (plate_id ~ '^SD-[A-Z0-9]{6}$');
+  END IF;
+END $$;
 
-ALTER TABLE users
-  ADD CONSTRAINT IF NOT EXISTS chk_users_plate_id_format
-  CHECK (plate_id ~ '^SD-[A-Z0-9]{6}$' OR plate_id IS NULL);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_users_plate_id_format'
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT chk_users_plate_id_format
+      CHECK (plate_id ~ '^SD-[A-Z0-9]{6}$' OR plate_id IS NULL);
+  END IF;
+END $$;
 
 -- ────────────────────────────────────────────────────────────
 -- SECTION 12: QUERY OPTIMIZATION — STATISTICS

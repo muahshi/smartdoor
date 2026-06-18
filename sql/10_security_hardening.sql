@@ -228,24 +228,29 @@ CREATE POLICY "admin_revocations_no_public" ON admin_session_revocations
 
 -- Add CHECK constraint to audit_logs.action (allow-listed actions)
 -- NOTE: Add new actions to this list before using them in code.
-ALTER TABLE audit_logs
-  ADD CONSTRAINT IF NOT EXISTS chk_audit_action
-  CHECK (action IN (
-    'login', 'logout',
-    'pin_changed', 'pin_failed', 'pin_locked',
-    'qr_regenerated', 'qr_viewed',
-    'subscription_activated', 'subscription_renewed', 'subscription_cancelled',
-    'order_placed', 'order_cancelled',
-    'payment_initiated', 'payment_verified', 'payment_failed', 'refund_issued',
-    'family_member_added', 'family_member_removed', 'family_member_updated',
-    'security_rules_updated', 'status_changed',
-    'voice_note_heard', 'voice_note_deleted',
-    'call_ended', 'call_initiated',
-    'support_ticket_created', 'support_ticket_resolved',
-    'admin_action', 'admin_login', 'admin_logout',
-    'plate_activated', 'plate_suspended',
-    'data_export_requested', 'account_deleted'
-  ));
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_audit_action'
+  ) THEN
+    ALTER TABLE audit_logs ADD CONSTRAINT chk_audit_action
+      CHECK (action IN (
+        'login', 'logout',
+        'pin_changed', 'pin_failed', 'pin_locked',
+        'qr_regenerated', 'qr_viewed',
+        'subscription_activated', 'subscription_renewed', 'subscription_cancelled',
+        'order_placed', 'order_cancelled',
+        'payment_initiated', 'payment_verified', 'payment_failed', 'refund_issued',
+        'family_member_added', 'family_member_removed', 'family_member_updated',
+        'security_rules_updated', 'status_changed',
+        'voice_note_heard', 'voice_note_deleted',
+        'call_ended', 'call_initiated',
+        'support_ticket_created', 'support_ticket_resolved',
+        'admin_action', 'admin_login', 'admin_logout',
+        'plate_activated', 'plate_suspended',
+        'data_export_requested', 'account_deleted'
+      ));
+  END IF;
+END $$;
 
 -- ────────────────────────────────────────────────────────────
 -- SECTION 6: DATA RETENTION POLICIES
