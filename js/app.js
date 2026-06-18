@@ -1,8 +1,22 @@
 /**
  * Smart Door — Main App Module
  * Visitor PWA + Owner Dashboard Interactions
- * app.js v1.0
+ * app.js v2.0 — Communication Engine Connected
+ *
+ * UI markup/behavior is unchanged from v1.0. The "visitor preview" buttons
+ * (Call / Bell / Voice / SOS / AI chat) now drive the real Phase 5
+ * communication services when the page is loaded in an authenticated
+ * owner session (the normal case for app.html), and fall back to the
+ * original purely-visual simulation if that context isn't available yet
+ * (e.g. a brief moment before auth resolves).
  */
+
+import { getCurrentOwner } from './services/auth.js';
+import { getFamilyMembers } from './services/security.js';
+import { logEvent } from './services/logs.js';
+import { initiateMaskedCall, endMaskedCall, sendTextMessage, triggerEmergency } from './services/communication.js';
+import { VoiceRecorder, uploadVoiceNote } from './services/voiceNotes.js';
+import { notifyBellRing } from './services/notifications.js';
 
 // ────────── PWA REGISTRATION ──────────
 if ('serviceWorker' in navigator) {
@@ -24,7 +38,37 @@ const AppState = {
   isRecording: false,
   nightModeActive: false,
   installPrompt: null,
+  // Phase 5 — Communication Engine context
+  ownerId: null,
+  plateId: null,
+  familyMembers: [],
+  activeCallId: null,
+  callStartedAt: null,
+  voiceRecorder: null,
 };
+
+// ────────── COMMUNICATION CONTEXT (Phase 5) ──────────
+/**
+ * Loads the real owner/plate/family context so the preview buttons can
+ * drive actual backend calls. Silent no-op if not authenticated — the
+ * buttons simply fall back to their original visual-only simulation.
+ */
+async function _loadCommContext() {
+  try {
+    const owner = await getCurrentOwner();
+    if (!owner) return;
+    AppState.ownerId = owner.id;
+    AppState.ownerName = owner.full_name || AppState.ownerName;
+    AppState.plateId = owner.plate_id;
+
+    const familyResult = await getFamilyMembers(owner.id);
+    if (familyResult.success) {
+      AppState.familyMembers = familyResult.members || [];
+    }
+  } catch (err) {
+    console.warn('[SmartDoor] Communication context unavailable, using preview-only mode:', err.message);
+  }
+}
 
 // ────────── DOM READY ──────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,6 +85,7 @@ function initApp() {
   checkNightMode();
   setupPWAInstall();
   animateOnLoad();
+  _loadCommContext(); // Phase 5 — fire-and-forget, buttons fall back gracefully until this resolves
   console.log('[SmartDoor] App initialized');
 }
 
@@ -97,9 +142,11 @@ function setupCallButton() {
 
 function triggerCall() {
   AppState.isCallActive = true;
+  AppState.callStartedAt = Date.now();
   showModal('call-modal');
 
-  // Simulate call routing animation
+  // Simulate call routing animation (kept exactly as before — this is what
+  // the visitor sees while the real masked call is being set up behind the scenes)
   const steps = [
     { text: '🔐 Encrypting your identity...', delay: 0 },
     { text: '☁️ Connecting via cloud telephony...', delay: 1200 },
@@ -119,14 +166,42 @@ function triggerCall() {
       }
     }, delay);
   });
+
+  // Phase 5 — real masked call via the communication engine (rate-limited,
+  // provider fallback, owner notification, call_logs row). Runs in parallel
+  // with the visual simulation above; failures here don't interrupt the UI.
+  if (AppState.ownerId && AppState.plateId) {
+    initiateMaskedCall({ plateId: AppState.plateId, ownerId: AppState.ownerId })
+      .then((result) => {
+        if (result.success) {
+          AppState.activeCallId = result.callId;
+        } else if (result.rateLimited) {
+          if (statusEl) statusEl.textContent = '⏳ ' + result.error;
+        } else {
+          console.warn('[SmartDoor] Masked call backend error:', result.error);
+        }
+      })
+      .catch((err) => console.error('[SmartDoor] initiateMaskedCall failed:', err));
+  }
 }
 
 function endCall() {
   AppState.isCallActive = false;
   closeModal('call-modal');
-  if (window.DashboardModule) {
-    DashboardModule.addLog('Masked call completed (45 sec)', 'call', '#22C55E');
+
+  const durationSecs = AppState.callStartedAt ? Math.round((Date.now() - AppState.callStartedAt) / 1000) : 45;
+
+  if (AppState.activeCallId && AppState.ownerId) {
+    endMaskedCall(AppState.activeCallId, AppState.ownerId, durationSecs).catch((err) =>
+      console.error('[SmartDoor] endMaskedCall failed:', err)
+    );
+    AppState.activeCallId = null;
+  } else if (window.DashboardModule) {
+    // Preview-only fallback (no backend context yet)
+    DashboardModule.addLog(`Masked call completed (${durationSecs} sec)`, 'call', '#22C55E');
   }
+
+  AppState.callStartedAt = null;
 }
 
 // ────────── BELL BUTTON ──────────
@@ -157,8 +232,13 @@ function triggerBell() {
   // Play bell sound (simulate)
   playBellSound();
 
-  // Log it
-  if (window.DashboardModule) {
+  // Phase 5 — real bell ring: logged to visitor_logs (existing activity feed
+  // + stats) and dispatched through the notification engine.
+  if (AppState.ownerId && AppState.plateId) {
+    logEvent({ ownerId: AppState.ownerId, plateId: AppState.plateId, eventType: 'bell_ring' }).catch(console.error);
+    notifyBellRing(AppState.ownerId, AppState.plateId).catch(console.error);
+    if (window.DashboardModule) DashboardModule.showToast('🔔 Bell rung! Notifying owner...', 'warning');
+  } else if (window.DashboardModule) {
     DashboardModule.addLog('Digital Bell Rung by visitor', 'bell', '#F59E0B');
     DashboardModule.showToast('🔔 Bell rung! Notifying owner...', 'warning');
   }
@@ -205,8 +285,9 @@ function setupVoiceButton() {
   const voiceBtn = document.getElementById('btn-voice');
   if (!voiceBtn) return;
 
-  let recordingTimer = null;
+  let fallbackTimer = null;
   let seconds = 0;
+  let recorder = null;
 
   voiceBtn.addEventListener('click', () => {
     if (!AppState.isRecording) {
@@ -216,7 +297,7 @@ function setupVoiceButton() {
     }
   });
 
-  function startRecording() {
+  async function startRecording() {
     AppState.isRecording = true;
     seconds = 0;
 
@@ -225,21 +306,33 @@ function setupVoiceButton() {
 
     const timerEl = document.getElementById('voice-timer');
     const statusEl = document.getElementById('voice-status');
-
     if (statusEl) statusEl.textContent = '🔴 Recording... Tap to stop';
 
-    recordingTimer = setInterval(() => {
-      seconds++;
-      if (timerEl) timerEl.textContent = `${seconds}s`;
-      if (seconds >= 10) {
-        stopRecording();
-      }
-    }, 1000);
+    // Phase 5 — try a real microphone recording first. Falls back to a
+    // visual-only timer (no audio captured) if mic access is unavailable
+    // or denied, so the UI still behaves sensibly either way.
+    try {
+      recorder = await VoiceRecorder.start({
+        onTick: (s) => {
+          seconds = s;
+          if (timerEl) timerEl.textContent = `${s}s`;
+          if (s >= 10) stopRecording();
+        },
+      });
+    } catch (err) {
+      console.warn('[SmartDoor] Mic unavailable, using visual-only voice note:', err.message);
+      recorder = null;
+      fallbackTimer = setInterval(() => {
+        seconds++;
+        if (timerEl) timerEl.textContent = `${seconds}s`;
+        if (seconds >= 10) stopRecording();
+      }, 1000);
+    }
   }
 
-  function stopRecording() {
+  async function stopRecording() {
     AppState.isRecording = false;
-    clearInterval(recordingTimer);
+    clearInterval(fallbackTimer);
 
     voiceBtn.style.background = '';
     voiceBtn.style.animation = '';
@@ -247,10 +340,28 @@ function setupVoiceButton() {
     const statusEl = document.getElementById('voice-status');
     if (statusEl) statusEl.textContent = '✅ Voice note sent!';
 
-    if (window.DashboardModule) {
+    if (recorder && AppState.ownerId && AppState.plateId) {
+      try {
+        const { blob, durationSecs, mimeType } = await recorder.stop();
+        const result = await uploadVoiceNote({ blob, durationSecs, mimeType, ownerId: AppState.ownerId, plateId: AppState.plateId });
+        if (result.success) {
+          if (window.DashboardModule) DashboardModule.showToast('🎤 Voice note delivered to owner!', 'success');
+        } else if (result.rateLimited) {
+          if (statusEl) statusEl.textContent = '⏳ ' + result.error;
+        } else {
+          console.warn('[SmartDoor] Voice note upload failed:', result.error);
+          if (window.DashboardModule) DashboardModule.showToast('Voice note could not be delivered', 'danger');
+        }
+      } catch (err) {
+        console.error('[SmartDoor] Voice note recording failed:', err);
+      }
+    } else if (window.DashboardModule) {
+      // Preview-only fallback (no mic / no backend context)
       DashboardModule.addLog(`Voice Message Left (${seconds} sec)`, 'voice', '#22C55E');
       DashboardModule.showToast('🎤 Voice note delivered to owner!', 'success');
     }
+
+    recorder = null;
 
     setTimeout(() => {
       if (statusEl) statusEl.textContent = '🎤 Tap to record (max 10s)';
@@ -321,7 +432,21 @@ function triggerSOS() {
 
   showModal('sos-active-modal');
 
-  if (window.DashboardModule) {
+  // Phase 5 — real emergency broadcast: bypasses DND/Night Mode, notifies
+  // every active family member in priority order, logged to message_logs + audit_logs.
+  if (AppState.ownerId && AppState.plateId) {
+    triggerEmergency({ ownerId: AppState.ownerId, plateId: AppState.plateId, familyMembers: AppState.familyMembers })
+      .then((result) => {
+        if (window.DashboardModule) {
+          if (result.success) {
+            DashboardModule.showToast(`🚨 SOS Alert sent — ${result.membersNotified}/${result.totalMembers} family members notified!`, 'danger');
+          } else if (result.rateLimited) {
+            DashboardModule.showToast(result.error, 'warning');
+          }
+        }
+      })
+      .catch((err) => console.error('[SmartDoor] triggerEmergency failed:', err));
+  } else if (window.DashboardModule) {
     DashboardModule.addLog('🚨 SOS EMERGENCY TRIGGERED', 'sos', '#EF4444');
     DashboardModule.showToast('🚨 SOS Alert sent to all family members!', 'danger');
   }
@@ -370,6 +495,22 @@ function setupAIAssistant() {
         } else if (d.priority === 'Critical') {
           showPriorityAccessOverlay(d.response);
           highlightSOS();
+        }
+
+        // Phase 5 — log every visitor text message; escalate critical intents
+        // through the same emergency broadcast SOS uses.
+        if (AppState.ownerId && AppState.plateId) {
+          const isCritical = d.priority === 'Critical';
+          sendTextMessage({
+            ownerId: AppState.ownerId,
+            plateId: AppState.plateId,
+            content: text,
+            messageType: isCritical ? 'emergency' : 'text',
+          }).catch(console.error);
+
+          if (isCritical) {
+            triggerEmergency({ ownerId: AppState.ownerId, plateId: AppState.plateId, familyMembers: AppState.familyMembers }).catch(console.error);
+          }
         }
 
         // Log it
@@ -593,6 +734,7 @@ document.addEventListener('click', (e) => {
 window.endCall = endCall;
 window.closeModal = closeModal;
 window.showModal = showModal;
+window.triggerSOS = triggerSOS; // app.js is now an ES module — top-level functions aren't global by default
 
 // ────────── NIGHT MODE CHECK ──────────
 function checkNightMode() {

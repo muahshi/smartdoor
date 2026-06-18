@@ -17,6 +17,8 @@ import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from 
 import { getLogs, getTodayStats, getWeeklyData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from './services/logs.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from './services/security.js';
 import { getSubscription } from './services/subscriptions.js';
+import { getCommunicationLogs, subscribeToCommunicationLogs } from './services/communication.js';
+import { getVoiceNoteUrl } from './services/voiceNotes.js';
 
 const DashboardModule = (() => {
   // ────────── STATE ──────────
@@ -98,18 +100,28 @@ const DashboardModule = (() => {
   async function _loadAllData() {
     const ownerId = state.owner.id;
 
-    const [logsResult, statsResult, weeklyResult, rulesResult, familyResult, subResult] = await Promise.allSettled([
+    const [logsResult, statsResult, weeklyResult, rulesResult, familyResult, subResult, commsResult] = await Promise.allSettled([
       getLogs(ownerId, { limit: 20 }),
       getTodayStats(ownerId),
       getWeeklyData(ownerId),
       getSecurityRules(ownerId),
       getFamilyMembers(ownerId),
       getSubscription(ownerId),
+      getCommunicationLogs(ownerId, { limit: 20 }),
     ]);
 
     // Visitor logs
     if (logsResult.status === 'fulfilled' && logsResult.value.success) {
       state.visitorLogs = logsResult.value.logs.map(formatLogForDisplay);
+    }
+
+    // Communication logs (call history, voice notes, messages, emergency alerts)
+    // — merged into the same unified timeline the dashboard already renders
+    // via #visitor-logs / #security-timeline, newest first.
+    if (commsResult.status === 'fulfilled' && commsResult.value.success) {
+      state.visitorLogs = [...state.visitorLogs, ...commsResult.value.logs]
+        .sort((a, b) => new Date(b.raw.created_at) - new Date(a.raw.created_at))
+        .slice(0, 20);
     }
 
     // Stats
@@ -192,7 +204,28 @@ const DashboardModule = (() => {
       setTimeout(() => { document.body.style.background = ''; }, 2000);
     });
 
-    state._realtimeUnsubs = [unsubLogs, unsubSOS];
+    // Communication engine: call history + voice notes + messages + emergency alerts
+    const unsubComms = subscribeToCommunicationLogs(ownerId, (formatted, kind) => {
+      state.visitorLogs.unshift(formatted);
+      if (state.visitorLogs.length > 20) state.visitorLogs.pop();
+      renderVisitorLogs();
+      setupSecurityTimeline();
+
+      if (kind === 'call') {
+        if (formatted.raw.call_status === 'completed') _bumpStat('call_attempt');
+        showToast(`${formatted.icon} ${formatted.event}`, formatted.raw.call_status === 'completed' ? 'success' : 'info');
+      } else if (kind === 'message') {
+        const isEmergency = formatted.raw.message_type === 'emergency';
+        if (!isEmergency) _bumpStat('voice_message');
+        showToast(`${formatted.icon} ${formatted.event}`, isEmergency ? 'danger' : 'success');
+        if (isEmergency) {
+          document.body.style.background = 'rgba(239,68,68,0.1)';
+          setTimeout(() => { document.body.style.background = ''; }, 2000);
+        }
+      }
+    });
+
+    state._realtimeUnsubs = [unsubLogs, unsubSOS, unsubComms];
   }
 
   function _bumpStat(eventType) {
@@ -721,6 +754,17 @@ const DashboardModule = (() => {
     }, 3000);
   }
 
+  // ────────── VOICE NOTE PLAYBACK ──────────
+  async function playVoiceNote(storagePath) {
+    const result = await getVoiceNoteUrl(storagePath);
+    if (!result.success) {
+      showToast('Could not load voice note', 'danger');
+      return;
+    }
+    const audio = new Audio(result.url);
+    audio.play().catch(() => showToast('Playback failed', 'danger'));
+  }
+
   // ────────── PUBLIC API ──────────
   return {
     init,
@@ -728,6 +772,7 @@ const DashboardModule = (() => {
     showToast,
     removeMember,
     setChartRange,
+    playVoiceNote,
     getState: () => ({ ...state }),
   };
 })();
