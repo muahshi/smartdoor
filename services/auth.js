@@ -37,10 +37,11 @@ export async function loginOwner(plateId, pin, rememberDevice = false) {
       };
     }
 
-    // Edge function returns a short-lived magic token → sign in with it
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,       // Edge function provides synthetic email
-      password: data.token,    // Short-lived token from server
+    // Edge function returns a hashed magic-link token → verify via OTP flow
+    const { data: authData, error: authError } = await supabase.auth.verifyOtp({
+      email:      data.email,
+      token:      data.token,   // hashed_token from generateLink
+      type:       'magiclink',
     });
 
     if (authError) {
