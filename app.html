@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="Smart Door PWA — Visitor & Owner Dashboard" />
+  <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#081321" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -412,13 +413,9 @@
 
 <body>
 
-<!-- CONFIG: Injected at build time or by server — required by services/supabase.js -->
-<script>
-  window.__SD_CONFIG__ = {
-    supabaseUrl:  'YOUR_SUPABASE_URL',   // Replace
-    supabaseAnon: 'YOUR_SUPABASE_ANON_KEY', // Replace
-  };
-</script>
+<!-- CONFIG: Generated at Vercel build time by scripts/build-env.js — DO NOT hardcode keys here -->
+<script src="config/env.generated.js"></script>
+<script type="module" src="js/monitoring-bootstrap.js"></script>
 
 <!-- ════════════════════════════════════════
      DESKTOP HEADER (shown on desktop only)
