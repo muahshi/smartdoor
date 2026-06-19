@@ -70,6 +70,12 @@ export async function createShipment({ orderId, customerName, phone, email, addr
       case 'delhivery':
         result = await _createDelhivery({ orderId, customerName, phone, email, address, productType, weight });
         break;
+      case 'bluedart':
+        result = await _createBlueDart({ orderId, customerName, phone, email, address, productType, weight });
+        break;
+      case 'dtdc':
+        result = await _createDtdc({ orderId, customerName, phone, email, address, productType, weight });
+        break;
       case 'manual':
       default:
         result = await _createManual({ orderId, customerName });
@@ -254,6 +260,31 @@ async function _createDelhivery({ orderId, customerName, phone, address, weight 
     trackingUrl:       `https://www.delhivery.com/track/package/${orderId}`,
     estimatedDelivery: _addBusinessDays(new Date(), 4).toISOString(),
     note:              'Delhivery integration pending. Set DELHIVERY_TOKEN.',
+  };
+}
+
+async function _createBlueDart({ orderId, customerName, phone, address, weight }) {
+  // TODO: Implement BlueDart API
+  // POST /Ver1.9/ShippingAPI/CreateShipment
+  // Requires: BLUEDART_LICENSE_KEY, BLUEDART_LOGIN_ID env vars
+  // Auth: JW Token generated per request via GenerateJWTAuth
+  return {
+    awbNumber:         `BD-PENDING-${orderId.slice(0, 8).toUpperCase()}`,
+    trackingUrl:       `https://www.bluedart.com/tracking/${orderId}`,
+    estimatedDelivery: _addBusinessDays(new Date(), 3).toISOString(),
+    note:              'BlueDart integration pending. Set BLUEDART_LICENSE_KEY and BLUEDART_LOGIN_ID.',
+  };
+}
+
+async function _createDtdc({ orderId, customerName, phone, address, weight }) {
+  // TODO: Implement DTDC API
+  // POST https://blktracksvc.dtdc.com/dtdc-api/api/customer/integration/consignment/softdata
+  // Requires: DTDC_API_KEY, DTDC_CUSTOMER_CODE env vars
+  return {
+    awbNumber:         `DT-PENDING-${orderId.slice(0, 8).toUpperCase()}`,
+    trackingUrl:       `https://www.dtdc.in/tracking/${orderId}`,
+    estimatedDelivery: _addBusinessDays(new Date(), 5).toISOString(),
+    note:              'DTDC integration pending. Set DTDC_API_KEY and DTDC_CUSTOMER_CODE.',
   };
 }
 
