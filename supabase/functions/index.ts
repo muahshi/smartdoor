@@ -1,78 +1,67 @@
 /**
- * Smart Door — Edge Function: generate-qr
- * supabase/functions/generate-qr/index.ts
+ * Smart Door — Edge Function: set-owner-pin
+ * supabase/functions/set-owner-pin/index.ts
  *
- * Plate ID ke liye QR PNG generate karta hai aur
- * Supabase Storage bucket "qr-codes" mein upload karta hai.
- * plates table mein qr_image_url update karta hai.
+ * Owner onboarding ke time PIN set karta hai.
+ * PIN kabhi client pe hash nahi hota — yahan bcrypt lagta hai.
  *
- * Uses: qrcode (npm via esm.sh), canvas not available in Deno —
- * we use qrcode's SVG output + store as SVG; PNG via toDataURL fallback.
+ * Also called at first login to set pin_hash from "UNSET" → real hash.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-// @ts-ignore — esm.sh resolves at runtime
-import QRCode from 'https://esm.sh/qrcode@1.5.4';
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const APP_URL              = Deno.env.get('APP_URL') || 'https://smartdoor.in';
-const QR_BUCKET            = 'qr-codes';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { plate_id, order_id } = await req.json();
-    if (!plate_id) {
-      return Response.json({ success: false, message: 'plate_id required.' }, { status: 400, headers: corsHeaders });
+    const { owner_id, pin, name, phone, email } = await req.json();
+
+    if (!owner_id || !pin) {
+      return Response.json({ success: false, message: 'owner_id and pin required.' }, { status: 400, headers: corsHeaders });
+    }
+    if (!/^\d{4}$/.test(String(pin))) {
+      return Response.json({ success: false, message: 'PIN must be exactly 4 digits.' }, { status: 400, headers: corsHeaders });
     }
 
-    const pid     = String(plate_id).toUpperCase();
-    const qrUrl   = `${APP_URL}/visitor.html?plate=${pid}`;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // ── Generate SVG ──
-    const svgString: string = await QRCode.toString(qrUrl, {
-      type:  'svg',
-      width: 400,
-      margin: 2,
-      errorCorrectionLevel: 'M',
-    });
+    // Hash the PIN (bcrypt, cost 12)
+    const pin_hash = await bcrypt.hash(String(pin), await bcrypt.genSalt(12));
 
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-    const svgPath = `${pid}.svg`;
+    // Update user record
+    const updatePayload: Record<string, unknown> = { pin_hash };
+    if (name)  updatePayload.full_name = name;
+    if (phone) updatePayload.phone     = phone.replace(/\D/g, '').slice(-10);
+    if (email) updatePayload.email     = email.toLowerCase().trim();
 
-    const { error: svgErr } = await supabase.storage
-      .from(QR_BUCKET)
-      .upload(svgPath, svgBlob, { contentType: 'image/svg+xml', upsert: true });
+    const { error } = await supabase
+      .from('users')
+      .update(updatePayload)
+      .eq('id', owner_id);
 
-    if (svgErr) throw new Error(`SVG upload failed: ${svgErr.message}`);
-
-    // ── Public URL ──
-    const { data: urlData } = supabase.storage.from(QR_BUCKET).getPublicUrl(svgPath);
-    const publicUrl = urlData?.publicUrl || null;
-
-    // ── Update plates table ──
-    await supabase.from('plates').update({
-      qr_image_url: publicUrl,
-      qr_slug:      pid,
-    }).eq('plate_id', pid);
-
-    // ── Update manufacturing record ──
-    if (order_id) {
-      await supabase.from('manufacturing').update({
-        qr_svg_path: svgPath,
-        updated_at:  new Date().toISOString(),
-      }).eq('order_id', order_id);
+    if (error) {
+      console.error('[set-owner-pin] DB update failed:', error);
+      return Response.json({ success: false, message: 'Failed to save PIN.' }, { status: 500, headers: corsHeaders });
     }
 
-    return Response.json({ success: true, plate_id: pid, qr_url: publicUrl }, { headers: corsHeaders });
+    // Audit log
+    await supabase.from('audit_logs').insert({
+      owner_id,
+      action:  'pin_set',
+      details: { source: 'onboarding' },
+    });
+
+    return Response.json({ success: true, message: 'PIN set successfully.' }, { headers: corsHeaders });
 
   } catch (err) {
-    console.error('[generate-qr] Error:', err);
-    return Response.json({ success: false, message: 'QR generation failed.' }, { status: 500, headers: corsHeaders });
+    console.error('[set-owner-pin] Error:', err);
+    return Response.json({ success: false, message: 'Server error.' }, { status: 500, headers: corsHeaders });
   }
 });
