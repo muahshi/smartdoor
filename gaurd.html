@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Smart Door — Guard Panel</title>
+  <link rel="icon" href="/images/favicon.ico" />
+  <style>
+    /* ── BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0a0a0f;
+      --surface: #13131a;
+      --card:    #1a1a24;
+      --border:  rgba(255,255,255,.08);
+      --text:    #e8e8f0;
+      --muted:   #7a7a9a;
+      --accent:  #4285f4;
+      --green:   #34a853;
+      --red:     #ea4335;
+      --orange:  #fbbc04;
+      --radius:  14px;
+      --font:    'Segoe UI', system-ui, sans-serif;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100dvh; }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .guard-badge {
+      background: var(--accent); color: #fff;
+      font-size: 11px; font-weight: 700; letter-spacing: .5px;
+      padding: 3px 8px; border-radius: 6px; text-transform: uppercase;
+    }
+    .guard-name { font-size: 15px; font-weight: 600; }
+    .property-name { font-size: 12px; color: var(--muted); }
+
+    /* ── NAV TABS ── */
+    .nav-tabs {
+      display: flex; background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab {
+      flex: 1; min-width: 72px; padding: 12px 8px;
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-align: center; cursor: pointer; border: none; background: none;
+      border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap;
+    }
+    .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .nav-tab .tab-icon { display: block; font-size: 18px; margin-bottom: 2px; }
+
+    /* ── MAIN CONTENT ── */
+    .main { padding: 16px; max-width: 480px; margin: 0 auto; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px;
+    }
+
+    /* ── STATS ROW ── */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+    .stat-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 10px; text-align: center;
+    }
+    .stat-num { font-size: 26px; font-weight: 800; color: var(--text); }
+    .stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; }
+
+    /* ── FORM ELEMENTS ── */
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    input, select, textarea {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px;
+      padding: 10px 12px; margin-bottom: 12px; outline: none; transition: border-color .2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    select option { background: var(--surface); }
+    textarea { resize: vertical; min-height: 70px; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: block; width: 100%; padding: 13px;
+      border-radius: 10px; border: none; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); opacity: .9; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-danger  { background: var(--red);   color: #fff; }
+    .btn-warning { background: var(--orange); color: #000; }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-sm { padding: 7px 14px; width: auto; display: inline-block; font-size: 12px; border-radius: 8px; }
+
+    /* ── CHECKIN LIST ── */
+    .checkin-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .checkin-item:last-child { border-bottom: none; }
+    .checkin-info .visitor-name { font-size: 14px; font-weight: 600; }
+    .checkin-info .visitor-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .status-badge {
+      font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+      text-transform: uppercase;
+    }
+    .status-approved  { background: rgba(52,168,83,.15);  color: var(--green); }
+    .status-pending   { background: rgba(251,188,4,.15);  color: var(--orange); }
+    .status-denied    { background: rgba(234,67,53,.15);  color: var(--red); }
+    .status-auto      { background: rgba(66,133,244,.15); color: var(--accent); }
+
+    /* ── DELIVERY TAGS ── */
+    .partner-tag {
+      font-size: 10px; font-weight: 700; padding: 2px 7px;
+      border-radius: 5px; text-transform: uppercase;
+    }
+    .partner-amazon   { background: #ff9900; color: #000; }
+    .partner-flipkart { background: #2874f0; color: #fff; }
+    .partner-swiggy   { background: #fc8019; color: #fff; }
+    .partner-zomato   { background: #cb202d; color: #fff; }
+    .partner-blinkit  { background: #0c831f; color: #fff; }
+    .partner-other    { background: var(--muted); color: var(--bg); }
+
+    /* ── QR SCAN BUTTON ── */
+    .qr-scan-btn {
+      background: linear-gradient(135deg, var(--accent), #0d47a1);
+      color: #fff; border: none; border-radius: var(--radius);
+      width: 100%; padding: 20px; font-size: 16px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-bottom: 16px;
+    }
+
+    /* ── EMERGENCY ── */
+    .emergency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .emergency-btn {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 10px;
+      text-align: center; cursor: pointer; transition: all .2s;
+    }
+    .emergency-btn:hover { border-color: var(--red); }
+    .emergency-btn .e-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+    .emergency-btn .e-label { font-size: 12px; font-weight: 700; color: var(--text); }
+    .emergency-btn.fire   { border-color: rgba(234,67,53,.4); }
+    .emergency-btn.medical{ border-color: rgba(52,168,83,.4); }
+    .emergency-btn.security{border-color: rgba(251,188,4,.4); }
+    .emergency-btn.evacuation{border-color: rgba(66,133,244,.4);}
+
+    /* ── UNIT SEARCH ── */
+    .search-result {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; margin-top: 8px;
+    }
+    .unit-number { font-size: 18px; font-weight: 800; }
+    .resident-list { margin-top: 8px; }
+    .resident-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-top: 1px solid var(--border);
+    }
+    .resident-priority {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      font-size: 11px; font-weight: 800; text-align: center; line-height: 22px;
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 20px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; z-index: 999;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── LOGIN SCREEN ── */
+    #login-screen {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; padding: 32px; z-index: 200;
+    }
+    #login-screen h1 { font-size: 22px; margin-bottom: 6px; }
+    #login-screen p  { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+    .login-form { width: 100%; max-width: 360px; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div style="font-size:40px; margin-bottom:12px;">🛡️</div>
+  <h1>Guard Panel</h1>
+  <p>Smart Door Security Interface</p>
+  <div class="login-form">
+    <label>Guard Phone Number</label>
+    <input type="tel" id="guard-phone" placeholder="+91 98765 43210" />
+    <label>Property Code</label>
+    <input type="text" id="property-code" placeholder="Enter code from admin" />
+    <button class="btn btn-primary" onclick="guardLogin()">Sign In →</button>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header" id="main-header" style="display:none;">
+  <div class="header-left">
+    <span class="guard-badge">Guard</span>
+    <div>
+      <div class="guard-name" id="header-guard-name">Loading...</div>
+      <div class="property-name" id="header-property-name">–</div>
+    </div>
+  </div>
+  <button onclick="guardLogout()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">⎋</button>
+</div>
+
+<!-- NAV TABS -->
+<div class="nav-tabs" id="main-nav" style="display:none;">
+  <button class="nav-tab active" onclick="showTab('checkin')">
+    <span class="tab-icon">🚶</span>Check-In
+  </button>
+  <button class="nav-tab" onclick="showTab('delivery')">
+    <span class="tab-icon">📦</span>Delivery
+  </button>
+  <button class="nav-tab" onclick="showTab('log')">
+    <span class="tab-icon">📋</span>Today
+  </button>
+  <button class="nav-tab" onclick="showTab('emergency')">
+    <span class="tab-icon">🚨</span>Emergency
+  </button>
+  <button class="nav-tab" onclick="showTab('verify')">
+    <span class="tab-icon">🔍</span>Verify
+  </button>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="main-content" style="display:none;">
+
+  <!-- STATS ROW -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-num" id="stat-total">0</div>
+      <div class="stat-label">Visitors</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-deliveries">0</div>
+      <div class="stat-label">Deliveries</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num" id="stat-pending">0</div>
+      <div class="stat-label">Pending</div>
+    </div>
+  </div>
+
+  <!-- CHECK-IN TAB -->
+  <div id="tab-checkin" class="tab-panel active">
+    <div class="card">
+      <div class="card-title">Visitor Check-In</div>
+
+      <button class="qr-scan-btn" onclick="scanQrPass()">
+        <span>📷</span> Scan QR / Visitor Pass
+      </button>
+
+      <div style="text-align:center; color:var(--muted); font-size:12px; margin-bottom:12px;">— or enter manually —</div>
+
+      <label>Visitor Name *</label>
+      <input type="text" id="ci-name" placeholder="Enter visitor name" />
+
+      <label>Phone Number</label>
+      <input type="tel" id="ci-phone" placeholder="Optional" />
+
+      <label>Vehicle Number</label>
+      <input type="text" id="ci-vehicle" placeholder="Optional" />
+
+      <label>Flat / Unit *</label>
+      <input type="text" id="ci-unit" placeholder="e.g. 702, A-12"
+        oninput="searchUnit(this.value)" />
+      <div id="unit-result"></div>
+
+      <label>Purpose</label>
+      <select id="ci-purpose">
+        <option value="guest">Guest</option>
+        <option value="delivery">Delivery</option>
+        <option value="worker">Worker / Service</option>
+        <option value="cab">Cab / Driver</option>
+        <option value="other">Other</option>
+      </select>
+
+      <button class="btn btn-success" onclick="submitCheckin()">✓ Check In Visitor</button>
+    </div>
+  </div>
+
+  <!-- DELIVERY TAB -->
+  <div id="tab-delivery" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Log Delivery</div>
+
+      <label>Delivery Partner</label>
+      <select id="del-partner">
+        <option value="amazon">🛒 Amazon</option>
+        <option value="flipkart">📱 Flipkart</option>
+        <option value="swiggy">🍔 Swiggy</option>
+        <option value="zomato">🍕 Zomato</option>
+        <option value="blinkit">⚡ Blinkit</option>
+        <option value="delhivery">🚚 Delhivery</option>
+        <option value="bluedart">💙 BlueDart</option>
+        <option value="dtdc">📮 DTDC</option>
+        <option value="courier">📦 Courier</option>
+        <option value="other">Other</option>
+      </select>
+
+      <label>Delivery Person Name</label>
+      <input type="text" id="del-name" placeholder="Optional" />
+
+      <label>Flat / Unit *</label>
+      <input type="text" id="del-unit" placeholder="e.g. 702" />
+
+      <label>AWB / Order Number</label>
+      <input type="text" id="del-awb" placeholder="Optional" />
+
+      <label>Notes</label>
+      <textarea id="del-notes" placeholder="Any notes..."></textarea>
+
+      <button class="btn btn-primary" onclick="submitDelivery()">📦 Log Delivery</button>
+    </div>
+
+    <!-- Today's deliveries -->
+    <div class="card">
+      <div class="card-title">Today's Deliveries</div>
+      <div id="delivery-list">
+        <div style="color:var(--muted); font-size:13px; text-align:center; padding:20px 0;">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TODAY'S LOG TAB -->
+  <div id="tab-log" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Today's Visitor Log</div>
+      <div id="checkin-log-list">
+        <div style="color:var(--muted); font-size:13px; text-align:center; padding:20px 0;">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Pending Approvals -->
+    <div class="card" id="pending-card">
+      <div class="card-title" style="color:var(--orange);">⏳ Pending Approvals</div>
+      <div id="pending-list">
+        <div style="color:var(--muted); font-size:13px; padding:10px 0;">No pending approvals.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMERGENCY TAB -->
+  <div id="tab-emergency" class="tab-panel">
+    <div class="card">
+      <div class="card-title" style="color:var(--red);">🚨 Emergency Alert</div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:16px;">
+        Tap to broadcast a society-wide emergency alert. All residents and admins will be notified.
+      </p>
+      <div class="emergency-grid">
+        <div class="emergency-btn fire" onclick="triggerEmergency('fire')">
+          <span class="e-icon">🔥</span>
+          <span class="e-label">Fire</span>
+        </div>
+        <div class="emergency-btn medical" onclick="triggerEmergency('medical')">
+          <span class="e-icon">🏥</span>
+          <span class="e-label">Medical</span>
+        </div>
+        <div class="emergency-btn security" onclick="triggerEmergency('security')">
+          <span class="e-icon">⚠️</span>
+          <span class="e-label">Security</span>
+        </div>
+        <div class="emergency-btn evacuation" onclick="triggerEmergency('evacuation')">
+          <span class="e-icon">🚪</span>
+          <span class="e-label">Evacuation</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="active-emergency-card" style="display:none;">
+      <div class="card-title" style="color:var(--red);">Active Emergency</div>
+      <div id="active-emergency-info"></div>
+      <button class="btn btn-success" style="margin-top:12px;" onclick="resolveEmergency()">
+        ✓ Mark as Resolved
+      </button>
+    </div>
+  </div>
+
+  <!-- VERIFY TAB -->
+  <div id="tab-verify" class="tab-panel">
+    <div class="card">
+      <div class="card-title">Verify Pass Code</div>
+      <label>Enter Pass Code</label>
+      <input type="text" id="verify-code"
+        placeholder="e.g. SD-A1B2C3D4"
+        style="text-transform:uppercase; letter-spacing:2px; font-size:18px;"
+        oninput="this.value=this.value.toUpperCase()" />
+      <button class="btn btn-primary" onclick="verifyPass()">🔍 Verify Pass</button>
+      <div id="verify-result" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Search Resident / Unit</div>
+      <label>Flat Number or Resident Name</label>
+      <input type="text" id="res-search"
+        placeholder="e.g. 702 or Rahul Sharma"
+        oninput="searchResident(this.value)" />
+      <div id="res-search-result"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div id="toast"></div>
+
+<script type="module">
+import { supabase } from '/services/supabase.js';
+import {
+  getGuardProfile,
+  checkInVisitor,
+  checkOutVisitor,
+  logDelivery,
+  validateAndCheckIn,
+  triggerEmergency as _triggerEmergency,
+  resolveEmergency as _resolveEmergency,
+  getTodayCheckins,
+  getPendingApprovals,
+  getTodayDeliveries,
+  subscribeToCheckinUpdates,
+  subscribeToEmergencies,
+} from '/services/guardPanel.js';
+import { findUnitByNumber, resolveRoutingForUnit } from '/services/propertyManagement.js';
+import { lookupPassByCode } from '/services/visitorPass.js';
+
+// ── STATE ──
+let _guard = null;
+let _property = null;
+let _selectedUnitId = null;
+let _activeEmergencyId = null;
+let _unsubCheckins = null;
+let _unsubEmergencies = null;
+
+window.showTab = function(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'log') loadTodayLog();
+  if (name === 'delivery') loadTodayDeliveries();
+};
+
+// ── LOGIN ──
+window.guardLogin = async function() {
+  const phone = document.getElementById('guard-phone').value.trim();
+  if (!phone) return toast('Enter your phone number.');
+  // In real implementation: Supabase OTP flow here.
+  // For now, look up guard by phone.
+  const { data: session } = await supabase.auth.getSession();
+  if (!session?.session) {
+    toast('Please complete OTP verification first.');
+    return;
+  }
+  await initGuardApp(session.session.user.id);
+};
+
+window.guardLogout = async function() {
+  if (_unsubCheckins) _unsubCheckins();
+  if (_unsubEmergencies) _unsubEmergencies();
+  await supabase.auth.signOut();
+  location.reload();
+};
+
+async function initGuardApp(authUserId) {
+  const result = await getGuardProfile(authUserId);
+  if (!result.success) { toast('Guard profile not found. Contact your admin.'); return; }
+
+  _guard    = result.guard;
+  _property = result.guard.properties;
+
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-header').style.display  = '';
+  document.getElementById('main-nav').style.display     = '';
+  document.getElementById('main-content').style.display = '';
+
+  document.getElementById('header-guard-name').textContent  = _guard.full_name;
+  document.getElementById('header-property-name').textContent = _property.name;
+
+  await loadStats();
+
+  // Realtime
+  _unsubCheckins    = subscribeToCheckinUpdates(_property.id, () => loadStats());
+  _unsubEmergencies = subscribeToEmergencies(_property.id, handleEmergencyAlert);
+}
+
+// ── STATS ──
+async function loadStats() {
+  const { supabase: sb } = await import('/services/supabase.js');
+  const today = new Date().toISOString().split('T')[0];
+  const [total, deliveries, pending] = await Promise.all([
+    sb.from('guard_checkins').select('id', { count:'exact', head:true })
+      .eq('property_id', _property.id).gte('checked_in_at', today),
+    sb.from('delivery_logs').select('id', { count:'exact', head:true })
+      .eq('property_id', _property.id).gte('arrived_at', today),
+    sb.from('guard_checkins').select('id', { count:'exact', head:true })
+      .eq('property_id', _property.id).eq('approval_status','pending'),
+  ]);
+  document.getElementById('stat-total').textContent     = total.count || 0;
+  document.getElementById('stat-deliveries').textContent = deliveries.count || 0;
+  document.getElementById('stat-pending').textContent   = pending.count || 0;
+}
+
+// ── UNIT SEARCH ──
+let _unitTimer = null;
+window.searchUnit = function(val) {
+  clearTimeout(_unitTimer);
+  if (!val || val.length < 1) { document.getElementById('unit-result').innerHTML=''; return; }
+  _unitTimer = setTimeout(async () => {
+    const result = await findUnitByNumber(_property.id, val);
+    const el = document.getElementById('unit-result');
+    if (!result.success || !result.units.length) {
+      el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:6px 0;">No unit found for "${val}"</div>`;
+      _selectedUnitId = null; return;
+    }
+    const unit = result.units[0];
+    const residents = unit.residents || [];
+    _selectedUnitId = unit.id;
+    el.innerHTML = `
+      <div class="search-result">
+        <span class="unit-number">${unit.towers?.name || ''} – ${unit.unit_number}</span>
+        <div class="resident-list">
+          ${residents.sort((a,b)=>a.routing_priority-b.routing_priority).map(r=>`
+            <div class="resident-row">
+              <div>
+                <span class="resident-priority">${r.routing_priority}</span>
+                <span style="font-size:13px; font-weight:600; margin-left:8px;">${r.full_name}</span>
+                <span style="font-size:11px; color:var(--muted); margin-left:6px;">${r.resident_type}</span>
+              </div>
+              <span style="font-size:12px; color:var(--muted);">${r.phone}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }, 300);
+};
+
+// ── CHECK-IN ──
+window.submitCheckin = async function() {
+  const name = document.getElementById('ci-name').value.trim();
+  if (!name) return toast('Visitor name required.');
+  const result = await checkInVisitor(_guard.id, _property.id, {
+    unitId:      _selectedUnitId,
+    visitorName: name,
+    visitorPhone:document.getElementById('ci-phone').value.trim() || null,
+    visitorVehicle:document.getElementById('ci-vehicle').value.trim() || null,
+    purpose:     document.getElementById('ci-purpose').value,
+    checkinType: 'manual',
+  });
+  if (!result.success) return toast('Error: ' + result.error);
+  toast('✓ Visitor checked in!');
+  ['ci-name','ci-phone','ci-vehicle','ci-unit'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('unit-result').innerHTML='';
+  _selectedUnitId = null;
+  await loadStats();
+};
+
+// ── QR SCAN ──
+window.scanQrPass = function() {
+  // Trigger native QR scanner or open camera.
+  // In PWA: use BarcodeDetector API or redirect to camera handler.
+  toast('QR scanning coming via mobile app. Use "Verify Pass" tab for manual code entry.');
+};
+
+// ── DELIVERY ──
+window.submitDelivery = async function() {
+  const unitNum = document.getElementById('del-unit').value.trim();
+  if (!unitNum) return toast('Unit number required.');
+
+  let unitId = null;
+  const uResult = await findUnitByNumber(_property.id, unitNum);
+  if (uResult.success && uResult.units.length) unitId = uResult.units[0].id;
+
+  const result = await logDelivery(_guard.id, _property.id, {
+    unitId,
+    partner:     document.getElementById('del-partner').value,
+    personName:  document.getElementById('del-name').value.trim() || null,
+    awbNumber:   document.getElementById('del-awb').value.trim() || null,
+    notes:       document.getElementById('del-notes').value.trim() || null,
+  });
+
+  if (!result.success) return toast('Error: ' + result.error);
+  toast('📦 Delivery logged!');
+  ['del-name','del-unit','del-awb','del-notes'].forEach(id=>document.getElementById(id).value='');
+  await loadTodayDeliveries();
+  await loadStats();
+};
+
+async function loadTodayDeliveries() {
+  const result = await getTodayDeliveries(_property.id);
+  const el = document.getElementById('delivery-list');
+  const deliveries = result.deliveries || [];
+  if (!deliveries.length) { el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px;">No deliveries today.</div>'; return; }
+  el.innerHTML = deliveries.map(d=>`
+    <div class="checkin-item">
+      <div class="checkin-info">
+        <div class="visitor-name">
+          <span class="partner-tag partner-${d.partner}">${d.partner.toUpperCase()}</span>
+          ${d.delivery_person_name ? `· ${d.delivery_person_name}` : ''}
+        </div>
+        <div class="visitor-meta">Unit ${d.units?.unit_number || '?'} · ${_timeAgo(d.arrived_at)}</div>
+      </div>
+      <span class="status-badge ${d.status==='delivered'?'status-approved':'status-pending'}">${d.status}</span>
+    </div>
+  `).join('');
+}
+
+// ── TODAY LOG ──
+async function loadTodayLog() {
+  const [checkins, pending] = await Promise.all([
+    getTodayCheckins(_property.id, 30),
+    getPendingApprovals(_property.id),
+  ]);
+  const logEl = document.getElementById('checkin-log-list');
+  const items = checkins.checkins || [];
+  if (!items.length) { logEl.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px;">No visitors today.</div>'; }
+  else logEl.innerHTML = items.map(c=>`
+    <div class="checkin-item">
+      <div class="checkin-info">
+        <div class="visitor-name">${c.visitor_name}</div>
+        <div class="visitor-meta">${c.units?.unit_number||'?'} · ${c.purpose||''} · ${_timeAgo(c.checked_in_at)}</div>
+      </div>
+      <span class="status-badge status-${c.approval_status==='auto_approved'?'auto':c.approval_status}">${c.approval_status.replace('_',' ')}</span>
+    </div>
+  `).join('');
+
+  const pendingEl = document.getElementById('pending-list');
+  const pendingItems = pending.checkins || [];
+  if (!pendingItems.length) pendingEl.innerHTML='<div style="color:var(--muted);font-size:13px;padding:10px 0;">No pending approvals.</div>';
+  else pendingEl.innerHTML = pendingItems.map(c=>`
+    <div class="checkin-item">
+      <div class="checkin-info">
+        <div class="visitor-name">${c.visitor_name}</div>
+        <div class="visitor-meta">Flat ${c.units?.unit_number||'?'} · ${_timeAgo(c.checked_in_at)}</div>
+      </div>
+      <div>
+        <button class="btn btn-success btn-sm" onclick="approveCheckin('${c.id}')">✓</button>
+        <button class="btn btn-danger btn-sm" style="margin-top:4px;" onclick="denyCheckin('${c.id}')">✗</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── EMERGENCY ──
+window.triggerEmergency = async function(type) {
+  const confirmed = confirm(`Trigger ${type.toUpperCase()} emergency alert? All residents will be notified.`);
+  if (!confirmed) return;
+  const { supabase: sb } = await import('/services/supabase.js');
+  const { data: session } = await sb.auth.getSession();
+  const result = await _triggerEmergency(_guard.id, _property.id, { eventType: type });
+  if (!result.success) return toast('Error: ' + result.error);
+  _activeEmergencyId = result.event.id;
+  document.getElementById('active-emergency-card').style.display='';
+  document.getElementById('active-emergency-info').innerHTML=`
+    <div style="font-size:16px;font-weight:700;color:var(--red);">🚨 ${type.toUpperCase()} ALERT ACTIVE</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px;">Triggered at ${new Date().toLocaleTimeString('en-IN')}</div>
+  `;
+  toast('🚨 Emergency alert broadcast!');
+};
+
+window.resolveEmergency = async function() {
+  if (!_activeEmergencyId) return;
+  const result = await _resolveEmergency(_activeEmergencyId);
+  if (!result.success) return toast('Error: ' + result.error);
+  document.getElementById('active-emergency-card').style.display='none';
+  _activeEmergencyId = null;
+  toast('✓ Emergency resolved.');
+};
+
+function handleEmergencyAlert(event) {
+  toast(`🚨 ${event.event_type.toUpperCase()} alert from ${event.triggered_by_role}`);
+}
+
+// ── VERIFY PASS ──
+window.verifyPass = async function() {
+  const code = document.getElementById('verify-code').value.trim();
+  if (!code) return toast('Enter a pass code.');
+  const result = await lookupPassByCode(code);
+  const el = document.getElementById('verify-result');
+  if (result.success && result.pass?.valid) {
+    el.innerHTML=`
+      <div class="search-result" style="border-color:var(--green);">
+        <div style="color:var(--green);font-size:14px;font-weight:700;">✓ Valid Pass</div>
+        <div style="margin-top:8px;">
+          <div><b>${result.pass.visitor_name}</b></div>
+          <div style="font-size:12px;color:var(--muted);">Unit ${result.pass.unit_number} · ${result.pass.pass_type} · ${result.pass.purpose||''}</div>
+        </div>
+      </div>`;
+  } else {
+    el.innerHTML=`
+      <div class="search-result" style="border-color:var(--red);">
+        <div style="color:var(--red);font-size:14px;font-weight:700;">✗ Invalid Pass</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${result.error || 'Pass not found'}</div>
+      </div>`;
+  }
+};
+
+window.searchResident = async function(val) {
+  if (!val || val.length < 2) return;
+  clearTimeout(_unitTimer);
+  _unitTimer = setTimeout(async () => {
+    const result = await findUnitByNumber(_property.id, val);
+    const el = document.getElementById('res-search-result');
+    if (!result.success || !result.units.length) {
+      el.innerHTML=`<div style="color:var(--muted);font-size:12px;padding:6px 0;">No results.</div>`; return;
+    }
+    el.innerHTML = result.units.map(u=>`
+      <div class="search-result" style="margin-bottom:8px;">
+        <span class="unit-number">${u.towers?.name||''} ${u.unit_number}</span>
+        ${(u.residents||[]).map(r=>`
+          <div style="font-size:13px;margin-top:6px;">${r.full_name} <span style="color:var(--muted);font-size:11px;">${r.phone}</span></div>
+        `).join('')}
+      </div>
+    `).join('');
+  }, 300);
+};
+
+// ── HELPERS ──
+function _timeAgo(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return `${Math.floor(diff/60000)}m ago`;
+  return `${Math.floor(diff/3600000)}h ago`;
+}
+
+function toast(msg, duration=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), duration);
+}
+
+window.toast = toast;
+
+// ── AUTO-INIT if already logged in ──
+(async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) await initGuardApp(session.user.id);
+})();
+</script>
+</body>
+</html>
+
