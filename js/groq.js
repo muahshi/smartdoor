@@ -6,8 +6,11 @@
 
 const GroqService = (() => {
   // ────────── CONFIG ──────────
+  // Phase 10: API key now comes from window.__SD_CONFIG__ (generated at
+  // Vercel build time by scripts/build-env.js from VITE_GROQ_API_KEY).
+  // Falls back to mock responses if not set (e.g. local dev without a key).
   const CONFIG = {
-    apiKey: 'YOUR_GROQ_API_KEY', // Replace with actual key
+    apiKey: window.__SD_CONFIG__?.groqApiKey || '',
     baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
     model: 'llama3-70b-8192',
     maxTokens: 500,
@@ -34,7 +37,7 @@ const GroqService = (() => {
 
     try {
       // If no real API key, use intelligent mock
-      if (!CONFIG.apiKey || CONFIG.apiKey === 'YOUR_GROQ_API_KEY') {
+      if (!CONFIG.apiKey) {
         return await _mockGroqResponse(messages, options);
       }
 
