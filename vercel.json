@@ -1,4 +1,5 @@
 {
+  "outputDirectory": ".",
   "rewrites": [
     { "source": "/p/:slug", "destination": "/visitor.html" },
     { "source": "/gate/:path*", "destination": "/guard.html" },
