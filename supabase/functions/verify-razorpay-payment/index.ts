@@ -163,6 +163,12 @@ serve(async (req) => {
       owner_id:     ownerId,
     });
 
+    // ── Trigger QR image generation (non-blocking) ──
+    // Edge function ya client-side QR service handle karega upload
+    supabase.functions.invoke("generate-qr", {
+      body: { plate_id: plateId, order_id: orderId },
+    }).catch((e: Error) => console.warn("[verify-payment] QR generation dispatch failed:", e.message));
+
     // owner_id update in order
     if (ownerId && !order.owner_id) {
       await supabase.from("orders").update({ owner_id: ownerId }).eq("id", orderId);
@@ -188,6 +194,46 @@ serve(async (req) => {
       { order_id: orderId, event_type: "in_production",    event_label: "In Manufacturing Queue", actor: "system" },
     ];
     await supabase.from("tracking_events").insert(trackingInserts);
+
+    // ── 11. Send activation / onboarding email ──
+    // Generate magic-link token for the owner's email so they can set PIN + family
+    const ownerEmail = order.customer_email;
+    const APP_URL    = Deno.env.get("APP_URL") || "https://smartdoor.in";
+    try {
+      const { data: linkData } = await supabase.auth.admin.generateLink({
+        type:    "magiclink",
+        email:   ownerEmail,
+        options: { redirectTo: `${APP_URL}/onboarding.html?plate_id=${plateId}&order_id=${orderId}` },
+      });
+
+      const activationUrl = linkData?.properties?.action_link || null;
+
+      if (activationUrl) {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            to:      ownerEmail,
+            subject: `Activate Your Smart Door — ${plateId}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:540px;margin:auto;">
+                <h2 style="color:#00A2E8;">Your Smart Door is Confirmed! 🏠</h2>
+                <p>Hi ${order.customer_name},</p>
+                <p>Payment received. Your plate <strong>${plateId}</strong> is now in production.</p>
+                <p>Click the button below to set your PIN and activate your account:</p>
+                <a href="${activationUrl}"
+                   style="display:inline-block;margin:20px 0;padding:14px 28px;
+                          background:#00A2E8;color:#fff;border-radius:10px;
+                          text-decoration:none;font-weight:700;font-size:1rem;">
+                  Activate My Smart Door →
+                </a>
+                <p style="color:#888;font-size:.85rem;">This link expires in 24 hours. If you didn't make this purchase, please contact hello@smartdoor.in immediately.</p>
+              </div>`,
+          },
+        });
+      }
+    } catch (emailErr) {
+      // Non-fatal — plate is created, email failure should not block response
+      console.error("[verify-payment] Activation email failed:", emailErr);
+    }
 
     return Response.json({
       success:     true,
