@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="Smart Door — Visitor Experience" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#081321" />
+  <title>Smart Door</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #081321;
+      color: #E2ECF4;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    .shell {
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ── Loading ── */
+    .loading-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+    .spinner { width:36px;height:36px;border-radius:50%;border:3px solid rgba(0,162,232,0.2);border-top-color:#00A2E8;animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Pending / not-found screen ── */
+    .pending-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; gap:16px; }
+    .pending-icon { font-size:3rem; }
+    .pending-title { font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:1.3rem; color:#fff; }
+    .pending-sub { font-size:0.88rem; color:rgba(255,255,255,0.5); max-width:320px; line-height:1.6; }
+    .pending-stage { margin-top:8px; padding:10px 16px; background:rgba(0,162,232,0.08); border:1px solid rgba(0,162,232,0.2); border-radius:10px; font-size:0.82rem; color:#7FD3FF; }
+
+    /* ── Visitor header (copied design tokens from app.html visitor tab) ── */
+    .visitor-header { padding: 32px 24px 20px; text-align: center; background: radial-gradient(ellipse 100% 80% at 50% 0%, rgba(0,162,232,0.12) 0%, transparent 70%); }
+    .owner-name-display {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 800; font-size: 1.6rem;
+      background: linear-gradient(135deg, #fff 0%, #C8E8F8 40%, #00A2E8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.2;
+    }
+    .night-banner { background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(79,70,229,0.08)); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 12px 16px; display:flex; align-items:center; gap:10px; }
+    .expiry-banner { border-radius: 12px; padding: 12px 16px; display:flex; align-items:center; gap:10px; }
+    .expiry-banner.grace { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); }
+    .expiry-banner.locked { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); }
+
+    .action-btn {
+      width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.03); cursor: pointer;
+      transition: all 0.25s; text-align: left; color: #E2ECF4; position: relative; overflow: hidden;
+    }
+    .action-btn:hover { transform: translateX(3px); border-color: rgba(0,162,232,0.25); }
+    .action-btn:active { transform: scale(0.98); }
+    .action-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+    .action-btn.primary-action { background: linear-gradient(135deg, rgba(0,162,232,0.15), rgba(0,120,215,0.08)); border-color: rgba(0,162,232,0.35); }
+    .action-btn.sos-action { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
+    .action-btn.sos-action.holding { background: rgba(239,68,68,0.25); }
+    .action-btn.recording-active { background: rgba(168,85,247,0.15); border-color: rgba(168,85,247,0.4); }
+    .action-btn.recording-active .action-icon { animation: pulse-dot 1s ease-in-out infinite; }
+    .action-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .action-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.92rem; color: #fff; margin-bottom: 2px; }
+    .action-sub { font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+
+    .call-wave { position: absolute; inset: -2px; border-radius: 50%; border: 2px solid rgba(0,162,232,0.5); animation: call-ring 2s ease-out infinite; }
+    @keyframes call-ring { 0% { opacity:0.6; transform:scale(1);} 100% { opacity:0; transform:scale(1.4);} }
+
+    .text-compose { margin:0 16px 16px; }
+    .text-compose textarea {
+      width:100%; min-height:64px; padding:12px 14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+      border-radius:12px; color:#E2ECF4; font-size:0.85rem; font-family:'Inter',sans-serif; resize:vertical; outline:none;
+    }
+    .text-compose button {
+      margin-top:8px; width:100%; padding:10px; border-radius:10px; border:none; cursor:pointer;
+      background: linear-gradient(135deg,#00A2E8,#0078D7); color:#fff; font-weight:700; font-family:'Space Grotesk',sans-serif; font-size:0.85rem;
+    }
+
+    .toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+      padding: 0.875rem 1.5rem; border-radius: 0.75rem; font-size: 0.9rem; font-weight: 600;
+      z-index: 9998; box-shadow: 0 8px 24px rgba(0,0,0,0.3); max-width:90%; text-align:center;
+    }
+    .toast.success { background: #10b981; color:#fff; }
+    .toast.error { background: #ef4444; color:#fff; }
+    .toast.info { background: #1a1a2e; border:1px solid rgba(0,162,232,0.3); color:#7FD3FF; }
+  </style>
+</head>
+<body>
+
+<!-- CONFIG: Generated at Vercel build time by scripts/build-env.js -->
+<script src="config/env.generated.js"></script>
+<script type="module" src="js/monitoring-bootstrap.js"></script>
+
+<div class="shell" id="shell">
+  <div class="loading-wrap" id="loading-state">
+    <div class="spinner"></div>
+    <div style="font-size:0.8rem;color:rgba(255,255,255,0.4);">Loading Smart Door…</div>
+  </div>
+</div>
+
+<script type="module">
+  import { resolveVisitorRoute, getFamilyMembersForSos } from './services/visitorExperience.js';
+  import { initiateMaskedCall, sendTextMessage, triggerEmergency } from './services/communication.js';
+  import { notifyBellRing } from './services/notifications.js';
+  import { VoiceRecorder, uploadVoiceNote } from './services/voiceNotes.js';
+  import { subscribeToStatusChanges } from './services/plates.js';
+  import { isNightModeActive } from './services/security.js';
+
+  const shell = document.getElementById('shell');
+  const params = new URLSearchParams(window.location.search);
+  const plateSlug = (params.get('plate') || '').trim().toUpperCase();
+
+  let state = null; // resolved route state
+  let unsubscribeStatus = null;
+
+  init();
+
+  async function init() {
+    if (!plateSlug) {
+      renderPending({ slug: '' });
+      return;
+    }
+    const result = await resolveVisitorRoute(plateSlug);
+    if (!result.success) {
+      renderPending({ slug: plateSlug });
+      return;
+    }
+    state = result;
+    if (state.state === 'pending_activation') {
+      renderPending(state);
+    } else {
+      renderVisitorExperience(state);
+      unsubscribeStatus = subscribeToStatusChanges(state.owner.id, (rules) => {
+        state.securityRules = { ...state.securityRules, ...rules };
+        updateStatusBadge();
+        updateNightBanner();
+      });
+    }
+  }
+
+  // ────────── PENDING / ACTIVATION-NOT-COMPLETE SCREEN ──────────
+  function renderPending(info) {
+    const stageLabel = info.pendingInfo?.message || 'This Smart Door hasn\u2019t been activated yet.';
+    const orderLine = info.pendingInfo?.orderNumber ? `Order ${info.pendingInfo.orderNumber}` : '';
+    shell.innerHTML = `
+      <div class="pending-wrap">
+        <div class="pending-icon">🚪</div>
+        <div class="pending-title">Activation Pending</div>
+        <div class="pending-sub">This Smart Door plate isn't active yet. If you're the resident, finish setup by logging in below. If you're a visitor, please check back soon.</div>
+        ${info.pendingInfo ? `<div class="pending-stage">${orderLine ? orderLine + ' · ' : ''}${stageLabel}</div>` : ''}
+        <a href="/login.html${info.slug ? `?plate=${info.slug}` : ''}" style="margin-top:18px;color:#00A2E8;font-size:0.85rem;font-weight:600;text-decoration:none;font-family:'Space Grotesk',sans-serif;">Owner? Login to activate →</a>
+        <div style="margin-top:32px;font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
+      </div>
+    `;
+  }
+
+  // ────────── FULL VISITOR EXPERIENCE ──────────
+  function renderVisitorExperience(s) {
+    const access = s.access;
+    shell.innerHTML = `
+      <div class="visitor-header">
+        <div style="font-size:0.8rem;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:'Space Grotesk',sans-serif;">Welcome to</div>
+        <div class="owner-name-display">${_esc(s.owner.name)}</div>
+        <div style="font-size:0.85rem;color:rgba(255,255,255,0.5);margin-top:2px;">Residence</div>
+        <div style="margin-top:14px;display:inline-flex;" id="status-badge-wrap"></div>
+      </div>
+
+      <div id="night-banner-wrap" style="margin:0 16px 8px;"></div>
+      <div id="expiry-banner-wrap" style="margin:0 16px 12px;"></div>
+
+      <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+        <button class="action-btn primary-action" id="btn-call" ${access.allowCall ? '' : 'disabled'}>
+          <div class="action-icon" style="background:linear-gradient(135deg,rgba(0,162,232,0.25),rgba(0,120,215,0.15));border:1px solid rgba(0,162,232,0.3);position:relative;">
+            📞<div class="call-wave"></div>
+          </div>
+          <div style="flex:1;">
+            <div class="action-title">Call Owner Securely</div>
+            <div class="action-sub" id="call-sub">Your number is safe with us</div>
+          </div>
+          <div style="font-size:0.65rem;color:rgba(0,162,232,0.6);font-weight:600;font-family:'Space Grotesk',sans-serif;">MASKED</div>
+        </button>
+
+        <button class="action-btn" id="btn-bell">
+          <div class="action-icon" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);"><span id="bell-icon">🔔</span></div>
+          <div style="flex:1;">
+            <div class="action-title">Ring Digital Bell</div>
+            <div class="action-sub" id="bell-sub">Instant alert on owner's phone</div>
+          </div>
+        </button>
+
+        <button class="action-btn" id="btn-voice" ${access.allowVoice ? '' : 'disabled'}>
+          <div class="action-icon" style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);">🎤</div>
+          <div style="flex:1;">
+            <div class="action-title">Leave a Voice Note</div>
+            <div id="voice-status" class="action-sub">${access.allowVoice ? 'Speak & leave a 10-sec note' : 'Unavailable during renewal'}</div>
+          </div>
+          <div id="voice-timer" style="font-size:0.72rem;color:#A855F7;font-weight:700;font-family:'Space Grotesk',sans-serif;"></div>
+        </button>
+
+        <button class="action-btn sos-action" id="btn-sos">
+          <div class="action-icon" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);">🚨</div>
+          <div style="flex:1;">
+            <div class="action-title" style="color:#EF4444;">Emergency SOS</div>
+            <div class="action-sub">For urgent help only</div>
+          </div>
+          <div style="font-size:0.65rem;color:rgba(239,68,68,0.7);font-weight:700;font-family:'Space Grotesk',sans-serif;">HOLD 2s</div>
+        </button>
+      </div>
+
+      <div class="text-compose">
+        <textarea id="text-input" placeholder="${access.allowText ? 'Leave a message for the resident...' : 'Text messages unavailable during renewal'}" ${access.allowText ? '' : 'disabled'}></textarea>
+        <button id="text-send" ${access.allowText ? '' : 'disabled'}>Send Message</button>
+      </div>
+
+      <div style="margin:0 16px 24px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.12);border-radius:10px;">
+        <span style="font-size:0.9rem;">🔒</span>
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">Your Privacy is 100% Protected</span>
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.25);">•</span>
+        <span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">No numbers shared</span>
+      </div>
+
+      <div style="text-align:center;padding-bottom:24px;">
+        <span style="font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:'Space Grotesk',sans-serif;letter-spacing:1px;">SECURED BY</span>
+        <div style="font-size:0.72rem;color:rgba(0,162,232,0.5);font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:2px;margin-top:2px;">⊙ SMART DOOR</div>
+      </div>
+    `;
+
+    updateStatusBadge();
+    updateNightBanner();
+    updateExpiryBanner();
+    bindActions(s);
+  }
+
+  function updateStatusBadge() {
+    const rules = state.securityRules || {};
+    const map = { available: 'status-available', busy: 'status-busy', sleeping: 'status-dnd', away: 'status-busy', custom: 'status-busy' };
+    const cls = map[rules.current_status] || 'status-available';
+    const text = rules.custom_message || ({
+      available: 'Available — We\u2019ll respond shortly',
+      busy: 'Busy — Please leave a message',
+      sleeping: 'Sleeping — Only SOS accepted',
+      away: 'Away — Voice note recommended',
+    }[rules.current_status] || 'Available');
+
+    const wrap = document.getElementById('status-badge-wrap');
+    if (wrap) wrap.innerHTML = `<div class="status-badge ${cls}"><span class="status-dot"></span><span>${_esc(text)}</span></div>`;
+  }
+
+  function updateNightBanner() {
+    const wrap = document.getElementById('night-banner-wrap');
+    if (!wrap) return;
+    const active = isNightModeActive(state.securityRules || {});
+    wrap.innerHTML = active ? `
+      <div class="night-banner">
+        <span style="font-size:1.2rem;">🌙</span>
+        <div>
+          <div style="font-size:0.82rem;font-weight:700;color:#A5B4FC;font-family:'Space Grotesk',sans-serif;">Night Security Mode Active</div>
+          <div style="font-size:0.72rem;color:rgba(165,180,252,0.6);">Only SOS calls accepted until morning</div>
+        </div>
+      </div>` : '';
+  }
+
+  function updateExpiryBanner() {
+    const wrap = document.getElementById('expiry-banner-wrap');
+    if (!wrap || !state.access?.bannerMessage) return;
+    const kind = state.access.bannerType === 'locked' ? 'locked' : 'grace';
+    const icon = kind === 'locked' ? '🔒' : '⏰';
+    wrap.innerHTML = `
+      <div class="expiry-banner ${kind}">
+        <span style="font-size:1.1rem;">${icon}</span>
+        <div style="font-size:0.78rem;color:${kind === 'locked' ? '#FCA5A5' : '#FCD34D'};line-height:1.4;">${_esc(state.access.bannerMessage)}</div>
+      </div>`;
+  }
+
+  // ────────── ACTION BINDINGS ──────────
+  function bindActions(s) {
+    const ownerId = s.owner.id;
+    const plateId = s.plate.plateId;
+
+    // CALL
+    const btnCall = document.getElementById('btn-call');
+    let activeCallId = null;
+    btnCall?.addEventListener('click', async () => {
+      if (btnCall.disabled) return;
+      btnCall.disabled = true;
+      document.getElementById('call-sub').textContent = 'Connecting…';
+      const result = await initiateMaskedCall({ plateId, ownerId });
+      if (result.success) {
+        activeCallId = result.callId;
+        document.getElementById('call-sub').textContent = 'Call connected — your number stays hidden';
+        showToast('Connecting you to the resident…', 'success');
+      } else {
+        document.getElementById('call-sub').textContent = 'Your number is safe with us';
+        showToast(result.error || 'Could not start call. Please try again.', 'error');
+      }
+      btnCall.disabled = !s.access.allowCall;
+    });
+
+    // BELL
+    const btnBell = document.getElementById('btn-bell');
+    btnBell?.addEventListener('click', async () => {
+      btnBell.disabled = true;
+      const bellIcon = document.getElementById('bell-icon');
+      bellIcon.textContent = '🔔';
+      bellIcon.style.animation = 'none';
+      await Promise.allSettled([
+        notifyBellRing(ownerId, plateId),
+        _logVisitorEvent(ownerId, plateId, 'bell_ring'),
+      ]);
+      document.getElementById('bell-sub').textContent = 'Bell rung! Owner notified.';
+      showToast('🔔 Bell rung — owner notified', 'success');
+      setTimeout(() => {
+        document.getElementById('bell-sub').textContent = 'Instant alert on owner\u2019s phone';
+        btnBell.disabled = false;
+      }, 4000);
+    });
+
+    // VOICE NOTE
+    const btnVoice = document.getElementById('btn-voice');
+    let recorder = null;
+    btnVoice?.addEventListener('click', async () => {
+      if (btnVoice.disabled) return;
+      const statusEl = document.getElementById('voice-status');
+      const timerEl = document.getElementById('voice-timer');
+
+      if (!recorder) {
+        try {
+          recorder = await VoiceRecorder.start({
+            maxDurationSecs: 10,
+            onTick: (secs) => { timerEl.textContent = `${secs}s`; },
+          });
+          statusEl.textContent = 'Recording… tap again to stop';
+          btnVoice.classList.add('recording-active');
+        } catch (err) {
+          showToast(err.message || 'Microphone access denied.', 'error');
+        }
+        return;
+      }
+
+      const { blob, durationSecs, mimeType } = await recorder.stop();
+      recorder = null;
+      btnVoice.classList.remove('recording-active');
+      statusEl.textContent = 'Uploading…';
+      timerEl.textContent = '';
+
+      const result = await uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mimeType });
+      if (result.success) {
+        statusEl.textContent = 'Voice note sent ✅';
+        showToast('🎤 Voice note sent to resident', 'success');
+      } else {
+        statusEl.textContent = result.error || 'Upload failed.';
+        showToast(result.error || 'Could not send voice note.', 'error');
+      }
+      setTimeout(() => { statusEl.textContent = 'Speak & leave a 10-sec note'; }, 4000);
+    });
+
+    // SOS — hold 2s
+    const btnSos = document.getElementById('btn-sos');
+    let sosTimer = null;
+    const startHold = () => {
+      btnSos.classList.add('holding');
+      sosTimer = setTimeout(async () => {
+        btnSos.classList.remove('holding');
+        btnSos.disabled = true;
+        const { members } = await getFamilyMembersForSos(plateId);
+        const result = await triggerEmergency({ ownerId, plateId, familyMembers: members });
+        if (result.success) {
+          showToast('🚨 Emergency alert sent — help is on the way', 'success');
+        } else {
+          showToast(result.error || 'Could not send emergency alert.', 'error');
+        }
+        setTimeout(() => { btnSos.disabled = false; }, 10000);
+      }, 2000);
+    };
+    const cancelHold = () => { btnSos.classList.remove('holding'); clearTimeout(sosTimer); };
+    btnSos?.addEventListener('mousedown', startHold);
+    btnSos?.addEventListener('touchstart', startHold, { passive: true });
+    ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach((ev) => btnSos?.addEventListener(ev, cancelHold));
+
+    // TEXT MESSAGE
+    const textInput = document.getElementById('text-input');
+    const textSend = document.getElementById('text-send');
+    textSend?.addEventListener('click', async () => {
+      const content = textInput.value.trim();
+      if (!content) return;
+      textSend.disabled = true;
+      textSend.textContent = 'Sending…';
+      const result = await sendTextMessage({ ownerId, plateId, content });
+      if (result.success) {
+        textInput.value = '';
+        showToast('💬 Message sent to resident', 'success');
+      } else {
+        showToast(result.error || 'Could not send message.', 'error');
+      }
+      textSend.disabled = !s.access.allowText;
+      textSend.textContent = 'Send Message';
+    });
+  }
+
+  async function _logVisitorEvent(ownerId, plateId, eventType) {
+    try {
+      const { supabase } = await import('./services/supabase.js');
+      await supabase.from('visitor_logs').insert({ owner_id: ownerId, plate_id: plateId, event_type: eventType });
+    } catch {}
+  }
+
+  function showToast(message, kind = 'info') {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = `toast ${kind}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
+  }
+
+  function _esc(str) {
+    const div = document.createElement('div');
+    div.textContent = str ?? '';
+    return div.innerHTML;
+  }
+
+  window.addEventListener('beforeunload', () => { if (unsubscribeStatus) unsubscribeStatus(); });
+</script>
+
+</body>
+</html>

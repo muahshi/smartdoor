@@ -6,7 +6,7 @@
   "trailingSlash": false,
 
   "rewrites": [
-    { "source": "/p/:plateId", "destination": "/login.html?plate=:plateId" },
+    { "source": "/p/:plateId", "destination": "/visitor.html?plate=:plateId" },
     { "source": "/app", "destination": "/app.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/admin", "destination": "/admin.html" },
@@ -46,6 +46,13 @@
     {
       "source": "/login.html",
       "headers": [
+        { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/visitor.html",
+      "headers": [
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
         { "key": "Cache-Control", "value": "no-cache, must-revalidate" }
       ]
     },
