@@ -31,8 +31,23 @@
  * manually (or `npm run build` if you add one) before opening any HTML file.
  */
 
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
+
+// ── Load .env.local for local development (not available on Vercel) ──
+const envLocalPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const lines = fs.readFileSync(envLocalPath, 'utf8').split('\n');
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx < 0) return;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) process.env[key] = val; // don't override real env
+  });
+}
 
 // Vercel auto-sets VERCEL_ENV to 'production' | 'preview' | 'development'.
 // We map that to our app's three-tier model unless VITE_APP_ENV is explicit.
