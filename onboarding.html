@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Door — Activate Your Plate</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100dvh;
+      background: #080F1A;
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #0D1829;
+      border: 1px solid rgba(0,162,232,0.14);
+      border-radius: 20px;
+      padding: 36px 32px;
+      width: 100%;
+      max-width: 440px;
+    }
+    .logo { display:flex; align-items:center; gap:10px; margin-bottom:28px; }
+    .logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:1rem; letter-spacing:1.5px; }
+    .logo-sub { font-size:0.6rem; color:#00A2E8; letter-spacing:2px; opacity:.7; }
+    h1 { font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; margin-bottom:8px; }
+    p.sub { color: rgba(255,255,255,.5); font-size:.88rem; line-height:1.6; margin-bottom:28px; }
+    .step { display:none; }
+    .step.active { display:block; }
+    label { display:block; font-size:.75rem; font-weight:600; color:rgba(255,255,255,.5); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; }
+    input {
+      width:100%; padding:12px 14px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      color: #fff; font-family:'Inter',sans-serif; font-size:.95rem;
+      margin-bottom:18px; outline:none;
+      transition: border-color .2s;
+    }
+    input:focus { border-color:#00A2E8; }
+    input[type="password"] { letter-spacing:4px; }
+    .btn {
+      width:100%; padding:14px; border:none; border-radius:12px;
+      background: linear-gradient(135deg,#00A2E8,#0060B0);
+      color:#fff; font-family:'Space Grotesk',sans-serif; font-weight:700;
+      font-size:1rem; cursor:pointer; transition:opacity .2s;
+    }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .pin-row { display:flex; gap:10px; margin-bottom:18px; }
+    .pin-row input { text-align:center; font-size:1.4rem; letter-spacing:8px; flex:1; margin-bottom:0; }
+    .hint { font-size:.75rem; color:rgba(255,255,255,.35); margin-top:-12px; margin-bottom:18px; }
+    .err { color:#EF4444; font-size:.82rem; margin-bottom:14px; display:none; }
+    .member-row { display:flex; gap:8px; margin-bottom:10px; }
+    .member-row input { flex:1; margin-bottom:0; }
+    .member-row .del-btn {
+      background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3);
+      color:#EF4444; border-radius:8px; padding:0 14px; cursor:pointer; font-size:1rem;
+    }
+    .add-btn {
+      background:rgba(0,162,232,.08); border:1px solid rgba(0,162,232,.2);
+      color:#00A2E8; border-radius:8px; padding:9px 16px;
+      font-size:.82rem; font-weight:600; cursor:pointer; width:100%; margin-bottom:18px;
+    }
+    .success-icon { font-size:3rem; text-align:center; margin-bottom:16px; }
+    .pill { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.72rem; font-weight:700; }
+    .pill-blue { background:rgba(0,162,232,.14); color:#00A2E8; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="28" height="28" viewBox="0 0 40 40"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00D4FF"/><stop offset="100%" style="stop-color:#0060B0"/></linearGradient></defs><path d="M20 4 L33 11 L33 22 Q33 31 20 35 Q7 31 7 22 L7 11 Z" fill="url(#g1)" opacity=".9"/><circle cx="20" cy="18" r="4" fill="rgba(0,0,0,.55)"/><rect x="18" y="21.5" width="4" height="6" rx="1.5" fill="rgba(0,0,0,.55)"/></svg>
+    <div><div class="logo-text">SMART DOOR</div><div class="logo-sub">HOME PRIVACY OS</div></div>
+  </div>
+
+  <!-- STEP 0: Loading / Token Verification -->
+  <div class="step active" id="step-loading">
+    <h1>Verifying your link…</h1>
+    <p class="sub">Please wait while we confirm your activation link.</p>
+  </div>
+
+  <!-- STEP 1: Basic Info -->
+  <div class="step" id="step-info">
+    <h1>Welcome! 🎉</h1>
+    <p class="sub">Your payment is confirmed. Let's set up your Smart Door account. Your plate ID is <strong id="display-plate-id" style="color:#00A2E8;"></strong>.</p>
+    <div class="err" id="err-info"></div>
+    <label>Your Full Name *</label>
+    <input id="ob-name" type="text" placeholder="e.g. Rahul Sharma" autocomplete="name" />
+    <label>Mobile Number *</label>
+    <input id="ob-phone" type="tel" placeholder="+91 98765 43210" autocomplete="tel" />
+    <label>Email Address *</label>
+    <input id="ob-email" type="email" placeholder="you@example.com" autocomplete="email" />
+    <button class="btn" onclick="goToStep2()">Continue →</button>
+  </div>
+
+  <!-- STEP 2: PIN Setup -->
+  <div class="step" id="step-pin">
+    <h1>Set Your PIN</h1>
+    <p class="sub">Choose a 4-digit PIN to log in to your Smart Door dashboard.</p>
+    <div class="err" id="err-pin"></div>
+    <label>Create PIN (4 digits)</label>
+    <div class="pin-row"><input id="ob-pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" /></div>
+    <label>Confirm PIN</label>
+    <div class="pin-row"><input id="ob-pin2" type="password" inputmode="numeric" maxlength="4" placeholder="••••" /></div>
+    <p class="hint">Do not share your PIN with anyone.</p>
+    <button class="btn" onclick="goToStep3()">Continue →</button>
+  </div>
+
+  <!-- STEP 3: Family Setup (optional) -->
+  <div class="step" id="step-family">
+    <h1>Family Setup</h1>
+    <p class="sub">Add family members who can also receive visitor calls. <span class="pill pill-blue">Optional</span></p>
+    <div class="err" id="err-family"></div>
+    <div id="family-list"></div>
+    <button class="add-btn" onclick="addFamilyRow()">+ Add Family Member</button>
+    <button class="btn" onclick="submitOnboarding()">✅ Activate My Smart Door →</button>
+  </div>
+
+  <!-- STEP 4: Done -->
+  <div class="step" id="step-done">
+    <div class="success-icon">🏠</div>
+    <h1 style="text-align:center;">You're Live!</h1>
+    <p class="sub" style="text-align:center;">Your Smart Door is being manufactured. Once it arrives, scan the QR to activate it.</p>
+    <p style="text-align:center; color:rgba(255,255,255,.35); font-size:.8rem; margin-bottom:28px;" id="done-plate-id"></p>
+    <button class="btn" onclick="window.location.href='/login.html'">Go to Dashboard →</button>
+  </div>
+
+  <!-- STEP: Error -->
+  <div class="step" id="step-error">
+    <h1>⚠️ Invalid Link</h1>
+    <p class="sub">This activation link is expired or invalid. Please check your email or contact support.</p>
+    <button class="btn" onclick="window.location.href='mailto:hello@smartdoor.in'">Contact Support</button>
+  </div>
+</div>
+
+<!-- Env config must be loaded first -->
+<script src="config/env.generated.js"></script>
+<script type="module">
+  import { supabase } from './services/supabase.js';
+
+  // ── State ──
+  const state = {
+    plateId: null,
+    orderId: null,
+    ownerId: null,
+    name: '', phone: '', email: '',
+    pin: '',
+  };
+
+  // ── Helpers ──
+  function showStep(id) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+  function showErr(elId, msg) {
+    const el = document.getElementById(elId);
+    el.textContent = msg; el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+  function val(id) { return document.getElementById(id)?.value.trim() || ''; }
+
+  // ── Step navigation (expose to global scope) ──
+  window.goToStep2 = function () {
+    const name = val('ob-name'), phone = val('ob-phone'), email = val('ob-email');
+    if (!name || !phone || !email) { showErr('err-info', 'All fields are required.'); return; }
+    if (!/^\d{10}$/.test(phone.replace(/\D/g, ''))) { showErr('err-info', 'Enter a valid 10-digit mobile number.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showErr('err-info', 'Enter a valid email address.'); return; }
+    state.name = name; state.phone = phone; state.email = email;
+    showStep('step-pin');
+  };
+
+  window.goToStep3 = function () {
+    const pin = val('ob-pin'), pin2 = val('ob-pin2');
+    if (!/^\d{4}$/.test(pin)) { showErr('err-pin', 'PIN must be exactly 4 digits.'); return; }
+    if (pin !== pin2) { showErr('err-pin', 'PINs do not match.'); return; }
+    state.pin = pin;
+    showStep('step-family');
+  };
+
+  window.addFamilyRow = function () {
+    const list = document.getElementById('family-list');
+    const row = document.createElement('div');
+    row.className = 'member-row';
+    row.innerHTML = `
+      <input type="text" placeholder="Name" class="fm-name" />
+      <input type="tel" placeholder="Phone (10 digits)" class="fm-phone" maxlength="10" />
+      <button class="del-btn" onclick="this.parentElement.remove()">✕</button>`;
+    list.appendChild(row);
+  };
+
+  window.submitOnboarding = async function () {
+    const btn = document.querySelector('#step-family .btn');
+    btn.disabled = true; btn.textContent = '⏳ Activating…';
+
+    // Collect family members
+    const members = [];
+    document.querySelectorAll('.member-row').forEach(row => {
+      const name  = row.querySelector('.fm-name')?.value.trim();
+      const phone = row.querySelector('.fm-phone')?.value.replace(/\D/g,'');
+      if (name && phone && phone.length === 10) members.push({ name, phone });
+    });
+
+    try {
+      // 1. Hash PIN via Edge Function (bcrypt server-side)
+      const { data: pinData, error: pinErr } = await supabase.functions.invoke('set-owner-pin', {
+        body: {
+          owner_id: state.ownerId,
+          pin:      state.pin,
+          name:     state.name,
+          phone:    state.phone.replace(/\D/g,'').slice(-10),
+          email:    state.email,
+        },
+      });
+      if (pinErr || !pinData?.success) throw new Error(pinData?.message || 'PIN setup failed');
+
+      // 2. Create Supabase Auth user
+      const { data: authData, error: authErr } = await supabase.auth.signUp({
+        email:    state.email,
+        password: state.pin + state.ownerId.slice(0, 8), // deterministic, PIN-coupled password
+        options: {
+          emailRedirectTo: `${window.location.origin}/app.html`,
+          data: { plate_id: state.plateId, owner_id: state.ownerId },
+        },
+      });
+      if (authErr) console.warn('[Onboarding] Auth signUp warn (may already exist):', authErr.message);
+
+      // 3. Link auth_user_id to users row
+      if (authData?.user?.id) {
+        await supabase.from('users').update({ auth_user_id: authData.user.id }).eq('id', state.ownerId);
+      }
+
+      // 4. Insert family members
+      if (members.length > 0) {
+        const rows = members.map(m => ({
+          owner_id:  state.ownerId,
+          plate_id:  state.plateId,
+          name:      m.name,
+          phone:     m.phone,
+          is_active: true,
+          role:      'family',
+        }));
+        await supabase.from('family_members').insert(rows);
+      }
+
+      document.getElementById('done-plate-id').textContent = 'Plate ID: ' + state.plateId;
+      showStep('step-done');
+
+    } catch (err) {
+      console.error('[Onboarding]', err);
+      showErr('err-family', err.message || 'Setup failed. Please try again.');
+      btn.disabled = false; btn.textContent = '✅ Activate My Smart Door →';
+    }
+  };
+
+  // ── Boot: verify OTP token from URL ──
+  async function boot() {
+    // URL format: /onboarding.html?token_hash=XXX&type=magiclink&plate_id=SD-XXXXX&order_id=UUID
+    const params    = new URLSearchParams(window.location.search);
+    const tokenHash = params.get('token_hash');
+    const type      = params.get('type') || 'magiclink';
+    const plateId   = params.get('plate_id');
+    const orderId   = params.get('order_id');
+
+    if (!tokenHash || !plateId) {
+      // Also support direct link with just plate_id for admin-initiated onboarding
+      if (plateId && !tokenHash) {
+        // Fetch order info to pre-fill
+        const { data: plate } = await supabase
+          .from('plates').select('owner_id, plate_id').eq('plate_id', plateId).single();
+        if (plate) {
+          state.plateId = plate.plate_id;
+          state.ownerId = plate.owner_id;
+          document.getElementById('display-plate-id').textContent = plate.plate_id;
+          if (orderId) state.orderId = orderId;
+          showStep('step-info');
+          return;
+        }
+      }
+      showStep('step-error');
+      return;
+    }
+
+    // Verify the magic-link OTP token
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (error) { console.error('[Onboarding] OTP verify failed:', error); showStep('step-error'); return; }
+
+    // Fetch order + owner details
+    const { data: plate } = await supabase
+      .from('plates').select('owner_id, plate_id').eq('plate_id', plateId).single();
+
+    if (!plate) { showStep('step-error'); return; }
+
+    state.plateId = plate.plate_id;
+    state.ownerId = plate.owner_id;
+    if (orderId) state.orderId = orderId;
+
+    // Pre-fill name/email from existing user record
+    const { data: user } = await supabase
+      .from('users').select('full_name, email, phone').eq('id', plate.owner_id).single();
+    if (user) {
+      document.getElementById('ob-name').value  = user.full_name || '';
+      document.getElementById('ob-email').value = user.email    || '';
+      document.getElementById('ob-phone').value = user.phone    || '';
+    }
+
+    document.getElementById('display-plate-id').textContent = plateId;
+    showStep('step-info');
+  }
+
+  boot();
+</script>
+</body>
+</html>

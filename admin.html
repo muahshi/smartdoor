@@ -1564,9 +1564,81 @@ window.filterOrders = function(status, tabEl) {
 
 window.openOrderDetail = async function(orderId) {
   const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single();
-  if (!o) return;
-  // Show in a toast summary for now
-  showToast(`Order ${o.order_number} · ${o.customer_name} · ₹${o.total_amount}`, 'success');
+  if (!o) { showToast('Order not found', 'error'); return; }
+
+  // Fetch plate info for QR URL
+  let qrSection = '';
+  if (o.plate_id) {
+    const { data: plate } = await supabase.from('plates').select('qr_image_url, status').eq('plate_id', o.plate_id).single();
+    if (plate?.qr_image_url) {
+      qrSection = `<div style="margin-top:8px;"><a href="${plate.qr_image_url}" target="_blank" style="color:#00A2E8;font-size:.78rem;">📥 Download QR (SVG)</a> &nbsp;<span style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:${plate.status==='active'?'rgba(34,197,94,.15)':'rgba(251,191,36,.12)'};color:${plate.status==='active'?'#34D399':'#FCD34D'}">${plate.status}</span></div>`;
+    } else {
+      qrSection = `<div style="margin-top:8px;color:rgba(255,255,255,.3);font-size:.75rem;">QR pending generation</div>`;
+    }
+  }
+
+  const actions = [];
+
+  if (o.payment_status === 'paid' && ['queued','in_production','packed'].includes(o.manufacturing_status)) {
+    actions.push(`<button class="btn btn-ghost btn-sm" onclick="adminMarkShipped('${o.id}','${o.plate_id || ''}')">🚚 Mark Shipped</button>`);
+  }
+  if (o.manufacturing_status === 'dispatched') {
+    actions.push(`<button class="btn btn-success btn-sm" onclick="adminMarkDelivered('${o.id}','${o.plate_id || ''}','${o.owner_id || ''}')">✅ Mark Delivered</button>`);
+  }
+
+  const html = `
+    <div style="font-size:11px;line-height:1.8;color:var(--text2);font-family:monospace;">
+      <b style="color:var(--text)">${o.order_number}</b> · ${o.customer_name}<br>
+      📧 ${o.customer_email || '—'} · 📱 ${o.customer_phone || '—'}<br>
+      🏷 ${o.product_type} · ₹${(o.total_amount||0).toLocaleString()}<br>
+      💳 Payment: <b>${o.payment_status}</b> · Mfg: <b>${o.manufacturing_status}</b><br>
+      🔑 Plate: <b>${o.plate_id || 'Not assigned'}</b><br>
+      📍 ${JSON.stringify(o.shipping_address||{})}
+      ${qrSection}
+    </div>
+    ${actions.length ? `<div style="display:flex;gap:8px;margin-top:14px;">${actions.join('')}</div>` : ''}
+  `;
+  showToast(html, 'info', 12000);
+};
+
+window.adminMarkShipped = async function(orderId, plateId) {
+  if (!confirm('Mark this order as shipped?')) return;
+  const { error } = await supabase.from('orders').update({
+    manufacturing_status: 'dispatched',
+    tracking_status:      'shipped',
+    updated_at:           new Date().toISOString(),
+  }).eq('id', orderId);
+
+  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+
+  await supabase.from('tracking_events').insert({
+    order_id: orderId, event_type: 'shipped', event_label: 'Shipped', actor: 'admin',
+  });
+
+  showToast('✅ Order marked as shipped', 'success');
+  loadOrders(currentOrderFilter);
+};
+
+window.adminMarkDelivered = async function(orderId, plateId, ownerId) {
+  if (!confirm('Mark as delivered and ACTIVATE subscription?')) return;
+
+  if (!plateId || !ownerId) {
+    showToast('❌ Missing plate_id or owner_id on this order', 'error');
+    return;
+  }
+
+  // Trigger activate-subscription Edge Function
+  const { data, error } = await supabase.functions.invoke('activate-subscription', {
+    body: { owner_id: ownerId, order_id: orderId, plate_id: plateId, plan: 'starter' },
+  });
+
+  if (error || !data?.success) {
+    showToast('Activation failed: ' + (data?.message || error?.message), 'error');
+    return;
+  }
+
+  showToast(`🏠 Delivered & Activated! Sub expires: ${new Date(data.expiryDate).toLocaleDateString('en-IN')}`, 'success');
+  loadOrders(currentOrderFilter);
 };
 
 // ═══════════════════════════════════════
