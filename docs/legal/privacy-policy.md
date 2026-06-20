@@ -1,9 +1,9 @@
 # Privacy Policy
 
-**Effective Date:** [INSERT GO-LIVE DATE]
-**Last Updated:** [INSERT GO-LIVE DATE]
+**Effective Date:** 17 June 2026
+**Last Updated:** 17 June 2026
 
-Smart Door ("we", "us", "our") operates the smartdoor.in website and the
+Smart Door ("we", "us", "our") operates the mysmartdoor.in website and the
 Smart Door visitor management platform (the "Service"). This Privacy
 Policy explains what personal data we collect, how we use it, and the
 choices you have.
@@ -82,7 +82,7 @@ Subject to applicable law, you may:
 - Request a copy of your data
 - Close your account at any time
 
-To exercise these rights, contact **support@smartdoor.in**.
+To exercise these rights, contact **support@mysmartdoor.in**.
 
 ---
 
@@ -108,5 +108,5 @@ We may update this Privacy Policy from time to time. Material changes will be no
 
 **Smart Door**
 Bhopal, Madhya Pradesh, India
-Email: support@smartdoor.in
+Email: support@mysmartdoor.in
 Phone: +91 89898 98989

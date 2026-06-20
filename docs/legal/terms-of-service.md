@@ -1,7 +1,7 @@
 # Terms of Service
 
-**Effective Date:** [INSERT GO-LIVE DATE]
-**Last Updated:** [INSERT GO-LIVE DATE]
+**Effective Date:** 17 June 2026
+**Last Updated:** 17 June 2026
 
 These Terms of Service ("Terms") govern your access to and use of the
 Smart Door website, products, and platform (the "Service"), operated by
@@ -132,5 +132,5 @@ after changes constitutes acceptance of the revised Terms.
 
 **Smart Door**
 Bhopal, Madhya Pradesh, India
-Email: support@smartdoor.in
+Email: support@mysmartdoor.in
 Phone: +91 89898 98989

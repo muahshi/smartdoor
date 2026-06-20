@@ -1,9 +1,9 @@
 # Refund Policy
 
-**Effective Date:** [INSERT GO-LIVE DATE]
-**Last Updated:** [INSERT GO-LIVE DATE]
+**Effective Date:** 17 June 2026
+**Last Updated:** 17 June 2026
 
-This Refund Policy applies to purchases made on smartdoor.in.
+This Refund Policy applies to purchases made on mysmartdoor.in.
 
 ---
 
@@ -34,7 +34,7 @@ This Refund Policy applies to purchases made on smartdoor.in.
 
 ## 5. How to Request a Refund
 
-Email **support@smartdoor.in** with your order ID, reason for refund, and (if applicable) photo/video evidence. We aim to respond within **48 hours**.
+Email **support@mysmartdoor.in** with your order ID, reason for refund, and (if applicable) photo/video evidence. We aim to respond within **48 hours**.
 
 ## 6. Refund Processing Time
 
@@ -44,5 +44,5 @@ Approved refunds are processed via Razorpay to your original payment method with
 
 **Smart Door**
 Bhopal, Madhya Pradesh, India
-Email: support@smartdoor.in
+Email: support@mysmartdoor.in
 Phone: +91 89898 98989

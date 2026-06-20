@@ -72,7 +72,7 @@ TEMPLATE = """<!DOCTYPE html>
   <meta name="description" content="{description}" />
   <meta name="theme-color" content="#00A2E8" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://smartdoor.in/legal/{slug}.html" />
+  <link rel="canonical" href="https://mysmartdoor.in/legal/{slug}.html" />
   <title>{title} — Smart Door</title>
   <link rel="manifest" href="../manifest.json" />
   <link rel="icon" type="image/png" sizes="192x192" href="../images/favicon-192x192.png" />
@@ -121,7 +121,7 @@ TEMPLATE = """<!DOCTYPE html>
       <svg width="26" height="26" viewBox="0 0 40 40"><defs><linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00D4FF"/><stop offset="100%" style="stop-color:#0060B0"/></linearGradient></defs><path d="M20 4 L33 11 L33 22 Q33 31 20 35 Q7 31 7 22 L7 11 Z" fill="url(#lg1)" opacity="0.9"/></svg>
       <span class="legal-logo-text">SMART DOOR</span>
     </a>
-    <a href="../index.html" class="legal-back">← Back to smartdoor.in</a>
+    <a href="../index.html" class="legal-back">← Back to mysmartdoor.in</a>
   </div>
 </nav>
 
@@ -142,7 +142,7 @@ TEMPLATE = """<!DOCTYPE html>
 
 <div class="legal-footer">
   © 2026 Smart Door. All rights reserved. Made in Bhopal, India 🇮🇳 ·
-  <a href="mailto:support@smartdoor.in" style="color:rgba(255,255,255,0.5);">support@smartdoor.in</a>
+  <a href="mailto:support@mysmartdoor.in" style="color:rgba(255,255,255,0.5);">support@mysmartdoor.in</a>
 </div>
 
 </body>

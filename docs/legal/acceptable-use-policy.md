@@ -1,7 +1,7 @@
 # Acceptable Use Policy
 
-**Effective Date:** [INSERT GO-LIVE DATE]
-**Last Updated:** [INSERT GO-LIVE DATE]
+**Effective Date:** 17 June 2026
+**Last Updated:** 17 June 2026
 
 This Acceptable Use Policy ("AUP") sets out rules for using the Smart
 Door platform ("Service"). It supplements our [Terms of Service](/legal/terms-of-service.html).
@@ -45,7 +45,7 @@ Violation of this AUP may result in:
 ## 5. Reporting Abuse
 
 If you believe another user is misusing the Service, contact
-**support@smartdoor.in** with details.
+**support@mysmartdoor.in** with details.
 
 ## 6. Changes to This Policy
 
@@ -56,4 +56,4 @@ after changes constitutes acceptance of the revised policy.
 
 **Smart Door**
 Bhopal, Madhya Pradesh, India
-Email: support@smartdoor.in
+Email: support@mysmartdoor.in

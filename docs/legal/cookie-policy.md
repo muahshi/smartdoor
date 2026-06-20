@@ -1,10 +1,10 @@
 # Cookie Policy
 
-**Effective Date:** [INSERT GO-LIVE DATE]
-**Last Updated:** [INSERT GO-LIVE DATE]
+**Effective Date:** 17 June 2026
+**Last Updated:** 17 June 2026
 
 This Cookie Policy explains how Smart Door ("we", "us", "our") uses
-cookies and similar tracking technologies on smartdoor.in and the Smart
+cookies and similar tracking technologies on mysmartdoor.in and the Smart
 Door platform.
 
 ---
@@ -54,4 +54,4 @@ be reflected with a new "Last Updated" date.
 
 **Smart Door**
 Bhopal, Madhya Pradesh, India
-Email: support@smartdoor.in
+Email: support@mysmartdoor.in

@@ -1,10 +1,10 @@
 # Shipping Policy
 
-**Effective Date:** [INSERT GO-LIVE DATE]
-**Last Updated:** [INSERT GO-LIVE DATE]
+**Effective Date:** 17 June 2026
+**Last Updated:** 17 June 2026
 
 This Shipping Policy applies to Smart Door nameplate hardware orders
-placed on smartdoor.in.
+placed on mysmartdoor.in.
 
 ---
 
@@ -44,11 +44,11 @@ Once dispatched, you will receive a tracking link via email/WhatsApp. You can al
 
 ## 7. Damaged Packages
 
-If your package arrives visibly damaged, please refuse delivery or note it with the courier, and contact **support@smartdoor.in** within 48 hours with photos.
+If your package arrives visibly damaged, please refuse delivery or note it with the courier, and contact **support@mysmartdoor.in** within 48 hours with photos.
 
 ## 8. Contact Us
 
 **Smart Door**
 Bhopal, Madhya Pradesh, India
-Email: support@smartdoor.in
+Email: support@mysmartdoor.in
 Phone: +91 89898 98989
