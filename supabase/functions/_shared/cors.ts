@@ -4,8 +4,8 @@
  */
 
 const PRODUCTION_ORIGINS = [
-  'https://smartdoor.in',
-  'https://www.smartdoor.in',
+  'https://mysmartdoor.in',
+  'https://www.mysmartdoor.in',
 ];
 
 const DEV_ORIGINS = [
