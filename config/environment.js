@@ -48,7 +48,7 @@ const CONFIGS = {
   production: {
     env:              'production',
     label:            '🟢 Production',
-    appUrl:           _SD.appUrl || 'https://smartdoor.in',
+    appUrl:           _SD.appUrl || 'https://mysmartdoor.in',
     supabaseUrl:      _SD.supabaseUrl    || '',
     supabaseAnonKey:  _SD.supabaseAnon   || '',
     razorpayKeyId:    _SD.razorpayKeyId  || '',
@@ -72,7 +72,7 @@ const CONFIGS = {
   staging: {
     env:              'staging',
     label:            '🟡 Staging',
-    appUrl:           _SD.appUrl || 'https://staging.smartdoor.in',
+    appUrl:           _SD.appUrl || 'https://staging.mysmartdoor.in',
     supabaseUrl:      _SD.supabaseUrl    || '',
     supabaseAnonKey:  _SD.supabaseAnon   || '',
     razorpayKeyId:    _SD.razorpayKeyId  || '',
