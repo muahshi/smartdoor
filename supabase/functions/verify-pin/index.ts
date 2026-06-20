@@ -16,8 +16,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 
 const ALLOWED_ORIGINS = [
-  'https://smartdoor.in',
-  'https://www.smartdoor.in',
+  'https://mysmartdoor.in',
+  'https://www.mysmartdoor.in',
   'http://localhost:3000',
   'http://127.0.0.1:5500',
 ];
