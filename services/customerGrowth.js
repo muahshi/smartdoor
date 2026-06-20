@@ -276,7 +276,7 @@ export async function getPMFMetrics() {
 // already create the code and log conversions. This adds the shareable
 // link and an admin leaderboard view.
 
-export function buildReferralLink(referralCode, baseUrl = 'https://smartdoor.in') {
+export function buildReferralLink(referralCode, baseUrl = 'https://mysmartdoor.in') {
   return `${baseUrl.replace(/\/$/, '')}/index.html?ref=${encodeURIComponent(referralCode)}`;
 }
 

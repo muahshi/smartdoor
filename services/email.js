@@ -67,7 +67,7 @@ export async function sendOrderConfirmation({ to, toName, orderNumber, productTy
     product_type:       productType,
     total_amount:       `₹${totalAmount}`,
     estimated_delivery: estimatedDelivery || '5–7 business days',
-    support_email:      'support@smartdoor.in',
+    support_email:      'support@mysmartdoor.in',
   });
 }
 
@@ -77,7 +77,7 @@ export async function sendPaymentSuccess({ to, toName, orderNumber, plateId, amo
     order_number: orderNumber,
     plate_id:     plateId,
     amount:       `₹${amount}`,
-    dashboard_url: `${window.__SD_CONFIG__?.baseUrl || 'https://smartdoor.in'}/app.html`,
+    dashboard_url: `${window.__SD_CONFIG__?.baseUrl || 'https://mysmartdoor.in'}/app.html`,
   });
 }
 
@@ -95,8 +95,8 @@ export async function sendDeliveryConfirmation({ to, toName, orderNumber, plateI
   return sendEmail(EMAIL_TEMPLATES.DELIVERY_CONFIRMATION, to, toName, {
     order_number:  orderNumber,
     plate_id:      plateId,
-    app_url:       `${window.__SD_CONFIG__?.baseUrl || 'https://smartdoor.in'}/app.html`,
-    setup_guide:   `${window.__SD_CONFIG__?.baseUrl || 'https://smartdoor.in'}/setup`,
+    app_url:       `${window.__SD_CONFIG__?.baseUrl || 'https://mysmartdoor.in'}/app.html`,
+    setup_guide:   `${window.__SD_CONFIG__?.baseUrl || 'https://mysmartdoor.in'}/setup`,
   });
 }
 
@@ -112,6 +112,6 @@ export async function sendRenewalReminder({ to, toName, daysLeft, expiryDate, pl
     expiry_date:   expiryDate,
     plan_name:     planName,
     renewal_price: `₹${renewalPrice}`,
-    renew_url:     `${window.__SD_CONFIG__?.baseUrl || 'https://smartdoor.in'}/app.html#renew`,
+    renew_url:     `${window.__SD_CONFIG__?.baseUrl || 'https://mysmartdoor.in'}/app.html#renew`,
   });
 }

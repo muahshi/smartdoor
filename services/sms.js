@@ -81,7 +81,7 @@ export async function smsDelivered(phone, { ownerName, plateId }) {
   return sendSms(SMS_TEMPLATES.DELIVERED, phone, {
     name:     ownerName,
     plate_id: plateId,
-    app_url:  'smartdoor.in/app',
+    app_url:  'mysmartdoor.in/app',
   });
 }
 
@@ -90,7 +90,7 @@ export async function smsRenewalReminder(phone, { ownerName, daysLeft, expiryDat
     name:        ownerName,
     days_left:   daysLeft,
     expiry_date: expiryDate,
-    renew_url:   'smartdoor.in/renew',
+    renew_url:   'mysmartdoor.in/renew',
   });
 }
 

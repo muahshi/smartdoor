@@ -104,7 +104,7 @@ export function generateCustomerCardHTML(manufacturing) {
       <div class="qr-box" style="margin:0 auto 16px;">QR Code</div>
       <div style="font-size:11px;color:#666;">Scan or visit:</div>
       <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${url}</div>
-      <div style="font-size:11px;color:#666;margin-top:14px;">Login at smartdoor.in/login with your Plate ID + PIN to finish setup.</div>
+      <div style="font-size:11px;color:#666;margin-top:14px;">Login at mysmartdoor.in/login with your Plate ID + PIN to finish setup.</div>
     </div>
   `;
   return _wrap('Customer Card', body);

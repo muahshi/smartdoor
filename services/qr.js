@@ -8,13 +8,13 @@
  * Supabase Storage bucket: qr-codes
  *
  * Uses: qrcode library (CDN via ESM)
- * URL format: https://smartdoor.in/p/SD-ABX9K7
+ * URL format: https://mysmartdoor.in/p/SD-ABX9K7
  */
 
 import { supabase } from './supabase.js';
 
 // ────────── CONFIG ──────────
-const QR_BASE_URL    = window.__SD_CONFIG__?.baseUrl || 'https://smartdoor.in';
+const QR_BASE_URL    = window.__SD_CONFIG__?.baseUrl || 'https://mysmartdoor.in';
 const QR_BUCKET      = 'qr-codes';
 const QR_SIZE_PX     = 400;      // Export resolution
 const QR_MARGIN      = 4;        // Quiet zone modules

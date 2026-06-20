@@ -112,7 +112,7 @@ export function generatePlateId() {
 }
 
 // ────────── GENERATE QR URL ──────────
-export function getQrUrl(plateId, baseUrl = 'https://smartdoor.in') {
+export function getQrUrl(plateId, baseUrl = 'https://mysmartdoor.in') {
   return `${baseUrl}/p/${plateId}`;
 }
 
