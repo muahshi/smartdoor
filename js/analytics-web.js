@@ -16,7 +16,7 @@
  * Required env vars (optional — each integration is independent):
  *   VITE_GA_MEASUREMENT_ID     e.g. G-XXXXXXXXXX
  *   VITE_CLARITY_PROJECT_ID    e.g. abc123xyz
- *   VITE_PLAUSIBLE_DOMAIN      e.g. smartdoor.in
+ *   VITE_PLAUSIBLE_DOMAIN      e.g. mysmartdoor.in
  */
 
 (function () {
