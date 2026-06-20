@@ -13,7 +13,7 @@ document, expanded for full production launch.
 | Channel | Use For | SLA Target |
 |---|---|---|
 | In-app ticket system | All issue types (primary channel) | First response < 4h business hours |
-| support@smartdoor.in | Email fallback, written records | First response < 24h |
+| support@mysmartdoor.in | Email fallback, written records | First response < 24h |
 | WhatsApp | Urgent/active issues (e.g. SOS misfire, payment stuck) | First response < 1h |
 | Phone (+91 89898 98989) | Critical escalations only | Immediate during business hours |
 

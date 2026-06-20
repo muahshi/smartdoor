@@ -15,4 +15,4 @@ Disallow: /sql/
 Disallow: /supabase/
 Disallow: /docs/
 
-Sitemap: https://smartdoor.in/sitemap.xml
+Sitemap: https://mysmartdoor.in/sitemap.xml

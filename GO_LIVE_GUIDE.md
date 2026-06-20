@@ -100,13 +100,13 @@ Using the `*.vercel.app` production URL (domains aren't switched yet):
 
 Follow `docs/DOMAIN_SETUP.md` exactly. Summary:
 
-1. In Vercel: Project → Settings → Domains → add `smartdoor.in`,
-   `www.smartdoor.in`, `app.smartdoor.in`, `admin.smartdoor.in`
+1. In Vercel: Project → Settings → Domains → add `mysmartdoor.in`,
+   `www.mysmartdoor.in`, `app.mysmartdoor.in`, `admin.mysmartdoor.in`
 2. Vercel will show the exact DNS records required (A/ALIAS for apex,
    CNAME for subdomains) — copy these precisely, they may differ from
    generic examples
 3. Update records at your domain registrar
-4. Wait for DNS propagation (`dig smartdoor.in` — can take minutes to a
+4. Wait for DNS propagation (`dig mysmartdoor.in` — can take minutes to a
    few hours depending on registrar/TTL)
 5. Confirm SSL certificate auto-provisions (Vercel handles this once DNS
    resolves correctly — usually within minutes)
@@ -115,9 +115,9 @@ Follow `docs/DOMAIN_SETUP.md` exactly. Summary:
 
 ## STEP 7 — Go Live (T-0)
 
-1. Confirm `https://smartdoor.in` loads the production build with a valid
+1. Confirm `https://mysmartdoor.in` loads the production build with a valid
    SSL certificate (padlock, no warnings)
-2. Confirm `https://www.smartdoor.in` redirects correctly
+2. Confirm `https://www.mysmartdoor.in` redirects correctly
 3. Post the announcement / open signups to real customers
 4. Keep the team on standby in a shared channel for the next 2 hours
 

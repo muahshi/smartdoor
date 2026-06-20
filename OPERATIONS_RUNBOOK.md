@@ -36,7 +36,7 @@ error, bad config) and does **not** touch the database:
 1. Go to Vercel Dashboard → Project → Deployments
 2. Find the last known-good deployment (before the bad one)
 3. Click the **⋯** menu on that deployment → **Promote to Production**
-4. Confirm `https://smartdoor.in` now serves the rolled-back version
+4. Confirm `https://mysmartdoor.in` now serves the rolled-back version
    (hard-refresh / check in incognito to bypass cache)
 5. No DNS changes needed — Vercel handles this instantly
 

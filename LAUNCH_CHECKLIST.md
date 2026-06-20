@@ -2,7 +2,7 @@
 ## Phase 10: Production Launch
 
 This is the master go/no-go checklist for taking Smart Door live on
-**smartdoor.in**. It consolidates and extends the checklists already
+**mysmartdoor.in**. It consolidates and extends the checklists already
 completed in earlier phases:
 - `docs/PRODUCTION_CHECKLIST.md` (Phase 8 — security, payments, comms, infra, monitoring, backup, performance)
 - `docs/BETA_LAUNCH_CHECKLIST.md` (Phase 9 — operations, customer success, manufacturing, support)
@@ -39,7 +39,7 @@ SEO, legal, analytics, and alerting.
 - [ ] `vercel.json` reviewed and deployed (build command, headers, caching, rewrites)
 - [ ] Build succeeds with zero errors in Vercel deployment logs
 - [ ] `config/env.generated.js` is generated correctly per environment (check via browser devtools `window.__SD_CONFIG__` — **never** check this file into git)
-- [ ] Security headers present on response (HSTS, X-Frame-Options, X-Content-Type-Options) — verify via `curl -I https://smartdoor.in`
+- [ ] Security headers present on response (HSTS, X-Frame-Options, X-Content-Type-Options) — verify via `curl -I https://mysmartdoor.in`
 - [ ] `/app.html`, `/login.html`, `/admin.html`, `/admin-login.html` all return `X-Robots-Tag: noindex`
 - [ ] Static asset caching verified (`images/`, `css/`, `js/` return long `Cache-Control` headers)
 - [ ] `/p/:plateId` QR rewrite resolves to `login.html?plate=:plateId` — **see Known Gap #1 below**
@@ -65,12 +65,12 @@ SEO, legal, analytics, and alerting.
 
 See `docs/DOMAIN_SETUP.md` for full DNS records. Summary:
 
-- [ ] `smartdoor.in` → Vercel (apex/root domain via ALIAS/ANAME or Vercel's recommended A record)
-- [ ] `www.smartdoor.in` → redirects to `smartdoor.in` (or vice versa — pick one canonical, configure in Vercel domain settings)
-- [ ] `app.smartdoor.in` → Vercel (optional: dedicated subdomain pointing at `app.html`, or keep app under main domain at `/app`)
-- [ ] `admin.smartdoor.in` → Vercel (optional: dedicated subdomain for `admin.html`, recommended for easier IP allowlisting later)
+- [ ] `mysmartdoor.in` → Vercel (apex/root domain via ALIAS/ANAME or Vercel's recommended A record)
+- [ ] `www.mysmartdoor.in` → redirects to `mysmartdoor.in` (or vice versa — pick one canonical, configure in Vercel domain settings)
+- [ ] `app.mysmartdoor.in` → Vercel (optional: dedicated subdomain pointing at `app.html`, or keep app under main domain at `/app`)
+- [ ] `admin.mysmartdoor.in` → Vercel (optional: dedicated subdomain for `admin.html`, recommended for easier IP allowlisting later)
 - [ ] SSL certificates auto-provisioned by Vercel for all 4 domains
-- [ ] DNS propagation verified (`dig smartdoor.in`, `dig app.smartdoor.in`, `dig admin.smartdoor.in`)
+- [ ] DNS propagation verified (`dig mysmartdoor.in`, `dig app.mysmartdoor.in`, `dig admin.mysmartdoor.in`)
 
 ---
 
@@ -98,10 +98,10 @@ See `docs/DOMAIN_SETUP.md` for full DNS records. Summary:
 
 ## 7. RESEND LIVE
 
-- [ ] Domain `smartdoor.in` verified in Resend
+- [ ] Domain `mysmartdoor.in` verified in Resend
 - [ ] SPF record added (`v=spf1 include:_spf.resend.com ~all` — adjust if combined with other senders)
 - [ ] DKIM records added (provided by Resend dashboard, 3x CNAME typically)
-- [ ] DMARC record added (`v=DMARC1; p=quarantine; rua=mailto:dmarc@smartdoor.in`)
+- [ ] DMARC record added (`v=DMARC1; p=quarantine; rua=mailto:dmarc@mysmartdoor.in`)
 - [ ] Test email sent and checked for deliverability to Gmail, Outlook, and a spam-score tool (e.g. mail-tester.com)
 - [ ] Transactional email templates tested: order confirmation, renewal reminder, OTP, password reset
 
@@ -115,7 +115,7 @@ See `docs/EMAIL_DNS_SETUP.md` for exact record values.
 - [ ] `VITE_SENTRY_DSN` set in Vercel production env → confirm errors appear in Sentry dashboard (trigger a test error)
 - [ ] Logtail / log shipping configured at the Edge Function level (server-side — see `docs/MONITORING_SETUP.md`)
 - [ ] `supabase/functions/health-check` returns 200 with all subsystems green
-- [ ] UptimeRobot (or equivalent) monitoring `https://smartdoor.in` and the health-check endpoint, alerting to WhatsApp/email/SMS
+- [ ] UptimeRobot (or equivalent) monitoring `https://mysmartdoor.in` and the health-check endpoint, alerting to WhatsApp/email/SMS
 - [ ] OpenTelemetry hooks reviewed — stub remains for future backend tracing (not required for v1 launch)
 
 ---
@@ -126,8 +126,8 @@ See `docs/EMAIL_DNS_SETUP.md` for exact record values.
 - [ ] Open Graph tags present and `og:image` (`images/og-smartdoor.webp`) renders correctly in link preview testers
 - [ ] Twitter Card tags present and validated
 - [ ] JSON-LD structured data (Organization + Product) present and validates with zero errors (Google Rich Results Test)
-- [ ] `sitemap.xml` live at `https://smartdoor.in/sitemap.xml`
-- [ ] `robots.txt` live at `https://smartdoor.in/robots.txt`, blocking `/app`, `/admin`, `/login`, `/p/`
+- [ ] `sitemap.xml` live at `https://mysmartdoor.in/sitemap.xml`
+- [ ] `robots.txt` live at `https://mysmartdoor.in/robots.txt`, blocking `/app`, `/admin`, `/login`, `/p/`
 - [ ] Canonical URLs set on all public pages (index + 6 legal pages)
 - [ ] Google Search Console property verified and sitemap submitted
 
@@ -136,7 +136,7 @@ See `docs/EMAIL_DNS_SETUP.md` for exact record values.
 ## 10. LEGAL PAGES
 
 - [ ] All 6 legal pages live and linked from footer: Privacy Policy, Terms of Service, Refund Policy, Shipping Policy, Cookie Policy, Acceptable Use Policy
-- [ ] `[INSERT GO-LIVE DATE]` placeholders in all `docs/legal/*.md` replaced with actual effective date, then regenerate via `python3 docs/legal/generate_legal_pages.py`
+- [x] `[INSERT GO-LIVE DATE]` placeholders in all `docs/legal/*.md` replaced with actual effective date (17 June 2026), then regenerated via `python3 docs/legal/generate_legal_pages.py`
 - [ ] Legal pages reviewed by a lawyer familiar with Indian IT Act / Consumer Protection (E-Commerce) Rules, 2020 (strongly recommended before accepting real payments)
 - [ ] Company registration details (CIN/GST, if applicable) added to footer or Terms of Service if operating as a registered entity
 
