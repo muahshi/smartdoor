@@ -91,7 +91,7 @@ earlier phase and should be checked by an external uptime monitor:
    Function URL
 3. Set check interval to 1–5 minutes
 4. Configure alert contacts (email, SMS, WhatsApp via webhook if supported)
-5. Also add a simple monitor for `https://smartdoor.in` itself (the
+5. Also add a simple monitor for `https://mysmartdoor.in` itself (the
    marketing page) to catch full-site outages, not just backend issues
 
 ---

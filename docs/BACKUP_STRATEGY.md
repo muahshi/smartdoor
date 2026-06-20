@@ -216,5 +216,5 @@ Add to Supabase Edge Function `health-check`:
 - Verify S3 bucket accessibility
 
 **Alert channels**:
-- Email: admin@smartdoor.in (critical failures)
+- Email: admin@mysmartdoor.in (critical failures)
 - Dashboard badge (health-check endpoint returns backup_status)

@@ -8,7 +8,7 @@
 ### Infrastructure
 - [ ] Production Supabase project created (separate from staging)
 - [ ] Vercel production deployment configured
-- [ ] Custom domain `smartdoor.in` pointing to Vercel
+- [ ] Custom domain `mysmartdoor.in` pointing to Vercel
 - [ ] SSL certificate active (auto via Vercel)
 - [ ] `VITE_APP_ENV=production` set in Vercel production environment
 - [ ] All env vars set in Vercel dashboard (see `docs/ENV_VARS.md`)

@@ -30,7 +30,7 @@
 - [ ] Max file sizes set per bucket (10MB for voice notes)
 
 ### Edge Function Security
-- [ ] `verify-pin`: domain-restricted CORS (`smartdoor.in` only in ALLOWED_ORIGINS)
+- [ ] `verify-pin`: domain-restricted CORS (`mysmartdoor.in` only in ALLOWED_ORIGINS)
 - [ ] `verify-pin`: PIN lockout integrated (checks `check_pin_lockout` before bcrypt)
 - [ ] `verify-razorpay-payment`: HMAC signature verification confirmed working
 - [ ] `verify-razorpay-payment`: Idempotency check (`provider_payment_id` uniqueness)
@@ -84,7 +84,7 @@
 - [ ] `validateEnv()` called at app boot — no errors on startup
 - [ ] `initMonitoring()` called at app boot
 - [ ] Inactivity auto-logout working (30 minutes)
-- [ ] QR code URLs resolve correctly (`https://smartdoor.in/p/SD-XXXXXX`)
+- [ ] QR code URLs resolve correctly (`https://mysmartdoor.in/p/SD-XXXXXX`)
 - [ ] OG meta tags populated in `index.html` for social sharing
 - [ ] Favicon and app icons present (`192x192`, `512x512`)
 
@@ -96,7 +96,7 @@
 - [ ] `error_logs` table created (Migration 09)
 - [ ] Health check endpoint responds: `GET /functions/v1/health-check` → 200
 - [ ] UptimeRobot (or similar) configured to ping health-check every 5 minutes
-- [ ] Alert email configured (admin@smartdoor.in gets notified on health failures)
+- [ ] Alert email configured (admin@mysmartdoor.in gets notified on health failures)
 - [ ] Supabase Dashboard alerts enabled: database size, connection count
 - [ ] Razorpay alerts enabled: failed payments email
 

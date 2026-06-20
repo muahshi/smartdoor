@@ -1,14 +1,14 @@
 # Smart Door — Email DNS Setup (Resend)
 ## Phase 10: Production Launch
 
-Reference for verifying `smartdoor.in` in Resend and configuring
+Reference for verifying `mysmartdoor.in` in Resend and configuring
 SPF/DKIM/DMARC for production email deliverability.
 
 ---
 
 ## 1. ADD & VERIFY DOMAIN IN RESEND
 
-1. Resend Dashboard → Domains → Add Domain → `smartdoor.in`
+1. Resend Dashboard → Domains → Add Domain → `mysmartdoor.in`
 2. Resend will display the exact DNS records to add — **use the values
    shown in your Resend dashboard**, not the placeholders below, since
    DKIM keys are unique per account.
@@ -21,12 +21,12 @@ SPF/DKIM/DMARC for production email deliverability.
 If you have no existing SPF record:
 ```
 Type: TXT
-Name: @ (or smartdoor.in)
+Name: @ (or mysmartdoor.in)
 Value: v=spf1 include:_spf.resend.com ~all
 ```
 
 If you already send email from another service (e.g. Google Workspace
-for `hello@smartdoor.in`), **merge** into one SPF record — multiple SPF
+for `hello@mysmartdoor.in`), **merge** into one SPF record — multiple SPF
 TXT records on the same name will break validation:
 ```
 v=spf1 include:_spf.resend.com include:_spf.google.com ~all
@@ -45,7 +45,7 @@ Add exactly as shown in your dashboard.
 ```
 Type: TXT
 Name: _dmarc
-Value: v=DMARC1; p=quarantine; rua=mailto:dmarc@smartdoor.in; pct=100
+Value: v=DMARC1; p=quarantine; rua=mailto:dmarc@mysmartdoor.in; pct=100
 ```
 Start with `p=quarantine` rather than `p=reject` for the first few weeks
 to monitor reports before fully enforcing — this avoids legitimate email
