@@ -18,7 +18,7 @@ import QRCode from 'https://esm.sh/qrcode@1.5.4';
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const APP_URL              = Deno.env.get('APP_URL') || 'https://smartdoor.in';
+const APP_URL              = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
 const QR_BUCKET            = 'qr-codes';
 
 serve(async (req) => {
