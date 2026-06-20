@@ -13,7 +13,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const FROM_EMAIL     = "Smart Door <noreply@smartdoor.in>";
+const FROM_EMAIL     = "Smart Door <noreply@mysmartdoor.in>";
 
 // ────────── EMAIL TEMPLATES ──────────
 function getEmailContent(template: string, toName: string, data: Record<string, string>) {
