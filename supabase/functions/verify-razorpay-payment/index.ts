@@ -206,7 +206,16 @@ serve(async (req) => {
         options: { redirectTo: `${APP_URL}/onboarding.html?plate_id=${plateId}&order_id=${orderId}` },
       });
 
-      const activationUrl = linkData?.properties?.action_link || null;
+      // NOTE: linkData.properties.action_link points at Supabase's own hosted
+      // /auth/v1/verify endpoint, which (with detectSessionInUrl: false on the
+      // client) redirects back with the session in a URL hash fragment — not
+      // the `?token_hash=...&type=...` query params onboarding.html's boot()
+      // actually reads. Build the link onboarding.html expects directly from
+      // hashed_token instead, matching its own documented URL format.
+      const hashedToken = linkData?.properties?.hashed_token || null;
+      const activationUrl = hashedToken
+        ? `${APP_URL}/onboarding.html?token_hash=${encodeURIComponent(hashedToken)}&type=magiclink&plate_id=${encodeURIComponent(plateId)}&order_id=${encodeURIComponent(orderId)}`
+        : null;
 
       if (activationUrl) {
         await supabase.functions.invoke("send-email", {

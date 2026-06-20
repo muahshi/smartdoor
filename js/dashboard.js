@@ -14,7 +14,7 @@
  */
 
 import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from './services/auth.js';
-import { getLogs, getTodayStats, getWeeklyData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from './services/logs.js';
+import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from './services/logs.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from './services/security.js';
 import { getSubscription, getRenewalInfo } from './services/subscriptions.js';
 import { getOrderSummary, subscribeToOrderTracking } from './services/orders.js';
@@ -34,6 +34,8 @@ const DashboardModule = (() => {
     visitorLogs: [],
     stats: { todayScans: 0, callsRouted: 0, voiceMessages: 0, bellRings: 0, blockedSpam: 0, weeklyGrowth: 0 },
     weeklyData: [0, 0, 0, 0, 0, 0, 0],
+    monthlyData: new Array(12).fill(0),
+    heatmapData: new Array(84).fill(0),
     intentBreakdown: {},
     subscription: null,
     orderSummary: null,          // Phase 6: latest order tracking
@@ -117,10 +119,13 @@ const DashboardModule = (() => {
   async function _loadAllData() {
     const ownerId = state.owner.id;
 
-    const [logsResult, statsResult, weeklyResult, rulesResult, familyResult, subResult, commsResult, orderResult] = await Promise.allSettled([
+    const [logsResult, statsResult, weeklyResult, monthlyResult, growthResult, heatmapResult, rulesResult, familyResult, subResult, commsResult, orderResult] = await Promise.allSettled([
       getLogs(ownerId, { limit: 20 }),
       getTodayStats(ownerId),
       getWeeklyData(ownerId),
+      getMonthlyData(ownerId),
+      getWeeklyGrowth(ownerId),
+      getScanHeatmapData(ownerId),
       getSecurityRules(ownerId),
       getFamilyMembers(ownerId),
       getSubscription(ownerId),
@@ -151,7 +156,7 @@ const DashboardModule = (() => {
         voiceMessages: s.voiceMessages,
         bellRings:     s.bellRings,
         blockedSpam:   s.blockedSpam,
-        weeklyGrowth:  18, // TODO: calculate vs last week
+        weeklyGrowth:  growthResult.status === 'fulfilled' ? growthResult.value.weeklyGrowth : 0,
         scansTrend:    0,
         callsTrend:    0,
         voiceTrend:    0,
@@ -164,6 +169,16 @@ const DashboardModule = (() => {
     // Weekly chart data
     if (weeklyResult.status === 'fulfilled' && weeklyResult.value.success) {
       state.weeklyData = weeklyResult.value.weeklyData;
+    }
+
+    // Monthly chart data
+    if (monthlyResult.status === 'fulfilled' && monthlyResult.value.success) {
+      state.monthlyData = monthlyResult.value.monthlyData;
+    }
+
+    // QR scan heatmap data
+    if (heatmapResult.status === 'fulfilled' && heatmapResult.value.success) {
+      state.heatmapData = heatmapResult.value.intensities;
     }
 
     // Security rules
@@ -515,7 +530,7 @@ const DashboardModule = (() => {
   function renderMonthlyChart() {
     document.querySelectorAll('#monthly-chart').forEach(el => {
       const months = ['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];
-      const data   = Array.from({ length: 12 }, (_, i) => state.weeklyData[i % 7] || 0); // placeholder
+      const data   = state.monthlyData;
       const max    = Math.max(...data, 1);
       el.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:7px;">
@@ -577,7 +592,7 @@ const DashboardModule = (() => {
     const cellCount = 84;
     let html = '';
     for (let i = 0; i < cellCount; i++) {
-      const intensity = (Math.sin(i * 1.7) + 1) / 2;
+      const intensity = state.heatmapData[i] || 0;
       const opacity   = (0.05 + intensity * 0.55).toFixed(2);
       html += `<div class="heatmap-cell" style="--h-opacity:${opacity};"></div>`;
     }
