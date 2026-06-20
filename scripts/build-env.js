@@ -78,6 +78,11 @@ function resolveVar(...names) {
 
 const supabaseUrl  = resolveVar('VITE_SUPABASE_URL', 'SUPABASE_URL');
 const supabaseAnon = resolveVar('VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
+// Same dual-naming issue as Supabase above: Vercel may have this set as
+// RAZORPAY_KEY_ID (no VITE_ prefix) instead of VITE_RAZORPAY_KEY_ID.
+// This is the PUBLIC key id only — RAZORPAY_KEY_SECRET is never read here
+// and never ships to the browser; it stays Edge-Function-only.
+const razorpayKeyId = resolveVar('VITE_RAZORPAY_KEY_ID', 'RAZORPAY_KEY_ID');
 
 const required = {
   'VITE_SUPABASE_URL / SUPABASE_URL': supabaseUrl,
@@ -105,7 +110,7 @@ const config = {
   baseUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://smartdoor.in' : ENV === 'staging' ? 'https://staging.smartdoor.in' : 'http://localhost:3000'),
   supabaseUrl,
   supabaseAnon,
-  razorpayKeyId: process.env.VITE_RAZORPAY_KEY_ID || '',
+  razorpayKeyId,
   groqApiKey: process.env.VITE_GROQ_API_KEY || '',
   sentryDsn: process.env.VITE_SENTRY_DSN || '',
   gaId: process.env.VITE_GA_MEASUREMENT_ID || '',
