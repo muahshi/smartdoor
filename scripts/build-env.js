@@ -63,9 +63,25 @@ function resolveEnv() {
 
 const ENV = resolveEnv();
 
+// Vercel project env vars were set WITHOUT the VITE_ prefix (SUPABASE_URL,
+// SUPABASE_ANON_KEY) instead of the VITE_-prefixed names this script
+// originally looked for (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY). That
+// mismatch is the root cause of window.__SD_CONFIG__ shipping with empty
+// Supabase values. Each var is now resolved against BOTH naming
+// conventions so the build works regardless of which one is set in Vercel.
+function resolveVar(...names) {
+  for (const name of names) {
+    if (process.env[name]) return process.env[name];
+  }
+  return '';
+}
+
+const supabaseUrl  = resolveVar('VITE_SUPABASE_URL', 'SUPABASE_URL');
+const supabaseAnon = resolveVar('VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
+
 const required = {
-  VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
-  VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || '',
+  'VITE_SUPABASE_URL / SUPABASE_URL': supabaseUrl,
+  'VITE_SUPABASE_ANON_KEY / SUPABASE_ANON_KEY': supabaseAnon,
 };
 
 const missing = Object.entries(required)
@@ -87,8 +103,8 @@ const config = {
   env: ENV,
   appUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://smartdoor.in' : ENV === 'staging' ? 'https://staging.smartdoor.in' : 'http://localhost:3000'),
   baseUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://smartdoor.in' : ENV === 'staging' ? 'https://staging.smartdoor.in' : 'http://localhost:3000'),
-  supabaseUrl: process.env.VITE_SUPABASE_URL || '',
-  supabaseAnon: process.env.VITE_SUPABASE_ANON_KEY || '',
+  supabaseUrl,
+  supabaseAnon,
   razorpayKeyId: process.env.VITE_RAZORPAY_KEY_ID || '',
   groqApiKey: process.env.VITE_GROQ_API_KEY || '',
   sentryDsn: process.env.VITE_SENTRY_DSN || '',
