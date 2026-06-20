@@ -198,7 +198,7 @@ serve(async (req) => {
     // ── 11. Send activation / onboarding email ──
     // Generate magic-link token for the owner's email so they can set PIN + family
     const ownerEmail = order.customer_email;
-    const APP_URL    = Deno.env.get("APP_URL") || "https://smartdoor.in";
+    const APP_URL    = Deno.env.get("APP_URL") || "https://mysmartdoor.in";
     try {
       const { data: linkData } = await supabase.auth.admin.generateLink({
         type:    "magiclink",
@@ -234,7 +234,7 @@ serve(async (req) => {
                           text-decoration:none;font-weight:700;font-size:1rem;">
                   Activate My Smart Door →
                 </a>
-                <p style="color:#888;font-size:.85rem;">This link expires in 24 hours. If you didn't make this purchase, please contact hello@smartdoor.in immediately.</p>
+                <p style="color:#888;font-size:.85rem;">This link expires in 24 hours. If you didn't make this purchase, please contact hello@mysmartdoor.in immediately.</p>
               </div>`,
           },
         });
