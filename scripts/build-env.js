@@ -25,7 +25,7 @@
  *   VITE_SUPABASE_ANON_KEY
  *   VITE_RAZORPAY_KEY_ID      (rzp_live_... in production, rzp_test_... elsewhere)
  *   VITE_GROQ_API_KEY
- *   VITE_APP_BASE_URL         e.g. https://smartdoor.in
+ *   VITE_APP_BASE_URL         e.g. https://mysmartdoor.in
  *
  * Local dev: copy .env.example -> .env.local and run `node scripts/build-env.js`
  * manually (or `npm run build` if you add one) before opening any HTML file.
@@ -106,8 +106,8 @@ if (missing.length > 0) {
 
 const config = {
   env: ENV,
-  appUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://smartdoor.in' : ENV === 'staging' ? 'https://staging.smartdoor.in' : 'http://localhost:3000'),
-  baseUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://smartdoor.in' : ENV === 'staging' ? 'https://staging.smartdoor.in' : 'http://localhost:3000'),
+  appUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://mysmartdoor.in' : ENV === 'staging' ? 'https://staging.mysmartdoor.in' : 'http://localhost:3000'),
+  baseUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://mysmartdoor.in' : ENV === 'staging' ? 'https://staging.mysmartdoor.in' : 'http://localhost:3000'),
   supabaseUrl,
   supabaseAnon,
   razorpayKeyId,
