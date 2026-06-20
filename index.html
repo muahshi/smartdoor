@@ -842,8 +842,8 @@
 <div class="modal-backdrop" id="booking-success-modal">
   <div class="modal-box" style="text-align:center;">
     <div style="width:70px;height:70px;border-radius:50%;background:rgba(34,197,94,0.12);border:2px solid rgba(34,197,94,0.35);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:2rem;">✅</div>
-    <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:#fff;margin-bottom:8px;">Order Confirmed! 🎉</div>
-    <p style="color:rgba(255,255,255,0.5);font-size:0.88rem;line-height:1.6;margin-bottom:20px;">Your Smart Door nameplate is being prepared. You'll receive a tracking link on your mobile shortly.</p>
+    <div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:800;color:#fff;margin-bottom:8px;" id="booking-success-title">Order Confirmed! 🎉</div>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.88rem;line-height:1.6;margin-bottom:20px;" id="booking-success-desc">Your Smart Door nameplate is being prepared. You'll receive a tracking link on your mobile shortly.</p>
     <div style="padding:16px;background:rgba(0,162,232,0.06);border:1px solid rgba(0,162,232,0.18);border-radius:12px;margin-bottom:20px;"><div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-bottom:4px;">Order ID</div><div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);" id="order-id">SD-2024-XXXX</div></div>
     <button onclick="closeModal('booking-success-modal')" class="btn-book">Continue</button>
   </div>
@@ -906,6 +906,47 @@
     document.getElementById('step-ind-2').classList.add('active');
   }
 
+  // ────────── TEMP: WHATSAPP FALLBACK (until Razorpay is live) ──────────
+  // submitBooking() auto-detects whether window.__SD_CONFIG__.razorpayKeyId
+  // is set. If it's empty (current state), the order is sent to this
+  // WhatsApp number instead of opening Razorpay checkout. The moment
+  // VITE_RAZORPAY_KEY_ID / RAZORPAY_KEY_ID is added in Vercel and the app
+  // is redeployed, this fallback turns off automatically — no code change
+  // needed here.
+  const WHATSAPP_OWNER_NUMBER = '919575877758';
+
+  function buildWhatsAppOrderMessage(orderParams, customerInfo, refId) {
+    const addr = orderParams.shippingAddress;
+    return [
+      '🔔 *New Smart Door Order Request*',
+      '',
+      `*Product:* ${selectedProduct.name} (₹${selectedProduct.price.toLocaleString('en-IN')})`,
+      `*Plate Text:* ${orderParams.houseName}`,
+      `*Font Style:* ${orderParams.fontStyle}`,
+      '',
+      '*Customer Details:*',
+      `Name: ${customerInfo.name}`,
+      `Phone: ${customerInfo.phone}`,
+      `Email: ${customerInfo.email}`,
+      '',
+      '*Shipping Address:*',
+      addr.line1,
+      `${addr.city}, ${addr.state} - ${addr.pincode}`,
+      '',
+      `*Reference ID:* ${refId}`,
+      '',
+      '_Sent automatically from smartdoor-omega.vercel.app — Razorpay link pending, please confirm and share the payment link manually._'
+    ].join('\n');
+  }
+
+  function sendOrderViaWhatsApp(orderParams, customerInfo) {
+    const refId = 'SD-WA-' + Date.now().toString(36).toUpperCase();
+    const message = buildWhatsAppOrderMessage(orderParams, customerInfo, refId);
+    const waUrl = `https://wa.me/${WHATSAPP_OWNER_NUMBER}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+    return { success: true, plateId: refId, viaWhatsApp: true };
+  }
+
   async function submitBooking(e) {
     e.preventDefault();
     const required = ['plate-name','buyer-name','buyer-phone','buyer-email','shipping-address','city','pincode'];
@@ -945,8 +986,12 @@
         },
       };
 
-      // initiateCheckout is bridged from services/payments.js module (see script[type=module] below)
-      const result = await window._SD_initiateCheckout(orderParams, customerInfo);
+      // initiateCheckout is bridged from services/payments.js module (see script[type=module] below).
+      // Falls back to WhatsApp while razorpayKeyId isn't set in SD_CONFIG yet.
+      const razorpayReady = !!(window.__SD_CONFIG__ && window.__SD_CONFIG__.razorpayKeyId);
+      const result = razorpayReady
+        ? await window._SD_initiateCheckout(orderParams, customerInfo)
+        : sendOrderViaWhatsApp(orderParams, customerInfo);
 
       if (result.cancelled) {
         submitBtn.disabled = false;
@@ -960,8 +1005,15 @@
         return;
       }
 
-      // Real success — show plate ID
+      // Real success — show plate ID (or WhatsApp reference ID)
       document.getElementById('order-id').textContent = result.plateId || result.orderNumber || '—';
+      if (result.viaWhatsApp) {
+        document.getElementById('booking-success-title').textContent = 'Order Request Sent! 📲';
+        document.getElementById('booking-success-desc').textContent = "Your order details have been sent to our team on WhatsApp. We'll confirm availability and share the payment link shortly.";
+      } else {
+        document.getElementById('booking-success-title').textContent = 'Order Confirmed! 🎉';
+        document.getElementById('booking-success-desc').textContent = "Your Smart Door nameplate is being prepared. You'll receive a tracking link on your mobile shortly.";
+      }
       document.getElementById('booking-form').reset();
       _currentProductKey = 'wood';
       showModal('booking-success-modal');
