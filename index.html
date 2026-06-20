@@ -850,7 +850,7 @@
 </div>
 
 <script src="js/groq.js"></script>
-<script src="js/app.js"></script>
+<script type="module" src="js/app.js"></script>
 <script>
   window.addEventListener('scroll', () => {
     document.getElementById('lp-nav').classList.toggle('scrolled', window.scrollY > 40);
@@ -865,7 +865,7 @@
     const woodCard = document.querySelector('[data-product="wood"]');
     if (woodCard) selectProduct(woodCard);
   });
-  function selectProduct(card) {
+  function selectProductBase(card) {
     document.querySelectorAll('.pcard.product-card').forEach(c => {
       c.classList.remove('selected');
       const btn = c.querySelector('.pcard-select');
@@ -892,9 +892,8 @@
   let _currentProductKey = 'wood'; // default matches selectedProduct
 
   // Track selected product key alongside selectProduct()
-  const _origSelectProduct = window.selectProduct;
   function selectProduct(card) {
-    if (_origSelectProduct) _origSelectProduct(card);
+    selectProductBase(card);
     _currentProductKey = card.dataset?.product || _currentProductKey;
     const fmt = `₹${selectedProduct.price.toLocaleString('en-IN')}`;
     document.getElementById('selected-name').textContent = selectedProduct.name;
