@@ -294,11 +294,28 @@
     // CALL
     const btnCall = document.getElementById('btn-call');
     let activeCallId = null;
+    let cachedVisitorPhone = null;
     btnCall?.addEventListener('click', async () => {
       if (btnCall.disabled) return;
+
+      // The masked-call providers (Exotel/Twilio) require a visitor phone
+      // number to bridge the two-leg call — without it the provider call
+      // fails outright. Ask once per session and reuse it.
+      let visitorPhone = cachedVisitorPhone;
+      if (!visitorPhone) {
+        const raw = window.prompt('Enter your phone number so we can connect your call (kept private, never shown to the resident):');
+        if (raw === null) return; // visitor cancelled
+        visitorPhone = raw.replace(/\D/g, '').slice(-10);
+        if (visitorPhone.length !== 10) {
+          showToast('Please enter a valid 10-digit phone number.', 'error');
+          return;
+        }
+        cachedVisitorPhone = visitorPhone;
+      }
+
       btnCall.disabled = true;
       document.getElementById('call-sub').textContent = 'Connecting…';
-      const result = await initiateMaskedCall({ plateId, ownerId });
+      const result = await initiateMaskedCall({ plateId, ownerId, visitorPhone });
       if (result.success) {
         activeCallId = result.callId;
         document.getElementById('call-sub').textContent = 'Call connected — your number stays hidden';

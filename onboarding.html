@@ -237,14 +237,16 @@
       }
 
       // 4. Insert family members
+      // (priority 1 is reserved for the primary owner — see services/security.js
+      // and call-status-webhook's routing fallback — so members start at 2)
       if (members.length > 0) {
-        const rows = members.map(m => ({
-          owner_id:  state.ownerId,
-          plate_id:  state.plateId,
-          name:      m.name,
-          phone:     m.phone,
-          is_active: true,
-          role:      'family',
+        const rows = members.map((m, idx) => ({
+          owner_id:     state.ownerId,
+          name:         m.name,
+          phone:        m.phone,
+          relationship: 'family',
+          priority:     idx + 2,
+          is_active:    true,
         }));
         await supabase.from('family_members').insert(rows);
       }

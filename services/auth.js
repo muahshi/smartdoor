@@ -37,10 +37,13 @@ export async function loginOwner(plateId, pin, rememberDevice = false) {
       };
     }
 
-    // Edge function returns a hashed magic-link token → verify via OTP flow
+    // Edge function returns a hashed magic-link token → verify via OTP flow.
+    // NOTE: verify-pin returns `linkData.properties.hashed_token`, which must be
+    // exchanged using the `token_hash` param (not `token`, which is for 6-digit
+    // OTP codes sent via email/SMS). This matches the pattern already used in
+    // onboarding.html's verifyOtp({ token_hash, type }) call.
     const { data: authData, error: authError } = await supabase.auth.verifyOtp({
-      email:      data.email,
-      token:      data.token,   // hashed_token from generateLink
+      token_hash: data.token,   // hashed_token from generateLink
       type:       'magiclink',
     });
 

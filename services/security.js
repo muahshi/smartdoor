@@ -63,8 +63,23 @@ export async function getFamilyMembers(ownerId) {
 }
 
 // ────────── ADD FAMILY MEMBER ──────────
+// NOTE: priority 1 is reserved for the primary owner (call_logs.routed_to_priority
+// defaults to 1 for the owner's own leg — see call-status-webhook's family
+// routing fallback). Family members occupy tiers 2, 3, 4, matching the
+// Primary Owner → Member 2 → Member 3 → Member 4 routing order.
 export async function addFamilyMember(ownerId, { name, phone, relationship = 'family' }) {
-  // Get current max priority
+  // Count existing members (was previously checked against a 1-row query,
+  // which could never report more than 1 member — fixed to a real count).
+  const { count, error: countErr } = await supabase
+    .from('family_members')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_id', ownerId);
+
+  if (countErr) return { success: false, error: countErr.message };
+  if ((count || 0) >= 3) {
+    return { success: false, error: 'Maximum 3 family members allowed (tiers 2–4 after the primary owner).' };
+  }
+
   const { data: existing } = await supabase
     .from('family_members')
     .select('priority')
@@ -72,11 +87,7 @@ export async function addFamilyMember(ownerId, { name, phone, relationship = 'fa
     .order('priority', { ascending: false })
     .limit(1);
 
-  if (existing?.length >= 4) {
-    return { success: false, error: 'Maximum 4 family members allowed.' };
-  }
-
-  const nextPriority = (existing?.[0]?.priority || 0) + 1;
+  const nextPriority = Math.max(existing?.[0]?.priority || 1, 1) + 1;
 
   const { data, error } = await supabase
     .from('family_members')
@@ -105,7 +116,7 @@ export async function reorderFamilyMembers(ownerId, orderedIds) {
   const updates = orderedIds.map((id, idx) =>
     supabase
       .from('family_members')
-      .update({ priority: idx + 1 })
+      .update({ priority: idx + 2 })   // tier 1 reserved for the primary owner
       .eq('id', id)
       .eq('owner_id', ownerId)
   );

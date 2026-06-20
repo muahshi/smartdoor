@@ -173,6 +173,124 @@ export async function getWeeklyData(ownerId) {
   }
 }
 
+// ────────── MONTHLY DATA (for chart) ──────────
+/**
+ * Real qr_scan counts for the last 12 calendar months (oldest → newest).
+ * @param {string} ownerId
+ */
+export async function getMonthlyData(ownerId) {
+  try {
+    const months = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(d);
+    }
+    const rangeStart = months[0];
+
+    const { data, error } = await supabase
+      .from('visitor_logs')
+      .select('created_at')
+      .eq('owner_id', ownerId)
+      .eq('event_type', 'qr_scan')
+      .gte('created_at', rangeStart.toISOString());
+
+    if (error) throw error;
+
+    const counts = new Array(12).fill(0);
+    data.forEach(log => {
+      const d = new Date(log.created_at);
+      const idx = months.findIndex(m => m.getFullYear() === d.getFullYear() && m.getMonth() === d.getMonth());
+      if (idx !== -1) counts[idx]++;
+    });
+
+    return { success: true, monthlyData: counts };
+  } catch (err) {
+    return { success: false, error: err.message, monthlyData: new Array(12).fill(0) };
+  }
+}
+
+// ────────── WEEKLY GROWTH (this 7 days vs prior 7 days) ──────────
+export async function getWeeklyGrowth(ownerId) {
+  try {
+    const now = new Date();
+    const start14 = new Date(now); start14.setDate(start14.getDate() - 14); start14.setHours(0, 0, 0, 0);
+    const start7  = new Date(now); start7.setDate(start7.getDate() - 7);   start7.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('visitor_logs')
+      .select('created_at')
+      .eq('owner_id', ownerId)
+      .eq('event_type', 'qr_scan')
+      .gte('created_at', start14.toISOString());
+
+    if (error) throw error;
+
+    let prevWeek = 0, thisWeek = 0;
+    data.forEach(log => {
+      const t = new Date(log.created_at);
+      if (t >= start7) thisWeek++;
+      else if (t >= start14) prevWeek++;
+    });
+
+    const growth = prevWeek === 0
+      ? (thisWeek > 0 ? 100 : 0)
+      : Math.round(((thisWeek - prevWeek) / prevWeek) * 100);
+
+    return { success: true, weeklyGrowth: growth };
+  } catch (err) {
+    return { success: false, error: err.message, weeklyGrowth: 0 };
+  }
+}
+
+// ────────── QR SCAN HEATMAP (real scan density, last 12 weeks × 7 days) ──────────
+/**
+ * Returns an 84-length array (7 rows × 12 cols, row-major: i = dayOfWeek*12 + weekIndex)
+ * of normalized intensities 0..1, matching the heatmap-grid's repeat(12, 1fr) layout.
+ * @param {string} ownerId
+ */
+export async function getScanHeatmapData(ownerId) {
+  try {
+    const WEEKS = 12;
+    const now = new Date();
+    const rangeStart = new Date(now);
+    rangeStart.setDate(rangeStart.getDate() - WEEKS * 7);
+    rangeStart.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from('visitor_logs')
+      .select('created_at')
+      .eq('owner_id', ownerId)
+      .eq('event_type', 'qr_scan')
+      .gte('created_at', rangeStart.toISOString());
+
+    if (error) throw error;
+
+    // counts[dayOfWeek][weekIndex] — weekIndex 0 = oldest of the 12 weeks
+    const counts = Array.from({ length: 7 }, () => new Array(WEEKS).fill(0));
+    data.forEach(log => {
+      const d = new Date(log.created_at);
+      const daysAgo = Math.floor((now - d) / 86400000);
+      const weekIndex = WEEKS - 1 - Math.floor(daysAgo / 7);
+      if (weekIndex < 0 || weekIndex >= WEEKS) return;
+      const dayOfWeek = d.getDay(); // 0=Sun..6=Sat
+      counts[dayOfWeek][weekIndex]++;
+    });
+
+    const max = Math.max(...counts.flat(), 1);
+    const intensities = [];
+    for (let row = 0; row < 7; row++) {
+      for (let col = 0; col < WEEKS; col++) {
+        intensities.push(counts[row][col] / max);
+      }
+    }
+
+    return { success: true, intensities };
+  } catch (err) {
+    return { success: false, error: err.message, intensities: new Array(84).fill(0) };
+  }
+}
+
 // ────────── REALTIME: SUBSCRIBE TO NEW LOGS ──────────
 /**
  * Live feed of visitor events for dashboard
