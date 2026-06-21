@@ -1,0 +1,10 @@
+users
+plates
+subscriptions
+notifications
+message_logs
+call_logs
+audit_logs
+admin_users
+ownership_transfers
+activation_events
