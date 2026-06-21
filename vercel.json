@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".",
   "rewrites": [
-    { "source": "/p/:slug", "destination": "/visitor.html" },
+    { "source": "/p/:slug", "destination": "/visitor.html?plate=:slug" },
     { "source": "/gate/:path*", "destination": "/guard.html" },
     { "source": "/society/:path*", "destination": "/society-admin.html" },
     { "source": "/pass/:code", "destination": "/visitor.html" },

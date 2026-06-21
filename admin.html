@@ -1234,6 +1234,7 @@ import {
   getAdminSession, requireAdminAuth, adminLogout, getDashboardMetrics, getRevenueChartData, hasPermission, canWrite
 } from './services/admin.js';
 import { searchCustomers, getCustomerProfile } from './services/customers.js';
+import { markDelivered } from './services/orders.js';
 import { getManufacturingQueue, getQueueCounts, updateProductionStatus, searchQRByPlateId, deactivateQR, reactivateQR, generateProductionSheetHTML } from './services/manufacturing.js';
 import { listTickets, getTicketDetail, createTicket as createTicketSvc, updateTicket, addTicketComment, getTicketStats } from './services/support.js';
 import { getFinancialMetrics, getSubscriptionAnalytics, getOrderAnalytics, getSystemHealth, getAuditLogs } from './services/analytics.js';
@@ -1627,13 +1628,14 @@ window.adminMarkDelivered = async function(orderId, plateId, ownerId) {
     return;
   }
 
-  // Trigger activate-subscription Edge Function
-  const { data, error } = await supabase.functions.invoke('activate-subscription', {
-    body: { owner_id: ownerId, order_id: orderId, plate_id: plateId, plan: 'starter' },
-  });
+  // Routed through services/orders.js markDelivered() — the canonical
+  // delivery→activation function (was previously dead code; admin.html had
+  // its own separate inline call to activate-subscription). Consolidating
+  // to one implementation avoids the two paths drifting out of sync.
+  const data = await markDelivered(orderId);
 
-  if (error || !data?.success) {
-    showToast('Activation failed: ' + (data?.message || error?.message), 'error');
+  if (!data.success) {
+    showToast('Activation failed: ' + (data.error || 'Unknown error'), 'error');
     return;
   }
 

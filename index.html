@@ -989,6 +989,21 @@
       // initiateCheckout is bridged from services/payments.js module (see script[type=module] below).
       // Falls back to WhatsApp while razorpayKeyId isn't set in SD_CONFIG yet.
       const razorpayReady = !!(window.__SD_CONFIG__ && window.__SD_CONFIG__.razorpayKeyId);
+
+      // PRODUCTION CONFIG VALIDATION: the WhatsApp fallback is only safe in
+      // development/staging while keys are being set up. In production, a
+      // missing razorpayKeyId must NOT silently produce a fake "Order
+      // Confirmed" — that would mean real customers think they paid when no
+      // order, payment, or plate was ever created. Fail loudly instead.
+      const currentEnv = window.__SD_CONFIG__?.env || 'development';
+      if (!razorpayReady && currentEnv === 'production') {
+        console.error('[submitBooking] BLOCKED: razorpayKeyId missing in production config. Set VITE_RAZORPAY_KEY_ID in Vercel.');
+        alert('Booking is temporarily unavailable. Please try again shortly or contact us on WhatsApp directly.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = origText;
+        return;
+      }
+
       const result = razorpayReady
         ? await window._SD_initiateCheckout(orderParams, customerInfo)
         : sendOrderViaWhatsApp(orderParams, customerInfo);
