@@ -227,22 +227,28 @@ export async function markDelivered(orderId) {
 
   // 3. Subscription activate karo (Edge Function via invoke)
   const orderResult = await getOrder(orderId);
-  if (orderResult.success && orderResult.order.owner_id) {
-    const { error } = await supabase.functions.invoke('activate-subscription', {
-      body: {
-        owner_id:  orderResult.order.owner_id,
-        order_id:  orderId,
-        plate_id:  orderResult.order.plate_id,
-        plan:      'starter',  // default plan on hardware purchase
-      },
-    });
-
-    if (error) {
-      console.error('[Orders] Subscription activation failed:', error);
-    }
+  if (!orderResult.success || !orderResult.order.owner_id || !orderResult.order.plate_id) {
+    return { success: false, error: 'Order is missing owner_id or plate_id — cannot activate subscription.' };
   }
 
-  return { success: true };
+  const { data, error } = await supabase.functions.invoke('activate-subscription', {
+    body: {
+      owner_id:  orderResult.order.owner_id,
+      order_id:  orderId,
+      plate_id:  orderResult.order.plate_id,
+      plan:      'starter',  // default plan on hardware purchase
+    },
+  });
+
+  if (error || !data?.success) {
+    console.error('[Orders] Subscription activation failed:', error || data?.message);
+    // Order is marked delivered, but activation failed — surface this so the
+    // caller doesn't show a false "success" toast (matches the audit's Bug 1
+    // principle: never report success when the underlying action failed).
+    return { success: false, error: data?.message || error?.message || 'Subscription activation failed.' };
+  }
+
+  return { success: true, expiryDate: data.expiryDate, message: data.message };
 }
 
 // ────────── SUBSCRIBE TO ORDER TRACKING (Realtime) ──────────
