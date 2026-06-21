@@ -13,7 +13,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcryptjs from 'npm:bcryptjs@2.4.3';
 
 const ALLOWED_ORIGINS = [
   'https://mysmartdoor.in',
@@ -105,11 +105,11 @@ serve(async (req) => {
       .single();
 
     if (userErr || !user) {
-      await bcrypt.compare('0000', '$2b$10$invalidhashpadding000000000000000000000000000000000000000');
+      bcryptjs.compareSync('0000', '$2b$10$invalidhashpadding000000000000000000000000000000000000000');
       return Response.json({ success: false, message: 'Invalid Plate ID or PIN' }, { status: 401, headers });
     }
 
-    const isValid = await bcrypt.compare(pinStr, user.pin_hash);
+    const isValid = bcryptjs.compareSync(pinStr, user.pin_hash);
 
     if (!isValid) {
       const { data: failData } = await supabaseAdmin.rpc('record_failed_pin', { p_plate_id: normalizedPlateId });
