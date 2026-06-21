@@ -24,13 +24,19 @@ const SUPABASE_URL        = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Product pricing (paise mein — INR × 100)
+// Yeh frontend index.html ke data-price attributes se EXACTLY match honi chahiye:
+//   acrylic (data-product="acrylic") = ₹1499
+//   teakwood (data-product="wood")   = ₹2499
+//   stainless (data-product="steel") = ₹2999
 const PRODUCT_PRICES: Record<string, number> = {
-  acrylic:   199900,   // ₹1999
-  stainless: 349900,   // ₹3499
-  teakwood:  299900,   // ₹2999
+  acrylic:   149900,   // ₹1499
+  stainless: 299900,   // ₹2999
+  teakwood:  249900,   // ₹2499
 };
-const SUBSCRIPTION_PRICE = 99900;   // ₹999/year
-const SHIPPING_PRICE     = 0;       // Free shipping
+const SHIPPING_PRICE = 0;   // Free shipping
+// NOTE: SUBSCRIPTION_PRICE removed. 1 year Privacy subscription is
+// included FREE with every plate (as advertised on the product page) —
+// it must NOT be added on top of the product price.
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -78,10 +84,9 @@ serve(async (req) => {
     }
 
     // ── Calculate amounts (paise) ──
-    const productPricePaise      = PRODUCT_PRICES[productType];
-    const subscriptionPricePaise = SUBSCRIPTION_PRICE;
-    const shippingPricePaise     = SHIPPING_PRICE;
-    const totalPaise             = productPricePaise + subscriptionPricePaise + shippingPricePaise;
+    const productPricePaise  = PRODUCT_PRICES[productType];
+    const shippingPricePaise = SHIPPING_PRICE;
+    const totalPaise         = productPricePaise + shippingPricePaise;
 
     // ── Create Razorpay order ──
     const razorpayAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
@@ -123,7 +128,7 @@ serve(async (req) => {
         owner_id:            ownerId || null,
         product_type:        productType,
         product_price:       productPricePaise / 100,
-        subscription_price:  subscriptionPricePaise / 100,
+        subscription_price:  0,   // included free — never charged separately
         shipping_price:      shippingPricePaise / 100,
         total_amount:        totalPaise / 100,
         payment_status:      "pending",
