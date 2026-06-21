@@ -5,7 +5,7 @@
     { "source": "/p/:slug", "destination": "/visitor.html?plate=:slug" },
     { "source": "/gate/:path*", "destination": "/guard.html" },
     { "source": "/society/:path*", "destination": "/society-admin.html" },
-    { "source": "/pass/:code", "destination": "/visitor.html" },
+    { "source": "/pass/:code", "destination": "/visitor.html?plate=:code" },
     { "source": "/app", "destination": "/app.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/onboarding", "destination": "/onboarding.html" }
