@@ -17,23 +17,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { PRODUCT_PRICES_PAISE, SHIPPING_PRICE_PAISE, isValidProductType } from "../_shared/pricing.ts";
 
 const RAZORPAY_KEY_ID     = Deno.env.get("RAZORPAY_KEY_ID")!;
 const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET")!;
 const SUPABASE_URL        = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Product pricing (paise mein — INR × 100)
-// Yeh frontend index.html ke data-price attributes se EXACTLY match honi chahiye:
-//   acrylic (data-product="acrylic") = ₹1499
-//   teakwood (data-product="wood")   = ₹2499
-//   stainless (data-product="steel") = ₹2999
-const PRODUCT_PRICES: Record<string, number> = {
-  acrylic:   149900,   // ₹1499
-  stainless: 299900,   // ₹2999
-  teakwood:  249900,   // ₹2499
-};
-const SHIPPING_PRICE = 0;   // Free shipping
+// Product pricing now lives in ONE place: ../_shared/pricing.ts
+// (PRODUCT_PRICES_PAISE / SHIPPING_PRICE_PAISE). Do not redeclare prices
+// here — import them, so this function can never drift out of sync with
+// other Edge Functions that also need product pricing.
 // NOTE: SUBSCRIPTION_PRICE removed. 1 year Privacy subscription is
 // included FREE with every plate (as advertised on the product page) —
 // it must NOT be added on top of the product price.
@@ -60,7 +54,7 @@ serve(async (req) => {
       return Response.json({ success: false, message: "Customer details required." }, { status: 400, headers: corsHeaders });
     }
 
-    if (!PRODUCT_PRICES[productType]) {
+    if (!isValidProductType(productType)) {
       return Response.json({ success: false, message: "Invalid product type." }, { status: 400, headers: corsHeaders });
     }
 
@@ -83,9 +77,9 @@ serve(async (req) => {
       }
     }
 
-    // ── Calculate amounts (paise) ──
-    const productPricePaise  = PRODUCT_PRICES[productType];
-    const shippingPricePaise = SHIPPING_PRICE;
+    // ── Calculate amounts (paise) — sourced from ../_shared/pricing.ts ──
+    const productPricePaise  = PRODUCT_PRICES_PAISE[productType];
+    const shippingPricePaise = SHIPPING_PRICE_PAISE;
     const totalPaise         = productPricePaise + shippingPricePaise;
 
     // ── Create Razorpay order ──
