@@ -10,7 +10,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcryptjs from 'npm:bcryptjs@2.4.3';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!;
@@ -33,7 +33,7 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     // Hash the PIN (bcrypt, cost 12)
-    const pin_hash = await bcrypt.hash(String(pin), await bcrypt.genSalt(12));
+    const pin_hash = bcryptjs.hashSync(String(pin), 12);
 
     // Update user record
     const updatePayload: Record<string, unknown> = { pin_hash };
