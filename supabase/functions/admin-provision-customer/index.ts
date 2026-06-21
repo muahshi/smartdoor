@@ -24,7 +24,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcryptjs from 'npm:bcryptjs@2.4.3';
 // @ts-ignore — esm.sh resolves at runtime
 import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { restrictedCors } from '../_shared/cors.ts';
@@ -109,7 +109,7 @@ serve(async (req) => {
     }
 
     // ── Hash PIN (bcrypt, cost 12 — matches set-owner-pin) ──
-    const pinHash = await bcrypt.hash(pinStr, await bcrypt.genSalt(12));
+    const pinHash = bcryptjs.hashSync(pinStr, 12);
 
     // ── Insert user ──
     const { data: user, error: userErr } = await supabaseAdmin
