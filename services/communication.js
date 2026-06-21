@@ -119,11 +119,11 @@ export async function sendTextMessage({ ownerId, plateId, content, messageType =
   }
 
   try {
-    // No .select().single() — visitor is anon; message_logs_select_own only
-    // permits authenticated owners to read rows. Supabase re-evaluates the
-    // SELECT policy when .select() is chained after insert; anon gets 0 rows
-    // back which surfaces as "violates row-level security policy" even though
-    // the INSERT itself succeeded. visitor.html never uses the returned row.
+    // No .select().single() after insert — visitor is anon and
+    // message_logs_select_own only allows authenticated owners to read rows.
+    // Supabase re-evaluates the SELECT policy when .select() is chained;
+    // anon gets 0 rows back which surfaces as "violates row-level security
+    // policy" even though the INSERT itself succeeded.
     const { error } = await supabase
       .from('message_logs')
       .insert({
