@@ -63,12 +63,12 @@ const CHANNELS = {
  */
 export async function createNotification({ ownerId, type, title, body = null, payload = {}, priority = 'normal', channels = ['in_app'] }) {
   try {
-    // Generate id client-side so dispatch() can reference it for the
-    // delivery_status update without needing a SELECT readback.
-    // No .select().single() — visitor is anon; notifications_select_own only
-    // permits authenticated owners. Chaining .select() after insert causes
-    // Supabase to re-evaluate the SELECT policy for the anon role, which
-    // returns 0 rows and surfaces as "violates row-level security policy".
+    // Generate id client-side — dispatch() needs it to update delivery_status
+    // without a SELECT readback. No .select().single() after insert because
+    // visitor is anon and notifications_select_own only allows authenticated
+    // owners. Chaining .select() causes Supabase to re-evaluate the SELECT
+    // policy for anon, which returns 0 rows and surfaces as "violates
+    // row-level security policy" even though the INSERT succeeded.
     const notificationId = crypto.randomUUID();
     const { error } = await supabase
       .from('notifications')
