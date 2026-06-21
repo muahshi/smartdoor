@@ -111,18 +111,25 @@ export async function uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mi
 
     if (uploadError) throw uploadError;
 
-    const { data: row, error: insertError } = await supabase
+    // Do NOT chain .select().single() — visitor is anon and voice_notes_select_own
+    // only allows authenticated owners to read rows. Supabase re-runs the SELECT
+    // policy after insert when .select() is chained; anon gets 0 rows back, which
+    // surfaces as an RLS error even though the INSERT itself succeeded.
+    // We generate the id client-side so the message_logs mirror and notification
+    // can still reference a stable voice note id without a readback.
+    const voiceNoteId = crypto.randomUUID();
+    const { error: insertError } = await supabase
       .from('voice_notes')
       .insert({
+        id: voiceNoteId,
         owner_id: ownerId,
         plate_id: plateId,
         storage_path: storagePath,
         duration_secs: Math.round(durationSecs),
-      })
-      .select()
-      .single();
+      });
 
     if (insertError) throw insertError;
+    const row = { id: voiceNoteId };
 
     // Mirror into message_logs so this voice note appears in the unified
     // "Communication Logs" feed alongside calls/text/emergency messages
