@@ -22,7 +22,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcryptjs from 'npm:bcryptjs@2.4.3';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getServiceClient } from '../_shared/adminAuth.ts';
 
@@ -284,7 +284,7 @@ serve(async (req) => {
       }
 
       // OTP valid — hash new PIN and update
-      const pinHash = await bcrypt.hash(pinStr, await bcrypt.genSalt(12));
+      const pinHash = bcryptjs.hashSync(pinStr, 12);
 
       const { error: updateErr } = await supabaseAdmin
         .from('users')
