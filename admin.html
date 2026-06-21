@@ -607,16 +607,19 @@
     <div class="nav-item active" data-panel="dashboard" onclick="switchPanel('dashboard', this)">
       <span class="nav-icon">📊</span> Dashboard
     </div>
-    <div class="nav-item" data-panel="analytics" onclick="switchPanel('analytics', this)">
+    <div class="nav-item" data-panel="analytics" data-resource="analytics" onclick="switchPanel('analytics', this)">
       <span class="nav-icon">📈</span> Analytics
     </div>
-    <div class="nav-item" data-panel="financial" onclick="switchPanel('financial', this)">
+    <div class="nav-item" data-panel="financial" data-resource="analytics" onclick="switchPanel('financial', this)">
       <span class="nav-icon">💰</span> Financial
     </div>
   </div>
 
   <div class="sidebar-section">
     <div class="sidebar-section-label">Operations</div>
+    <div class="nav-item" data-panel="provisioning" data-resource="customers" data-action="write" onclick="switchPanel('provisioning', this)">
+      <span class="nav-icon">➕</span> Provisioning
+    </div>
     <div class="nav-item" data-panel="customers" onclick="switchPanel('customers', this)">
       <span class="nav-icon">👥</span> Customers
     </div>
@@ -714,6 +717,11 @@
         <div class="metric-card"><div class="metric-label">Open Tickets</div><div class="metric-value" id="m-tickets">—</div><div class="metric-sub">Support tickets</div></div>
         <div class="metric-card"><div class="metric-label">Expiring Soon</div><div class="metric-value" id="m-expiring">—</div><div class="metric-sub">Subs expiring in 30d</div></div>
         <div class="metric-card"><div class="metric-label">New Customers</div><div class="metric-value" id="m-newcust">—</div><div class="metric-sub">This month <span class="metric-trend trend-up" id="m-growth"></span></div></div>
+        <div class="metric-card"><div class="metric-label">Total Plates</div><div class="metric-value" id="m-plates-total">—</div><div class="metric-sub">All provisioned plates</div></div>
+        <div class="metric-card"><div class="metric-label">Active Plates</div><div class="metric-value" id="m-plates-active">—</div><div class="metric-sub">Currently live</div></div>
+        <div class="metric-card"><div class="metric-label">Inactive Plates</div><div class="metric-value" id="m-plates-inactive">—</div><div class="metric-sub">Suspended / inactive</div></div>
+        <div class="metric-card"><div class="metric-label">Messages Today</div><div class="metric-value" id="m-msgs-today">—</div><div class="metric-sub">Visitor messages</div></div>
+        <div class="metric-card"><div class="metric-label">Voice Notes Today</div><div class="metric-value" id="m-voice-today">—</div><div class="metric-sub">Recorded today</div></div>
       </div>
 
       <div class="grid-2">
@@ -741,6 +749,71 @@
             <button class="btn btn-ghost btn-sm" onclick="switchPanel('support', document.querySelector('[data-panel=support]'))">View All</button>
           </div>
           <div id="dashOpenTickets"><div class="empty-state"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ PROVISIONING PANEL (Phase 12 — Internal Admin Portal) ══════════ -->
+    <div class="panel" id="panel-provisioning">
+      <div class="section-header">
+        <span class="section-title">➕ Create Customer</span>
+        <span style="font-size:11px;color:var(--muted)">Provision a customer + plate without going through the website checkout</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Customer Details</span></div>
+          <form id="createCustomerForm" onsubmit="return false;">
+            <div class="form-group">
+              <label class="form-label">Full Name *</label>
+              <input type="text" class="form-input" id="cc-name" required placeholder="e.g. Ramesh Kumar">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone *</label>
+              <input type="tel" class="form-input" id="cc-phone" required placeholder="10-digit mobile number" maxlength="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" id="cc-email" placeholder="optional">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Address</label>
+              <textarea class="form-input" id="cc-address" rows="2" placeholder="optional"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Product Type *</label>
+              <select class="form-select" id="cc-product" required>
+                <option value="acrylic">Acrylic</option>
+                <option value="teakwood">Teakwood</option>
+                <option value="stainless">Stainless Steel</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Initial PIN *</label>
+              <input type="text" class="form-input" id="cc-pin" required placeholder="4 digits" maxlength="4" inputmode="numeric" pattern="[0-9]{4}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subscription Plan</label>
+              <select class="form-select" id="cc-plan">
+                <option value="">No subscription (hardware only)</option>
+                <option value="starter">Starter Suite — ₹999/yr</option>
+                <option value="standard">Standard Fleet — ₹1,999/yr</option>
+                <option value="scale">Scale Mesh — ₹2,999/yr</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="createCustomerBtn" style="width:100%" onclick="submitCreateCustomer()">Create Customer</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">Customer Package</span></div>
+          <div id="customerPackageResult">
+            <div class="empty-state">
+              <div style="font-size:32px;margin-bottom:8px">📦</div>
+              <div>Fill the form and click Create Customer.</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:6px">Plate ID, QR code and activation summary will appear here.</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1231,13 +1304,18 @@
 <script type="module">
 import { supabase } from './services/supabase.js';
 import {
-  getAdminSession, requireAdminAuth, adminLogout, getDashboardMetrics, getRevenueChartData, hasPermission, canWrite
+  getAdminSession, requireAdminAuth, adminLogout, getDashboardMetrics, getRevenueChartData, hasPermission, canWrite, canAccessRevenue, isSuperAdmin
 } from './services/admin.js';
 import { searchCustomers, getCustomerProfile } from './services/customers.js';
 import { markDelivered } from './services/orders.js';
 import { getManufacturingQueue, getQueueCounts, updateProductionStatus, searchQRByPlateId, deactivateQR, reactivateQR, generateProductionSheetHTML } from './services/manufacturing.js';
 import { listTickets, getTicketDetail, createTicket as createTicketSvc, updateTicket, addTicketComment, getTicketStats } from './services/support.js';
 import { getFinancialMetrics, getSubscriptionAnalytics, getOrderAnalytics, getSystemHealth, getAuditLogs } from './services/analytics.js';
+import {
+  generatePlateId as previewPlateId, generateQRCode as previewQRCode, createCustomer,
+  resetPin as resetPinSvc, suspendPlate, reactivatePlate, regenerateQr,
+  transferOwnership as transferOwnershipSvc, resendActivation as resendActivationSvc,
+} from './services/adminProvisioning.js';
 
 // ─── AUTH CHECK ───
 const session = requireAdminAuth();
@@ -1250,6 +1328,22 @@ document.getElementById('adminAvatar').textContent = (session.full_name || 'A')[
 if (canWrite(session, 'admin_users')) {
   document.getElementById('addAdminBtn').style.display = '';
 }
+
+// Phase 12 — RBAC nav hiding. dealer/support don't get Financial/Analytics
+// (revenue), and "Create Customer" only shows for roles that can write
+// customers (super_admin, dealer). Server-side Edge Functions enforce the
+// same rules independently — this is UI convenience, not the real boundary.
+document.querySelectorAll('.nav-item[data-resource]').forEach((item) => {
+  const resource = item.dataset.resource;
+  const action = item.dataset.action; // optional override — defaults to read-or-write check below
+  const allowed = resource === 'analytics'
+    ? canAccessRevenue(session)
+    : action
+      ? hasPermission(session, resource, action)
+      : (hasPermission(session, resource, 'read') || hasPermission(session, resource, 'write'));
+  if (!allowed) item.style.display = 'none';
+});
+document.getElementById('createCustomerBtn')?.style.setProperty('display', hasPermission(session, 'customers', 'write') ? '' : 'none');
 
 // ─── STATE ───
 let currentPanel = 'dashboard';
@@ -1275,6 +1369,7 @@ window.switchPanel = function(panelId, navEl) {
 
   const titles = {
     dashboard: ['Dashboard', 'Overview & KPIs'],
+    provisioning: ['Provisioning', 'Create Customer + Plate'],
     customers: ['Customers', 'Customer Management'],
     orders: ['Orders', 'Order Management'],
     manufacturing: ['Manufacturing', 'Production Queue'],
@@ -1350,6 +1445,11 @@ async function loadDashboard() {
     document.getElementById('m-tickets').textContent = m.openTickets;
     document.getElementById('m-expiring').textContent = m.expiringSoon;
     document.getElementById('m-newcust').textContent = m.newCustomersThisMonth;
+    document.getElementById('m-plates-total').textContent = m.totalPlates ?? '—';
+    document.getElementById('m-plates-active').textContent = m.activePlates ?? '—';
+    document.getElementById('m-plates-inactive').textContent = m.inactivePlates ?? '—';
+    document.getElementById('m-msgs-today').textContent = m.messagesToday ?? '—';
+    document.getElementById('m-voice-today').textContent = m.voiceNotesToday ?? '—';
     document.getElementById('openTicketsBadge').textContent = m.openTickets;
     if (m.customerGrowthPct !== null) {
       const el = document.getElementById('m-growth');
@@ -1461,9 +1561,40 @@ window.openCustomerProfile = async function(customerId) {
   const res = await getCustomerProfile(customerId);
   if (!res.success) { document.getElementById('customerModalBody').innerHTML = `<div class="empty-state">Error: ${res.error}</div>`; return; }
 
-  const { user, orders, subscriptions, visitorLogs, voiceNotes, callLogs, familyMembers } = res.profile;
+  const { user, orders, subscriptions, visitorLogs, voiceNotes, callLogs, familyMembers, plate, messagesCount, notificationsCount } = res.profile;
   const sub = subscriptions.find(s => s.status === 'active');
   const totalSpend = orders.filter(o => o.payment_status === 'paid').reduce((s, o) => s + (o.total_amount || 0), 0);
+
+  const refreshThisProfile = () => openCustomerProfile(customerId);
+
+  let plateMgmtHTML = '<div style="color:var(--muted);font-size:12px">No plate linked to this customer.</div>';
+  if (plate) {
+    const statusBadge = plate.status === 'active'
+      ? '<span class="badge badge-success">Active</span>'
+      : plate.status === 'suspended'
+        ? '<span class="badge badge-danger">Suspended</span>'
+        : `<span class="badge badge-muted">${plate.status}</span>`;
+
+    plateMgmtHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-family:monospace;font-weight:600">${plate.plate_id}</span>
+        ${statusBadge}
+        <span style="font-size:11px;color:var(--muted)">${messagesCount} messages · ${notificationsCount} notifications</span>
+      </div>
+      ${plate.status === 'suspended' && plate.suspended_reason ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Suspended: ${plate.suspended_reason}</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${hasPermission(session,'pin_reset','write') ? `<button class="btn btn-ghost btn-sm" onclick="adminResetPin('${user.id}','${plate.plate_id}')">🔑 Reset PIN</button>` : ''}
+        ${hasPermission(session,'plates','write') ? (plate.status === 'suspended'
+            ? `<button class="btn btn-success btn-sm" onclick="adminReactivatePlate('${plate.plate_id}', refreshCurrentCustomerProfile)">▶ Reactivate</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="adminSuspendPlate('${plate.plate_id}', refreshCurrentCustomerProfile)">⏸ Suspend</button>`) : ''}
+        ${isSuperAdmin(session) ? `<button class="btn btn-ghost btn-sm" onclick="adminTransferOwnership('${plate.plate_id}', refreshCurrentCustomerProfile)">🔁 Transfer Ownership</button>` : ''}
+        ${hasPermission(session,'activation_resend','write') ? `<button class="btn btn-ghost btn-sm" onclick="adminResendActivation('${user.id}','${(user.full_name||'').replace(/'/g,'')}','${user.email||''}','${user.phone||''}','${plate.plate_id}')">✉ Resend Activation</button>` : ''}
+        ${plate.qr_image_url
+          ? `<a class="btn btn-ghost btn-sm" href="${plate.qr_image_url}" download="${plate.plate_id}.png">↓ QR PNG</a>`
+          : `<button class="btn btn-ghost btn-sm" onclick="adminRegenerateQr('${plate.plate_id}', refreshCurrentCustomerProfile)">↻ Generate QR</button>`}
+      </div>
+    `;
+  }
 
   document.getElementById('customerModalBody').innerHTML = `
     <div class="profile-header">
@@ -1478,6 +1609,11 @@ window.openCustomerProfile = async function(customerId) {
       <div class="stat-pill"><div class="stat-pill-value">${orders.length}</div><div class="stat-pill-label">Orders</div></div>
       <div class="stat-pill"><div class="stat-pill-value">₹${totalSpend.toLocaleString()}</div><div class="stat-pill-label">Total Spend</div></div>
       <div class="stat-pill"><div class="stat-pill-value">${visitorLogs.length}</div><div class="stat-pill-label">Visitor Logs</div></div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Plate Management</div>
+      ${plateMgmtHTML}
     </div>
 
     <div style="margin-bottom:12px">
@@ -1511,6 +1647,8 @@ window.openCustomerProfile = async function(customerId) {
       <div style="font-size:12px;color:var(--muted)">Voice Notes: ${voiceNotes.length} · Call Logs: ${callLogs.length}</div>
     </div>
   `;
+
+  window.refreshCurrentCustomerProfile = refreshThisProfile;
 };
 
 // ═══════════════════════════════════════
@@ -2026,6 +2164,168 @@ window.createTicket = async function() {
     closeModal('createTicketModal');
     loadSupport();
   } else showToast('Error: ' + res.error, 'error');
+};
+
+// ═══════════════════════════════════════
+// PROVISIONING — Create Customer (Phase 12)
+// ═══════════════════════════════════════
+
+window.submitCreateCustomer = async function() {
+  if (!hasPermission(session, 'customers', 'write')) {
+    showToast('Your role cannot create customers.', 'error');
+    return;
+  }
+
+  const fullName = document.getElementById('cc-name').value.trim();
+  const phone = document.getElementById('cc-phone').value.trim();
+  const email = document.getElementById('cc-email').value.trim();
+  const address = document.getElementById('cc-address').value.trim();
+  const productType = document.getElementById('cc-product').value;
+  const initialPin = document.getElementById('cc-pin').value.trim();
+  const subscriptionPlan = document.getElementById('cc-plan').value;
+
+  if (!fullName || phone.length !== 10 || !/^\d{4}$/.test(initialPin)) {
+    showToast('Please fill in name, a 10-digit phone, and a 4-digit PIN.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('createCustomerBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  const res = await createCustomer({
+    fullName, phone, email, address, productType, initialPin,
+    subscriptionPlan: subscriptionPlan || null,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Create Customer';
+
+  if (!res.success) {
+    showToast('Error: ' + res.error, 'error');
+    return;
+  }
+
+  showToast(`Customer created — Plate ${res.customer.plate_id}`, 'success');
+  renderCustomerPackage(res.customer);
+  document.getElementById('createCustomerForm').reset();
+};
+
+function renderCustomerPackage(c) {
+  const qrImg = c.qr_image_url
+    ? `<img src="${c.qr_image_url}" style="width:160px;height:160px;border-radius:8px;background:#fff;padding:8px" alt="QR for ${c.plate_id}">`
+    : `<div class="empty-state" style="padding:20px">QR generation failed — use Plate Management → Regenerate QR.</div>`;
+
+  document.getElementById('customerPackageResult').innerHTML = `
+    <div style="text-align:center;margin-bottom:14px">${qrImg}</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px">
+      ${c.qr_image_url ? `<a class="btn btn-ghost btn-sm" href="${c.qr_image_url}" download="${c.plate_id}.png">↓ PNG</a>` : ''}
+      ${c.qr_svg_url ? `<a class="btn btn-ghost btn-sm" href="${c.qr_svg_url}" download="${c.plate_id}.svg">↓ SVG</a>` : ''}
+    </div>
+    <table style="width:100%;font-size:13px">
+      <tr><td style="color:var(--muted);padding:4px 0">Name</td><td style="text-align:right;font-weight:600">${c.full_name}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Phone</td><td style="text-align:right">${c.phone}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Plate ID</td><td style="text-align:right"><span class="badge badge-info">${c.plate_id}</span></td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Product</td><td style="text-align:right">${c.product_type}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Plan</td><td style="text-align:right">${c.subscription_plan || 'None'}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Activated</td><td style="text-align:right">${new Date(c.activation_date).toLocaleString('en-IN')}</td></tr>
+      <tr><td style="color:var(--muted);padding:4px 0">Login URL</td><td style="text-align:right"><a href="${c.qr_url}" target="_blank" style="color:var(--info)">${c.qr_url}</a></td></tr>
+    </table>
+  `;
+}
+
+// ═══════════════════════════════════════
+// PLATE MANAGEMENT (Phase 12)
+// Reset PIN / Suspend / Reactivate / Transfer Ownership / Regenerate QR
+// — these replace the legacy deactivateQR()/reactivateQR() calls in the
+// QR Management panel for any *new* admin action, since those go through
+// the anon-key client and are blocked by RLS (see services/admin.js note
+// near adminAuditLog and supabase/functions/admin-plate-status/index.ts
+// header comment for the full explanation).
+// ═══════════════════════════════════════
+
+window.adminResetPin = async function(ownerId, plateId) {
+  if (!hasPermission(session, 'pin_reset', 'write')) {
+    showToast('Your role cannot reset PINs.', 'error'); return;
+  }
+  const newPin = prompt(`Enter new 4-digit PIN for ${plateId}:`);
+  if (!newPin) return;
+  if (!/^\d{4}$/.test(newPin.trim())) { showToast('PIN must be exactly 4 digits.', 'error'); return; }
+
+  const res = await resetPinSvc(ownerId, newPin.trim());
+  if (res.success) {
+    showToast(res.message || 'PIN reset successfully.', 'success');
+  } else {
+    showToast('Error: ' + (res.error || res.message), 'error');
+  }
+};
+
+window.adminSuspendPlate = async function(plateId, refreshFn) {
+  if (!hasPermission(session, 'plates', 'write')) {
+    showToast('Your role cannot suspend plates.', 'error'); return;
+  }
+  const reason = prompt(`Reason for suspending ${plateId}:`);
+  if (!reason || !reason.trim()) { showToast('A reason is required.', 'error'); return; }
+
+  const res = await suspendPlate(plateId, reason.trim());
+  if (res.success) {
+    showToast(`${plateId} suspended.`, 'success');
+    if (typeof refreshFn === 'function') refreshFn();
+  } else showToast('Error: ' + (res.error || res.message), 'error');
+};
+
+window.adminReactivatePlate = async function(plateId, refreshFn) {
+  if (!hasPermission(session, 'plates', 'write')) {
+    showToast('Your role cannot reactivate plates.', 'error'); return;
+  }
+  const res = await reactivatePlate(plateId);
+  if (res.success) {
+    showToast(`${plateId} reactivated.`, 'success');
+    if (typeof refreshFn === 'function') refreshFn();
+  } else showToast('Error: ' + (res.error || res.message), 'error');
+};
+
+window.adminRegenerateQr = async function(plateId, refreshFn) {
+  const res = await regenerateQr(plateId);
+  if (res.success) {
+    showToast('QR regenerated.', 'success');
+    if (typeof refreshFn === 'function') refreshFn();
+  } else showToast('Error: ' + (res.error || res.message), 'error');
+};
+
+window.adminResendActivation = async function(ownerId, fullName, email, phone, plateId) {
+  if (!hasPermission(session, 'activation_resend', 'write')) {
+    showToast('Your role cannot resend activation.', 'error'); return;
+  }
+  const res = await resendActivationSvc({ ownerId, fullName, email, phone, plateId });
+  if (res.success) showToast('Activation resent.', 'success');
+  else showToast('Error: ' + (res.error || res.message), 'error');
+};
+
+window.adminTransferOwnership = async function(plateId, refreshFn) {
+  if (!isSuperAdmin(session)) {
+    showToast('Only Super Admins can transfer ownership.', 'error'); return;
+  }
+  const newOwnerName = prompt(`New owner's full name for ${plateId}:`);
+  if (!newOwnerName) return;
+  const newOwnerPhone = prompt('New owner\'s 10-digit phone:');
+  if (!newOwnerPhone || newOwnerPhone.replace(/\D/g,'').length !== 10) { showToast('Valid phone required.', 'error'); return; }
+  const newOwnerPin = prompt('New 4-digit PIN for the incoming owner:');
+  if (!newOwnerPin || !/^\d{4}$/.test(newOwnerPin.trim())) { showToast('PIN must be 4 digits.', 'error'); return; }
+  const reason = prompt('Reason (house_sold / tenant_changed / new_owner):', 'new_owner') || 'new_owner';
+
+  if (!confirm(`Transfer ${plateId} to ${newOwnerName}? Messages/notifications history is preserved; the previous owner will lose access immediately.`)) return;
+
+  const res = await transferOwnershipSvc({
+    plateId, reason: reason.trim(), newOwnerName: newOwnerName.trim(),
+    newOwnerPhone: newOwnerPhone.trim(), newOwnerPin: newOwnerPin.trim(),
+  });
+
+  if (res.success) {
+    showToast(res.message || 'Ownership transferred.', 'success');
+    if (res.family_members_warning) showToast(res.family_members_warning, 'info');
+    if (typeof refreshFn === 'function') refreshFn();
+  } else showToast('Error: ' + (res.error || res.message), 'error');
 };
 
 // ═══════════════════════════════════════
