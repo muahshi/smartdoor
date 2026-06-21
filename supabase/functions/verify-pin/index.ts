@@ -159,6 +159,28 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Auth token generation failed. Please retry.' }, { status: 500, headers });
     }
 
+    // ── Server-side auth_user_id linking ──
+    // Previously this link was only ever set client-side, inside
+    // onboarding.html, after a separate auth.signUp() call. If onboarding
+    // was skipped or abandoned, PIN login would still "succeed" here (a
+    // valid Supabase Auth session gets created) but getCurrentOwner()
+    // (services/auth.js) would never resolve a profile, since it looks up
+    // users by auth_user_id. generateLink() above already creates-or-finds
+    // the Supabase Auth user for this email and returns it — so we link it
+    // here, server-side, on every successful login, not just onboarding.
+    if (!user.auth_user_id && linkData?.user?.id) {
+      const { error: linkUpdateErr } = await supabaseAdmin
+        .from('users')
+        .update({ auth_user_id: linkData.user.id })
+        .eq('id', user.id);
+
+      if (linkUpdateErr) {
+        // Non-fatal — login can still proceed via the magic-link token;
+        // log it so it's visible without blocking the user.
+        console.error('[verify-pin] auth_user_id link failed:', linkUpdateErr);
+      }
+    }
+
     return Response.json({
       success:    true,
       owner_id:   user.id,
