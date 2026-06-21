@@ -104,6 +104,20 @@ if (missing.length > 0) {
   );
 }
 
+// Razorpay key is not in `required` above (checkout has a WhatsApp fallback
+// for dev/staging while keys are being set up — see index.html submitBooking()).
+// But in PRODUCTION specifically, a missing key means real customers hit the
+// WhatsApp fallback instead of actually paying. Fail loudly at build time.
+if (!razorpayKeyId && ENV === 'production') {
+  console.warn(
+    `\n🚨 [build-env] PRODUCTION BUILD with no Razorpay key set!\n` +
+    `   VITE_RAZORPAY_KEY_ID / RAZORPAY_KEY_ID is empty in the production scope.\n` +
+    `   Checkout will silently fall back to the WhatsApp order flow —\n` +
+    `   no real orders, payments, or plates will be created.\n` +
+    `   Set the live key in Vercel → Project → Settings → Environment Variables (Production scope).\n`
+  );
+}
+
 const config = {
   env: ENV,
   appUrl: process.env.VITE_APP_BASE_URL || (ENV === 'production' ? 'https://mysmartdoor.in' : ENV === 'staging' ? 'https://staging.mysmartdoor.in' : 'http://localhost:3000'),
