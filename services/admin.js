@@ -22,19 +22,24 @@ export const ADMIN_ROLES = {
   MANUFACTURING:  'manufacturing',
   SUPPORT:        'support',
   ANALYST:        'analyst',
+  DEALER:         'dealer', // Phase 12 — Internal Admin Portal: create customer + plate, no revenue
 };
 
 export const PERMISSIONS = {
-  CUSTOMERS:      'customers',
-  ORDERS:         'orders',
-  MANUFACTURING:  'manufacturing',
-  QR:             'qr',
-  SUBSCRIPTIONS:  'subscriptions',
-  SUPPORT:        'support',
-  ANALYTICS:      'analytics',
-  COMMUNICATION:  'communication',
-  AUDIT:          'audit',
-  SYSTEM:         'system',
+  CUSTOMERS:          'customers',
+  ORDERS:             'orders',
+  MANUFACTURING:      'manufacturing',
+  QR:                 'qr',
+  PLATES:             'plates',            // Phase 12
+  PIN_RESET:          'pin_reset',         // Phase 12 — granted to support too
+  ACTIVATION_RESEND:  'activation_resend', // Phase 12 — granted to support too
+  OWNERSHIP_TRANSFER: 'ownership_transfer',// Phase 12 — super_admin only
+  SUBSCRIPTIONS:      'subscriptions',
+  SUPPORT:            'support',
+  ANALYTICS:          'analytics',
+  COMMUNICATION:      'communication',
+  AUDIT:              'audit',
+  SYSTEM:             'system',
 };
 
 // ────────── SESSION MANAGEMENT ──────────
@@ -109,8 +114,8 @@ export function canDelete(session, resource) {
 }
 
 // ────────── ADMIN LOGIN ──────────
-// Note: Real implementation should use Edge Function for bcrypt compare.
-// This is the client-side flow that calls the Edge Function.
+// supabase/functions/admin-login/index.ts (Phase 12) does the actual
+// bcrypt compare + optional TOTP check + session issuance.
 
 export async function adminLogin(email, password, totpCode = null) {
   try {
@@ -119,10 +124,17 @@ export async function adminLogin(email, password, totpCode = null) {
     });
 
     if (error || !data?.success) {
-      return { success: false, error: data?.message || 'Invalid credentials.' };
+      // requires2FA must survive a failed/incomplete login so the UI
+      // (admin-login.html) can reveal the TOTP input instead of just
+      // showing a generic error.
+      return { success: false, error: data?.message || 'Invalid credentials.', requires2FA: !!data?.requires2FA };
     }
 
     const session = setAdminSession(data.admin, data.token);
+    // NOTE: admin_audit_logs blocks anon/authenticated writes (see the
+    // adminAuditLog doc comment below) — admin-login already writes its
+    // own 'login' audit row server-side with service_role, so this call
+    // is intentionally redundant/best-effort, not the source of truth.
     await adminAuditLog('login', 'admin_users', data.admin.id, {}, {}, 'Login successful');
 
     return { success: true, session };
@@ -142,7 +154,19 @@ export async function adminLogout() {
 }
 
 // ────────── AUDIT LOGGING ──────────
-
+// NOTE (Phase 12): admin_audit_logs has RLS policy
+// "admin_audit_logs_no_public_access" (sql/08_admin_schema.sql) which
+// blocks BOTH anon and authenticated roles — i.e. this client-side insert
+// can only ever succeed if it's run with the service_role key. Calling it
+// from here (anon key, browser) will silently no-op under RLS today.
+// It's left in place because removing it would break every existing
+// caller's code path (display/loading logic doesn't depend on the insert
+// succeeding). New sensitive admin actions (provisioning, PIN reset,
+// suspend/reactivate, ownership transfer) now write their own audit rows
+// server-side inside the relevant Edge Function
+// (supabase/functions/admin-*/index.ts, via service_role) instead of
+// relying on this helper. Prefer that pattern for any new write-heavy
+// admin action.
 export async function adminAuditLog(action, resource, resourceId, before, after, notes = '') {
   try {
     const session = getAdminSession();
@@ -167,18 +191,27 @@ export async function adminAuditLog(action, resource, resourceId, before, after,
 
 export async function getDashboardMetrics() {
   try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const [
       usersRes,
       ordersRes,
       subsRes,
       mfgRes,
       ticketsRes,
+      platesRes,
+      messagesTodayRes,
+      voiceNotesTodayRes,
     ] = await Promise.all([
       supabase.from('users').select('id, created_at', { count: 'exact', head: false }),
       supabase.from('orders').select('id, payment_status, total_amount, created_at', { count: 'exact', head: false }),
       supabase.from('subscriptions').select('id, status, plan', { count: 'exact', head: false }),
       supabase.from('manufacturing').select('id, production_status', { count: 'exact', head: false }),
       supabase.from('support_tickets').select('id, status', { count: 'exact', head: false }),
+      supabase.from('plates').select('id, status', { count: 'exact', head: false }),
+      supabase.from('message_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()),
+      supabase.from('voice_notes').select('id', { count: 'exact', head: true }).gte('created_at', todayStart.toISOString()),
     ]);
 
     const users = usersRes.data || [];
@@ -186,6 +219,7 @@ export async function getDashboardMetrics() {
     const subs = subsRes.data || [];
     const mfg = mfgRes.data || [];
     const tickets = ticketsRes.data || [];
+    const plates = platesRes.data || [];
 
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -225,6 +259,12 @@ export async function getDashboardMetrics() {
         manufacturingQueue: mfg.filter(m => ['queued','printing','quality_check'].includes(m.production_status)).length,
         openTickets: tickets.filter(t => t.status === 'open').length,
         pendingTickets: tickets.filter(t => t.status === 'pending').length,
+        // Phase 12 — Internal Admin Portal dashboard cards
+        totalPlates: plates.length,
+        activePlates: plates.filter(p => p.status === 'active').length,
+        inactivePlates: plates.filter(p => p.status === 'inactive' || p.status === 'suspended').length,
+        messagesToday: messagesTodayRes.count || 0,
+        voiceNotesToday: voiceNotesTodayRes.count || 0,
       }
     };
   } catch (err) {
@@ -271,4 +311,17 @@ export async function getRevenueChartData(months = 6) {
   } catch (err) {
     return { success: false, error: err.message };
   }
+}
+
+// ────────── ROLE CONVENIENCE HELPERS (Phase 12) ──────────
+
+export function isSuperAdmin(session) {
+  return session?.role === ADMIN_ROLES.SUPER_ADMIN;
+}
+
+/** Dealer role is explicitly barred from revenue/financial data (per brief). */
+export function canAccessRevenue(session) {
+  if (!session) return false;
+  if (session.role === ADMIN_ROLES.DEALER) return false;
+  return hasPermission(session, PERMISSIONS.ANALYTICS) || isSuperAdmin(session);
 }

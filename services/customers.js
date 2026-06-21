@@ -71,6 +71,23 @@ export async function getCustomerProfile(customerId) {
 
     if (userRes.error) return { success: false, error: userRes.error.message };
 
+    // Phase 12 — Plate Management needs the plate row (status, QR, suspension
+    // info) plus message/notification counts, alongside the existing profile data.
+    let plate = null;
+    let messagesCount = 0;
+    let notificationsCount = 0;
+
+    if (userRes.data?.plate_id) {
+      const [plateRes, messagesRes, notificationsRes] = await Promise.all([
+        supabase.from('plates').select('*').eq('plate_id', userRes.data.plate_id).maybeSingle(),
+        supabase.from('message_logs').select('id', { count: 'exact', head: true }).eq('owner_id', customerId),
+        supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('owner_id', customerId),
+      ]);
+      plate = plateRes.data || null;
+      messagesCount = messagesRes.count || 0;
+      notificationsCount = notificationsRes.count || 0;
+    }
+
     return {
       success: true,
       profile: {
@@ -82,6 +99,9 @@ export async function getCustomerProfile(customerId) {
         callLogs: callLogsRes.data || [],
         familyMembers: familyRes.data || [],
         securityRules: securityRes.data || [],
+        plate,
+        messagesCount,
+        notificationsCount,
       }
     };
   } catch (err) {
