@@ -121,9 +121,9 @@ export async function sendTextMessage({ ownerId, plateId, content, messageType =
   try {
     // Do NOT chain .select().single() — visitor is anon and message_logs_select_own
     // only allows authenticated owners to read rows. Supabase re-runs the SELECT
-    // policy after insert when .select() is chained; anon gets 0 rows back, which
-    // Supabase surfaces as "violates row-level security policy" even though the INSERT
-    // itself succeeded. Drop the readback — visitor.html never uses the returned row.
+    // policy after insert when .select() is chained; anon gets 0 rows back which
+    // Supabase surfaces as "violates row-level security policy" even though the
+    // INSERT itself succeeded. visitor.html never uses the returned row.
     const { error } = await supabase
       .from('message_logs')
       .insert({
