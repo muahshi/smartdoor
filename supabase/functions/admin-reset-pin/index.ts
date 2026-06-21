@@ -11,7 +11,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcryptjs from 'npm:bcryptjs@2.4.3';
 import { restrictedCors } from '../_shared/cors.ts';
 import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from '../_shared/adminAuth.ts';
 
@@ -55,7 +55,7 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Customer not found.' }, { status: 404, headers });
     }
 
-    const pinHash = await bcrypt.hash(pinStr, await bcrypt.genSalt(12));
+    const pinHash = bcryptjs.hashSync(pinStr, 12);
 
     const { error: updateErr } = await supabaseAdmin
       .from('users')
