@@ -34,7 +34,6 @@
  * until product/payments sign off, per the brief.
  */
 
-import { supabase } from './supabase.js';
 import { getAdminSession, adminAuditLog } from './admin.js';
 import { generatePlateId as previewPlateId, getQrUrl } from './plates.js';
 import { generateQrDataUrl, generateQrSvg } from './qr.js';
@@ -43,26 +42,30 @@ import { sendWhatsApp } from './whatsapp.js';
 
 // ────────── INTERNAL: AUTHENTICATED EDGE FUNCTION CALL ──────────
 /**
- * All admin-* Edge Functions verify the session token server-side
- * (supabase/functions/_shared/adminAuth.ts) via this Authorization header —
- * NOT via the Supabase anon/auth session, since admin login is a separate,
- * custom session system (see services/admin.js).
+ * Uses native fetch() — NOT supabase.functions.invoke() — so that the
+ * admin session token is sent as the Authorization header without being
+ * overridden by the Supabase JS SDK's internal anon-key Bearer injection.
  */
+const _EDGE_BASE = `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`;
+
 async function callAdminFunction(name, body) {
-  const session = getAdminSession();
-  if (!session?.token) {
-    return { success: false, error: 'Your admin session has expired. Please sign in again.' };
-  }
+  const raw = localStorage.getItem('sd_admin_session');
+  if (!raw) return { success: false, error: 'Your admin session has expired. Please sign in again.' };
+  let session;
+  try { session = JSON.parse(raw); } catch { return { success: false, error: 'Corrupt admin session. Please sign in again.' }; }
+  const token = session?.token;
+  if (!token) return { success: false, error: 'Your admin session has expired. Please sign in again.' };
 
   try {
-    const { data, error } = await supabase.functions.invoke(name, {
-      body,
-      headers: { Authorization: `Bearer ${session.token}` },
+    const res = await fetch(`${_EDGE_BASE}/${name}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
     });
-
-    if (error) {
-      return { success: false, error: error.message || 'Request failed.' };
-    }
+    const data = await res.json();
     if (!data?.success) {
       return { success: false, error: data?.message || 'Request failed.' };
     }
