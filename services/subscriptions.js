@@ -78,7 +78,7 @@ export async function verifyAndActivate(ownerId, { razorpayPaymentId, razorpayOr
  * @param {string} ownerId
  * @param {string} orderId
  * @param {string} plateId   - SD-ABX9K7
- * @param {string} plan      - Default 'starter'
+ * @param {string} plan      - Default 'hardware_only'
  */
 export async function activateFromOrder(ownerId, orderId, plateId, plan = 'hardware_only') {
   try {
@@ -108,7 +108,7 @@ export async function activateFromOrder(ownerId, orderId, plateId, plan = 'hardw
           status:        'active',
           start_date:    startDate.toISOString(),
           expiry_date:   expiryDate.toISOString(),
-          renewal_price: PLANS[plan]?.price || 999,
+          renewal_price: PLANS[plan]?.renewal_price ?? 0,
         });
       if (error) return { success: false, error: error.message };
     }
@@ -137,7 +137,7 @@ export async function getRenewalInfo(ownerId) {
 
   const sub         = subResult.subscription;
   const expiryDate  = new Date(sub.expiry_date);
-  const renewalText = `₹${sub.planPrice || 999}/year · Renews ${_formatDate(expiryDate)}`;
+  const renewalText = `₹${sub.planPrice || 0}/year · Renews ${_formatDate(expiryDate)}`;
 
   return {
     success:     true,

@@ -236,7 +236,7 @@ export async function markDelivered(orderId) {
       owner_id:  orderResult.order.owner_id,
       order_id:  orderId,
       plate_id:  orderResult.order.plate_id,
-      plan:      'starter',  // default plan on hardware purchase
+      plan:      'hardware_only',  // default plan on hardware purchase
     },
   });
 
