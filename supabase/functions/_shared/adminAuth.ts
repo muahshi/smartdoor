@@ -11,8 +11,9 @@
  *
  * Session token contract (set by admin-login):
  *   - Client ko ek random opaque token milta hai (raw).
- *   - DB mein sirf SHA-256(token) store hota hai (admin_users.session_token).
+ *   - DB mein wahi raw token store hota hai (admin_users.session_token).
  *   - Client har request pe `Authorization: Bearer <token>` bhejta hai.
+ *   - Server directly token compare karta hai (no SHA-256 hashing).
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -23,14 +24,6 @@ export interface AdminContext {
   full_name: string;
   role_name: string;
   permissions: Record<string, string[]>;
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const hashBuf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
 }
 
 /**
@@ -45,12 +38,11 @@ export async function verifyAdminSession(
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   if (!token) return null;
 
-  const tokenHash = await sha256Hex(token);
-
+  // Direct token comparison — no SHA-256 hashing
   const { data: admin, error } = await supabaseAdmin
     .from('admin_users')
     .select('id, email, full_name, is_active, session_token, session_exp, role_id, admin_roles(name, permissions)')
-    .eq('session_token', tokenHash)
+    .eq('session_token', token)
     .maybeSingle();
 
   if (error || !admin || !admin.is_active) return null;
