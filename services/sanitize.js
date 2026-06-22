@@ -123,7 +123,7 @@ export const validate = {
   pincode:  (v) => /^\d{6}$/.test(String(v || '')),
   uuidv4:   (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v || '')),
   productType: (v) => ['acrylic', 'stainless', 'teakwood'].includes(v),
-  plan:     (v) => ['starter', 'standard', 'scale'].includes(v),
+  plan:     (v) => ['hardware_only', 'smartdoor_care'].includes(v),
   nonEmpty: (v) => typeof v === 'string' && v.trim().length > 0,
 };
 

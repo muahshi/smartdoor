@@ -106,7 +106,7 @@ export async function generateQRCode(plateId) {
  * @param {string} [input.address]
  * @param {'acrylic'|'stainless'|'teakwood'} input.productType
  * @param {string} input.initialPin   - 4 digits
- * @param {'starter'|'standard'|'scale'} [input.subscriptionPlan]
+ * @param {'hardware_only'|'smartdoor_care'} [input.subscriptionPlan]
  */
 export async function createCustomer({
   fullName, phone, email, address, productType, initialPin, subscriptionPlan,

@@ -13,9 +13,8 @@
 import { supabase } from './supabase.js';
 
 const PLANS = {
-  starter:  { name: 'Starter Suite',  price: 999,  features: ['1 Plate', 'AI Receptionist', 'Visitor Logs', '5 Family Members'] },
-  standard: { name: 'Standard Fleet', price: 1999, features: ['3 Plates', 'All Starter Features', 'Voice Notes', 'Analytics'] },
-  scale:    { name: 'Scale Mesh',     price: 2999, features: ['10 Plates', 'All Standard Features', 'Priority Support', 'API Access'] },
+  hardware_only:   { name: 'Hardware Only',   price: 0,   renewal_price: 0,   features: ['1 Plate', 'Basic Visitor Log', 'QR Access'] },
+  smartdoor_care:  { name: 'SmartDoor Care',  price: 299, renewal_price: 299, features: ['1 Plate', 'AI Receptionist', 'Visitor Logs', '5 Family Members', 'Voice Notes', 'Analytics', 'Priority Support'] },
 };
 
 // ────────── GET SUBSCRIPTION (UNCHANGED) ──────────
@@ -29,7 +28,7 @@ export async function getSubscription(ownerId) {
 
   if (error) return { success: false, error: error.message };
 
-  const plan       = PLANS[data.plan] || PLANS.starter;
+  const plan       = PLANS[data.plan] || PLANS.hardware_only;
   const expiryDate = new Date(data.expiry_date);
   const daysLeft   = Math.max(0, Math.ceil((expiryDate - Date.now()) / (1000 * 60 * 60 * 24)));
 
@@ -81,7 +80,7 @@ export async function verifyAndActivate(ownerId, { razorpayPaymentId, razorpayOr
  * @param {string} plateId   - SD-ABX9K7
  * @param {string} plan      - Default 'starter'
  */
-export async function activateFromOrder(ownerId, orderId, plateId, plan = 'starter') {
+export async function activateFromOrder(ownerId, orderId, plateId, plan = 'hardware_only') {
   try {
     const startDate  = new Date();
     const expiryDate = new Date(startDate);

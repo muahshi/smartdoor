@@ -85,7 +85,7 @@ export async function getSubscriptionAnalytics() {
     const cancelled= subs.filter(s => s.status === 'cancelled');
     const expiringSoon = active.filter(s => new Date(s.expiry_date) <= in30Days);
 
-    const planBreakdown = { starter: 0, standard: 0, scale: 0 };
+    const planBreakdown = { hardware_only: 0, smartdoor_care: 0 };
     active.forEach(s => {
       if (planBreakdown[s.plan] !== undefined) planBreakdown[s.plan]++;
     });

@@ -60,7 +60,7 @@ export async function recordActivationEvent(plateId, ownerId, eventType, opts = 
  * Use this from admin tools / the first-login wizard instead of calling
  * subscriptions.activateFromOrder() directly.
  */
-export async function activatePlateAndLog(ownerId, orderId, plateId, plan = 'starter', actor = 'system') {
+export async function activatePlateAndLog(ownerId, orderId, plateId, plan = 'hardware_only', actor = 'system') {
   const { activateFromOrder } = await import('./subscriptions.js');
   const result = await activateFromOrder(ownerId, orderId, plateId, plan);
 

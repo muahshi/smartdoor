@@ -213,7 +213,7 @@ async function _logAudit(ownerId, action, details) {
 export async function requireAuth() {
   const authed = await isAuthenticated();
   if (!authed) {
-    window.location.href = '/?login=required';
+    window.location.href = '/login';
     return false;
   }
   return true;

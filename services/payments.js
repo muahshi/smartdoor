@@ -42,7 +42,7 @@ export function loadRazorpaySDK() {
  *
  * @param {object} params
  * @param {string} params.productType  - 'acrylic' | 'stainless' | 'teakwood'
- * @param {string} params.plan         - 'starter' | 'standard' | 'scale'
+ * @param {string} params.plan         - 'hardware_only' | 'smartdoor_care'
  * @param {object} params.shipping     - { line1, city, state, pincode }
  * @param {string} params.houseName    - Customer ka ghar ka naam
  * @param {string} params.houseNumber  - e.g. B-204
