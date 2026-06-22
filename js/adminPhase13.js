@@ -74,7 +74,7 @@ function injectPhase13UI() {
       <h2>📋 Bulk Create Plates</h2>
       <div style="background:#1f2937;padding:16px;border-radius:8px;margin-bottom:20px">
         <p style="margin:0 0 8px">Upload a CSV with columns: <code>name,phone,email,product_type,pin</code></p>
-        <p style="margin:0;font-size:13px;color:#9ca3af">Optional columns: <code>subscription_plan</code> (starter/standard/scale)</p>
+        <p style="margin:0;font-size:13px;color:#9ca3af">Optional columns: <code>subscription_plan</code> (hardware_only/smartdoor_care)</p>
         <a href="#" onclick="Phase13.downloadSampleCsv()" style="font-size:13px;color:#60a5fa">⬇️ Download sample CSV</a>
       </div>
       <div style="margin-bottom:16px">
@@ -241,7 +241,7 @@ async function loadAnalytics() {
 // BULK PROVISIONING
 // ────────────────────────────────────────────────
 function downloadSampleCsv() {
-  const csv = 'name,phone,email,product_type,pin,subscription_plan\nRajesh Kumar,9876543210,rajesh@email.com,acrylic,1234,starter\nPreeti Sharma,9123456789,,stainless,5678,';
+  const csv = 'name,phone,email,product_type,pin,subscription_plan\nRajesh Kumar,9876543210,rajesh@email.com,acrylic,1234,hardware_only\nPreeti Sharma,9123456789,,stainless,5678,smartdoor_care';
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
   a.download = 'smartdoor-bulk-import-sample.csv';

@@ -770,7 +770,7 @@ const DashboardModule = (() => {
       // Renewal line update karo
       if (renewalEl && state.subscription.expiry_date) {
         const expiryDate  = new Date(state.subscription.expiry_date);
-        const price       = state.subscription.planPrice || 999;
+        const price       = state.subscription.planPrice || 0;
         const renewalText = `₹${price}/year · Renews ${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
         renewalEl.textContent = renewalText;
       }
