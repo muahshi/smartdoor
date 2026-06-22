@@ -1,23 +1,164 @@
-name: Deploy Supabase Functions
+# ============================================================
+# .github/workflows/deploy-functions.yml
+# SmartDoor — Supabase Edge Functions Deploy
+#
+# Triggers on push to main (only when function files change).
+# Each function is deployed individually so JWT settings are correct.
+#
+# Required GitHub Secrets:
+#   SUPABASE_ACCESS_TOKEN   → Supabase Dashboard → Account → Access Tokens
+#   SUPABASE_PROJECT_ID     → Project Settings → General → Reference ID
+# ============================================================
+
+name: Deploy Supabase Edge Functions
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'supabase/functions/**'
 
 jobs:
   deploy:
+    name: Deploy Edge Functions
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: supabase/setup-cli@v1
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - run: supabase functions deploy --no-verify-jwt
+      # ── Functions that require JWT (owner/visitor facing) ──────────────────
+      - name: Deploy verify-pin
+        run: supabase functions deploy verify-pin
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy set-owner-pin
+        run: supabase functions deploy set-owner-pin
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy owner-forgot-pin
+        run: supabase functions deploy owner-forgot-pin
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy activate-subscription
+        run: supabase functions deploy activate-subscription
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-login
+        run: supabase functions deploy admin-login
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-plate-status
+        run: supabase functions deploy admin-plate-status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-reset-pin
+        run: supabase functions deploy admin-reset-pin
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-transfer-ownership
+        run: supabase functions deploy admin-transfer-ownership
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-fullfilment-status
+        run: supabase functions deploy admin-fullfilment-status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-print-pack
+        run: supabase functions deploy admin-print-pack
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy razorpay-refund
+        run: supabase functions deploy razorpay-refund
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Functions that skip JWT (public endpoints / cron) ──────────────────
+      - name: Deploy generate-qr (no-verify-jwt — called internally)
+        run: supabase functions deploy generate-qr --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy groq-proxy (no-verify-jwt — called from browser with anon key)
+        run: supabase functions deploy groq-proxy --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-email (no-verify-jwt — called from other functions)
+        run: supabase functions deploy send-email --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-whatsapp (no-verify-jwt — called from other functions)
+        run: supabase functions deploy send-whatsapp --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy verify-razorpay-payment (no-verify-jwt — webhook from Razorpay)
+        run: supabase functions deploy verify-razorpay-payment --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy create-razorpay-order (no-verify-jwt — pre-auth checkout)
+        run: supabase functions deploy create-razorpay-order --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy renewal-engine-cron (no-verify-jwt — cron trigger)
+        run: supabase functions deploy renewal-engine-cron --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy health-check (no-verify-jwt — monitoring)
+        run: supabase functions deploy health-check --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy initiate-call (no-verify-jwt — visitor facing)
+        run: supabase functions deploy initiate-call --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy call-status-webhook (no-verify-jwt — Exotel webhook)
+        run: supabase functions deploy call-status-webhook --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Admin functions (JWT required — admin portal) ───────────────────────
+      - name: Deploy admin-provision-customer
+        run: supabase functions deploy admin-provision-customer
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-bulk-provision
+        run: supabase functions deploy admin-bulk-provision
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy admin-analytics
+        run: supabase functions deploy admin-analytics
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deployment complete
+        run: echo "✅ All Edge Functions deployed successfully"
