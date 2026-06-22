@@ -13,13 +13,13 @@
  * UI is NOT modified — only data layer replaced.
  */
 
-import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from './services/auth.js';
-import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from './services/logs.js';
-import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from './services/security.js';
-import { getSubscription, getRenewalInfo } from './services/subscriptions.js';
-import { getOrderSummary, subscribeToOrderTracking } from './services/orders.js';
-import { getCommunicationLogs, subscribeToCommunicationLogs } from './services/communication.js';
-import { getVoiceNoteUrl } from './services/voiceNotes.js';
+import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from '../services/auth.js';
+import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from '../services/logs.js';
+import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
+import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
+import { getOrderSummary, subscribeToOrderTracking } from '../services/orders.js';
+import { getCommunicationLogs, subscribeToCommunicationLogs } from '../services/communication.js';
+import { getVoiceNoteUrl } from '../services/voiceNotes.js';
 
 const DashboardModule = (() => {
   // ────────── STATE ──────────

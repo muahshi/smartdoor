@@ -12,8 +12,8 @@
  * Does NOT modify existing admin.html markup — injects new sections.
  */
 
-import { getAdminSession, hasPermission, PERMISSIONS } from './services/admin.js';
-import { supabase } from './services/supabase.js';
+import { getAdminSession, hasPermission, PERMISSIONS } from '../services/admin.js';
+import { supabase } from '../services/supabase.js';
 
 const EDGE_BASE = `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`;
 

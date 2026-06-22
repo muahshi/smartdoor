@@ -13,7 +13,7 @@
  *   Step 4 → Success
  */
 
-import { supabase } from './services/supabase.js';
+import { supabase } from '../services/supabase.js';
 
 const EDGE_FN = 'owner-forgot-pin';
 

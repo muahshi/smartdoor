@@ -11,12 +11,12 @@
  * (e.g. a brief moment before auth resolves).
  */
 
-import { getCurrentOwner } from './services/auth.js';
-import { getFamilyMembers } from './services/security.js';
-import { logEvent } from './services/logs.js';
-import { initiateMaskedCall, endMaskedCall, sendTextMessage, triggerEmergency } from './services/communication.js';
-import { VoiceRecorder, uploadVoiceNote } from './services/voiceNotes.js';
-import { notifyBellRing } from './services/notifications.js';
+import { getCurrentOwner } from '../services/auth.js';
+import { getFamilyMembers } from '../services/security.js';
+import { logEvent } from '../services/logs.js';
+import { initiateMaskedCall, endMaskedCall, sendTextMessage, triggerEmergency } from '../services/communication.js';
+import { VoiceRecorder, uploadVoiceNote } from '../services/voiceNotes.js';
+import { notifyBellRing } from '../services/notifications.js';
 
 // ────────── PWA REGISTRATION ──────────
 if ('serviceWorker' in navigator) {

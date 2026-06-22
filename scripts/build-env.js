@@ -125,7 +125,7 @@ const config = {
   supabaseUrl,
   supabaseAnon,
   razorpayKeyId,
-  groqApiKey: process.env.VITE_GROQ_API_KEY || '',
+  groqApiKey: '', // Removed: GROQ_API_KEY is server-side only (groq-proxy Edge Function)
   sentryDsn: process.env.VITE_SENTRY_DSN || '',
   gaId: process.env.VITE_GA_MEASUREMENT_ID || '',
   clarityId: process.env.VITE_CLARITY_PROJECT_ID || '',

@@ -9,9 +9,14 @@ const GroqService = (() => {
   // Phase 10: API key now comes from window.__SD_CONFIG__ (generated at
   // Vercel build time by scripts/build-env.js from VITE_GROQ_API_KEY).
   // Falls back to mock responses if not set (e.g. local dev without a key).
+  // Phase 13 security fix: GROQ_API_KEY never sent to browser.
+  // Browser calls groq-proxy Edge Function; proxy calls Groq with server-side key.
   const CONFIG = {
-    apiKey: window.__SD_CONFIG__?.groqApiKey || '',
-    baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+    proxyUrl: (() => {
+      const url = window.__SD_CONFIG__?.supabaseUrl || '';
+      return url ? url + '/functions/v1/groq-proxy' : null;
+    })(),
+    anonKey: window.__SD_CONFIG__?.supabaseAnon || '',
     model: 'llama3-70b-8192',
     maxTokens: 500,
     temperature: 0.7,
@@ -36,19 +41,21 @@ const GroqService = (() => {
     };
 
     try {
-      // If no real API key, use intelligent mock
-      if (!CONFIG.apiKey) {
+      // Route through groq-proxy Edge Function (key stays server-side)
+      if (!CONFIG.proxyUrl) {
+        console.warn('[GroqService] No Supabase URL configured — using mock.');
         return await _mockGroqResponse(messages, options);
       }
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeout);
 
-      const response = await fetch(CONFIG.baseUrl, {
+      const response = await fetch(CONFIG.proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${CONFIG.apiKey}`,
+          'apikey': CONFIG.anonKey,
+          'Authorization': `Bearer ${CONFIG.anonKey}`,
         },
         body: JSON.stringify({
           model: mergedOptions.model,
@@ -62,14 +69,15 @@ const GroqService = (() => {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error(`Groq API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`Groq Proxy Error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
       _isLoading = false;
+      if (!data.success) throw new Error(data.error || 'Proxy returned failure');
       return {
         success: true,
-        content: data.choices[0]?.message?.content || '',
+        content: data.content || '',
         usage: data.usage,
         model: data.model,
       };
@@ -320,11 +328,6 @@ Do NOT say "The owner" — write from the first person perspective of the househ
   function isLoading() { return _isLoading; }
   function getLastError() { return _lastError; }
   function getRequestCount() { return _requestCount; }
-
-  function setApiKey(key) {
-    CONFIG.apiKey = key;
-    console.log('[GroqService] API key updated');
-  }
 
   // ────────── EXPORTS ──────────
   return {
