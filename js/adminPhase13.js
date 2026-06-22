@@ -13,19 +13,29 @@
  */
 
 import { getAdminSession, hasPermission, PERMISSIONS } from '../services/admin.js';
-import { supabase } from '../services/supabase.js';
 
 const EDGE_BASE = `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`;
 
 async function callAdmin(fn, body) {
-  const session = getAdminSession();
-  if (!session?.token) return { success: false, error: 'Session expired' };
-  const { data, error } = await supabase.functions.invoke(fn, {
-    body,
-    headers: { Authorization: `Bearer ${session.token}` },
-  });
-  if (error) return { success: false, error: error.message };
-  return data || { success: false, error: 'No response' };
+  const raw = localStorage.getItem('sd_admin_session');
+  if (!raw) return { success: false, error: 'Session expired' };
+  let session;
+  try { session = JSON.parse(raw); } catch { return { success: false, error: 'Session expired' }; }
+  const token = session?.token;
+  if (!token) return { success: false, error: 'Session expired' };
+  try {
+    const res = await fetch(`${EDGE_BASE}/${fn}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err.message || 'Connection error' };
+  }
 }
 
 // ────────────────────────────────────────────────
