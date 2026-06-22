@@ -38,14 +38,6 @@ function edgeRateLimit(key: string): boolean {
   return true;
 }
 
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const hashBuf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuf))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -192,14 +184,13 @@ serve(async (req) => {
     await supabaseAdmin.rpc('reset_pin_lockout', { p_plate_id: lockoutKey });
 
     const rawToken = randomToken();
-    const tokenHash = await sha256Hex(rawToken);
     const ip =
       req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
     await supabaseAdmin
       .from('admin_users')
       .update({
-        session_token: tokenHash,
+        session_token: rawToken,
         session_exp: new Date(Date.now() + SESSION_DURATION_MS).toISOString(),
         last_login_at: new Date().toISOString(),
         last_login_ip: ip,
