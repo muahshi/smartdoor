@@ -796,9 +796,8 @@
               <label class="form-label">Subscription Plan</label>
               <select class="form-select" id="cc-plan">
                 <option value="">No subscription (hardware only)</option>
-                <option value="starter">Starter Suite — ₹999/yr</option>
-                <option value="standard">Standard Fleet — ₹1,999/yr</option>
-                <option value="scale">Scale Mesh — ₹2,999/yr</option>
+                <option value="hardware_only">Hardware Only — ₹0/yr renewal</option>
+                <option value="smartdoor_care">SmartDoor Care — ₹299/yr</option>
               </select>
             </div>
             <button class="btn btn-primary" id="createCustomerBtn" style="width:100%" onclick="submitCreateCustomer()">Create Customer</button>
@@ -2405,7 +2404,7 @@ async function loadAnalytics() {
     const pb = subRes.subscriptions.planBreakdown;
     renderDoughnut('planChart',
       ['Starter', 'Standard', 'Scale'],
-      [pb.starter || 0, pb.standard || 0, pb.scale || 0],
+      [pb.hardware_only || 0, pb.smartdoor_care || 0],
       ['#F59E0B', '#3B82F6', '#8B5CF6']
     );
   }
@@ -2625,7 +2624,7 @@ function mfgStatusBadge(status) {
 }
 
 function planBadge(plan) {
-  const map = { starter: 'badge-info', standard: 'badge-warning', scale: 'badge-purple' };
+  const map = { hardware_only: 'badge-info', smartdoor_care: 'badge-warning' };
   return `<span class="badge ${map[plan] || 'badge-muted'}">${plan || '—'}</span>`;
 }
 
@@ -2697,6 +2696,8 @@ window.openAddAdminModal = () => showToast('Admin creation coming soon', 'succes
 // ─── INITIAL LOAD ───
 loadDashboard();
 </script>
+
+<script type="module" src="js/adminPhase13.js"></script>
 
 </body>
 </html>
