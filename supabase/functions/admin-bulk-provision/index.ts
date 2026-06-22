@@ -143,9 +143,9 @@ serve(async (req) => {
         results.push({ row: rowNum, status: 'failed', name: cleanName, error: 'pin must be exactly 4 digits' });
         continue;
       }
-      const plan = ['starter', 'standard', 'scale'].includes(String(row.subscription_plan || '').toLowerCase())
+      const plan = ['hardware_only', 'smartdoor_care'].includes(String(row.subscription_plan || '').toLowerCase())
         ? String(row.subscription_plan).toLowerCase()
-        : null;
+        : 'hardware_only';
 
       // ── Generate unique Plate ID ──
       const plateId = await generateUniquePlateId(supabaseAdmin);
@@ -212,7 +212,7 @@ serve(async (req) => {
           status: 'active',
           start_date: new Date().toISOString(),
           expiry_date: expiry.toISOString(),
-          renewal_price: { starter: 999, standard: 1999, scale: 2999 }[plan] || 999,
+          renewal_price: plan === 'smartdoor_care' ? 299 : 0,
         });
       }
 

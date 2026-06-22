@@ -34,7 +34,7 @@ const APP_URL    = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
 const QR_BUCKET  = 'qr-codes';
 
 // Mirrors services/subscriptions.js PLANS — keep both in sync if pricing changes.
-const PLAN_PRICES: Record<string, number> = { starter: 999, standard: 1999, scale: 2999 };
+const PLAN_PRICES: Record<string, number> = { hardware_only: 0, smartdoor_care: 299 };
 
 const PLATE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // matches services/plates.js generatePlateId() alphabet, no ambiguous 0/O/1/I
 
@@ -89,7 +89,7 @@ serve(async (req) => {
     if (!/^\d{4}$/.test(pinStr)) {
       return Response.json({ success: false, message: 'Initial PIN must be exactly 4 digits.' }, { status: 400, headers });
     }
-    const plan = ['starter', 'standard', 'scale'].includes(String(subscription_plan)) ? String(subscription_plan) : null;
+    const plan = ['hardware_only', 'smartdoor_care'].includes(String(subscription_plan)) ? String(subscription_plan) : 'hardware_only';
 
     // ── Generate a unique Plate ID (retry on collision, max 10 tries) ──
     let plateId = '';
@@ -191,7 +191,7 @@ serve(async (req) => {
           status: 'active',
           start_date: new Date().toISOString(),
           expiry_date: expiry.toISOString(),
-          renewal_price: PLAN_PRICES[plan] || 999,
+          renewal_price: PLAN_PRICES[plan] ?? 0,
         })
         .select()
         .single();

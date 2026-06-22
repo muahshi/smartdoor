@@ -13,7 +13,7 @@
  * product cards in index.html:
  *   data-product="acrylic"   data-price="1499"
  *   data-product="wood"      data-price="2499"
- *   data-product="steel"     data-price="2999"
+ *   data-product="steel"     data-price="2999"  (hardware one-time price, not subscription)
  *
  * (The frontend's product key "wood"/"steel" maps to "teakwood"/"stainless"
  * here via PRODUCT_TYPE_MAP in services/payments.js before this is called.)

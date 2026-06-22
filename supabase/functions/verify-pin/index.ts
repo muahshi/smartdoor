@@ -187,7 +187,7 @@ serve(async (req) => {
       full_name:  user.full_name,
       email:      syntheticEmail,
       token:      linkData.properties.hashed_token,
-      plan:       sub?.plan || 'starter',
+      plan:       sub?.plan || 'hardware_only',
       sub_expiry: sub?.expiry_date || null,
     }, { headers });
 

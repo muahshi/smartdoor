@@ -19,7 +19,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { owner_id, order_id, plate_id, plan = "starter" } = await req.json();
+    const { owner_id, order_id, plate_id, plan = "hardware_only" } = await req.json();
 
     if (!owner_id || !order_id || !plate_id) {
       return Response.json({ success: false, message: "owner_id, order_id, plate_id required." }, { status: 400, headers: corsHeaders });
@@ -58,7 +58,7 @@ serve(async (req) => {
         status:        "active",
         start_date:    startDate.toISOString(),
         expiry_date:   expiryDate.toISOString(),
-        renewal_price: plan === "standard" ? 1999 : plan === "scale" ? 2999 : 999,
+        renewal_price: plan === "smartdoor_care" ? 299 : 0,
       });
     }
 

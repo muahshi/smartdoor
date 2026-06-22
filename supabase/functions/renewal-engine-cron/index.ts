@@ -114,7 +114,7 @@ serve(async (req) => {
                 ownerName:    owner.full_name || 'Valued Customer',
                 daysLeft:     Math.max(0, daysLeft),
                 expiryDate:   expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-                renewalPrice: `₹${sub.renewal_price || 999}`,
+                renewalPrice: `₹${sub.renewal_price ?? 0}`,
                 renewalLink:  'https://mysmartdoor.in/app#renew',
               },
             },

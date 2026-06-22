@@ -175,14 +175,14 @@ serve(async (req) => {
         .from('subscriptions')
         .select('plan, status, renewal_price, start_date');
 
-      const planPrices: Record<string, number> = { starter: 999, standard: 1999, scale: 2999 };
+      const planPrices: Record<string, number> = { hardware_only: 0, smartdoor_care: 299 };
       let mrr = 0;
       let totalActiveSubs = 0;
       let newThisMonth = 0;
 
       for (const sub of (subs || [])) {
         if (sub.status === 'active') {
-          mrr += (sub.renewal_price || planPrices[sub.plan] || 999) / 12;
+          mrr += (sub.renewal_price ?? planPrices[sub.plan] ?? 0) / 12;
           totalActiveSubs++;
         }
         if (sub.start_date >= monthStart) newThisMonth++;
