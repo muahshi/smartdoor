@@ -49,8 +49,13 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   // Skip API calls - always go to network
-  if (event.request.url.includes('api.anthropic.com') || 
-      event.request.url.includes('api.groq.com')) {
+  let requestHost = '';
+  try {
+    requestHost = new URL(event.request.url).hostname;
+  } catch (e) {
+    requestHost = '';
+  }
+  if (requestHost === 'api.anthropic.com' || requestHost === 'api.groq.com') {
     return;
   }
 
