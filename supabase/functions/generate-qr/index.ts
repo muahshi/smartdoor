@@ -31,14 +31,18 @@ serve(async (req) => {
     }
 
     const pid     = String(plate_id).toUpperCase();
-    const qrUrl   = `${APP_URL}/visitor.html?plate=${pid}`;
+    // FIX: QR must encode the /p/:slug URL (the canonical visitor route),
+    // NOT /visitor.html?plate= (which is only the internal Vercel rewrite
+    // destination — scanning it directly skips the pretty URL and breaks
+    // on some QR scanners that percent-encode the '?' differently).
+    const qrUrl   = `${APP_URL}/p/${pid}`;
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     // ── Generate SVG ──
     const svgString: string = await QRCode.toString(qrUrl, {
       type:  'svg',
       width: 400,
-      margin: 2,
+      margin: 4,
       errorCorrectionLevel: 'M',
     });
 
@@ -51,13 +55,36 @@ serve(async (req) => {
 
     if (svgErr) throw new Error(`SVG upload failed: ${svgErr.message}`);
 
-    // ── Public URL ──
-    const { data: urlData } = supabase.storage.from(QR_BUCKET).getPublicUrl(svgPath);
-    const publicUrl = urlData?.publicUrl || null;
+    const { data: svgUrlData } = supabase.storage.from(QR_BUCKET).getPublicUrl(svgPath);
+    const svgPublicUrl = svgUrlData?.publicUrl || null;
 
-    // ── Update plates table ──
+    // ── Generate PNG ──
+    let pngPublicUrl: string | null = null;
+    try {
+      const pngDataUrl: string = await QRCode.toDataURL(qrUrl, {
+        width: 400,
+        margin: 4,
+        errorCorrectionLevel: 'M',
+      });
+      const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
+      const pngBlob = new Blob([pngBytes], { type: 'image/png' });
+      const pngPath = `${pid}.png`;
+      const { error: pngErr } = await supabase.storage
+        .from(QR_BUCKET)
+        .upload(pngPath, pngBlob, { contentType: 'image/png', upsert: true });
+      if (!pngErr) {
+        const { data: pngUrlData } = supabase.storage.from(QR_BUCKET).getPublicUrl(pngPath);
+        pngPublicUrl = pngUrlData?.publicUrl || null;
+      }
+    } catch (_pngErr) {
+      // PNG is best-effort — SVG is the canonical QR format
+      console.warn('[generate-qr] PNG generation failed (non-fatal):', _pngErr);
+    }
+
+    // ── Update plates table (both qr_image_url PNG and qr_svg_url SVG) ──
     await supabase.from('plates').update({
-      qr_image_url: publicUrl,
+      qr_image_url: pngPublicUrl || svgPublicUrl, // PNG preferred for img tags
+      qr_svg_url:   svgPublicUrl,
       qr_slug:      pid,
     }).eq('plate_id', pid);
 
@@ -69,7 +96,13 @@ serve(async (req) => {
       }).eq('order_id', order_id);
     }
 
-    return Response.json({ success: true, plate_id: pid, qr_url: publicUrl }, { headers: corsHeaders });
+    return Response.json({
+      success: true,
+      plate_id: pid,
+      qr_url: svgPublicUrl,
+      qr_image_url: pngPublicUrl || svgPublicUrl,
+      qr_svg_url: svgPublicUrl,
+    }, { headers: corsHeaders });
 
   } catch (err) {
     console.error('[generate-qr] Error:', err);
