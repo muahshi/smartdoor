@@ -136,9 +136,9 @@ serve(async (req) => {
         .from('users')
         .select(`
           id, full_name, phone, email, plate_id, created_at,
-          subscriptions!left(status, plan, expiry_date),
-          plates!left(status, product_type, qr_image_url, qr_svg_url),
-          orders!left(id, payment_status, total_amount)
+          subscriptions!owner_id(status, plan, expiry_date),
+          plates!owner_id(status, product_type, qr_image_url, qr_svg_url),
+          orders!owner_id(id, payment_status, total_amount)
         `, { count: 'exact' })
         .range(Number(offset), Number(offset) + Number(limit) - 1)
         .order('created_at', { ascending: false });
