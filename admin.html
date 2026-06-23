@@ -1989,7 +1989,9 @@ window.searchQR = async function() {
   const res = await searchQRByPlateId(q);
 
   if (!res.success || !res.results.length) {
-    document.getElementById('qrResults').innerHTML = '<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records found for: ' + q + '</div></div>';
+    const qrResults = document.getElementById('qrResults');
+    qrResults.innerHTML = '<div class="empty-state"><div class="icon">📱</div><div class="text" id="qrNoResultsText"></div></div>';
+    document.getElementById('qrNoResultsText').textContent = `No QR records found for: ${q}`;
     return;
   }
 
