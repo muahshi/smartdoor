@@ -577,12 +577,23 @@
 
     /* ─── RESPONSIVE ─── */
     @media (max-width: 900px) {
-      .sidebar { transform: translateX(-100%); transition: transform 0.25s; }
-      .sidebar.open { transform: translateX(0); }
+      .sidebar { transform: translateX(-100%); transition: transform 0.25s; z-index: 200; }
+      .sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
       .main { margin-left: 0; }
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
       .metric-grid { grid-template-columns: repeat(2, 1fr); }
     }
+
+    /* ─── MOBILE SIDEBAR OVERLAY ─── */
+    #sidebarOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 199;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #sidebarOverlay.visible { display: block; }
   </style>
 </head>
 <body>
@@ -590,6 +601,9 @@
 <!-- CONFIG: Generated at Vercel build time by scripts/build-env.js — DO NOT hardcode keys here -->
 <script src="config/env.generated.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
+
+<!-- Mobile sidebar overlay — tap to close -->
+<div id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 
 <!-- ═══════════ SIDEBAR ═══════════ -->
@@ -1303,13 +1317,20 @@
 <script type="module">
 import { supabase } from './services/supabase.js';
 import {
-  getAdminSession, requireAdminAuth, adminLogout, getDashboardMetrics, getRevenueChartData, hasPermission, canWrite, canAccessRevenue, isSuperAdmin
+  getAdminSession, requireAdminAuth, adminLogout, hasPermission, canWrite, canAccessRevenue, isSuperAdmin
 } from './services/admin.js';
-import { searchCustomers, getCustomerProfile } from './services/customers.js';
+// ROOT CAUSE FIX: All admin reads now go through the admin-data Edge Function
+// (service_role) instead of direct anon-key Supabase calls. RLS blocks all
+// anon reads on users/plates/orders/subscriptions/support_tickets/admin_audit_logs.
+import {
+  getDashboardMetrics, searchCustomers, getCustomerProfile,
+  getFinancialMetrics, getOrderList, getSubscriptionList, getAuditLogs, getSystemHealth,
+  getRevenueChartData,
+} from './services/adminData.js';
 import { markDelivered } from './services/orders.js';
 import { getManufacturingQueue, getQueueCounts, updateProductionStatus, searchQRByPlateId, deactivateQR, reactivateQR, generateProductionSheetHTML } from './services/manufacturing.js';
 import { listTickets, getTicketDetail, createTicket as createTicketSvc, updateTicket, addTicketComment, getTicketStats } from './services/support.js';
-import { getFinancialMetrics, getSubscriptionAnalytics, getOrderAnalytics, getSystemHealth, getAuditLogs } from './services/analytics.js';
+import { getSubscriptionAnalytics, getOrderAnalytics } from './services/analytics.js';
 import {
   generatePlateId as previewPlateId, generateQRCode as previewQRCode, createCustomer,
   resetPin as resetPinSvc, suspendPlate, reactivatePlate, regenerateQr,
@@ -1390,7 +1411,31 @@ window.switchPanel = function(panelId, navEl) {
 
 window.refreshCurrentPanel = () => loadPanel(currentPanel);
 window.handleLogout = () => adminLogout();
-window.toggleSidebar = () => document.getElementById('sidebar').classList.toggle('open');
+
+window.toggleSidebar = function() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const isOpen = sidebar.classList.contains('open');
+  if (isOpen) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('visible');
+  } else {
+    sidebar.classList.add('open');
+    overlay.classList.add('visible');
+  }
+};
+
+window.closeSidebar = function() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('visible');
+};
+
+// Close sidebar on nav item click on mobile
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    if (window.innerWidth < 900) closeSidebar();
+  });
+});
 
 // ─── RESPONSIVE MENU BTN ───
 if (window.innerWidth < 900) {
@@ -1468,13 +1513,9 @@ async function loadDashboard() {
     renderLineChart('orderChart', orderRes.orders.monthly.labels, orderRes.orders.monthly.orderCounts, 'Orders', '#3B82F6');
   }
 
-  // Recent orders
-  const { data: recentOrders } = await supabase
-    .from('orders')
-    .select('order_number, customer_name, product_type, total_amount, payment_status, created_at')
-    .order('created_at', { ascending: false })
-    .limit(5);
-  renderDashRecentOrders(recentOrders || []);
+  // Recent orders — use admin-data (service_role) to bypass RLS
+  const recentOrdersRes = await getOrderList({ limit: 5 });
+  renderDashRecentOrders(recentOrdersRes.orders || []);
 
   // Open tickets
   const ticketsRes = await listTickets({ status: 'open', limit: 5 });
@@ -1658,16 +1699,14 @@ async function loadOrders(status = null) {
   const tbody = document.getElementById('ordersTable');
   tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
 
-  let qb = supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(100);
-  if (status && status !== 'all') {
-    if (['pending','paid','failed','refunded'].includes(status)) qb = qb.eq('payment_status', status);
-    else if (status === 'production') qb = qb.eq('manufacturing_status', 'in_production');
-    else if (status === 'shipped') qb = qb.eq('manufacturing_status', 'dispatched');
-    else if (status === 'delivered') qb = qb.eq('manufacturing_status', 'delivered');
+  // FIX: Use admin-data Edge Function (service_role) instead of anon key — RLS blocks direct reads.
+  const statusFilter = (status && status !== 'all' && ['pending','paid','failed','refunded'].includes(status)) ? status : null;
+  const res = await getOrderList({ statusFilter, limit: 100 });
+  if (!res.success) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`;
+    return;
   }
-
-  const { data } = await qb;
-  const orders = data || [];
+  const orders = res.orders || [];
 
   if (!orders.length) {
     tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🛒</div><div class="text">No orders found</div></div></td></tr>';
@@ -1701,18 +1740,32 @@ window.filterOrders = function(status, tabEl) {
 };
 
 window.openOrderDetail = async function(orderId) {
-  const { data: o } = await supabase.from('orders').select('*').eq('id', orderId).single();
+  // Use admin-data edge fn to get order (RLS blocks direct anon read)
+  const res = await getOrderList({ limit: 1000 }); // fetch all then find — simpler than new Edge Function type
+  const o = (res.orders || []).find(x => x.id === orderId);
   if (!o) { showToast('Order not found', 'error'); return; }
 
-  // Fetch plate info for QR URL
+  // Fetch plate info via customer profile path
   let qrSection = '';
-  if (o.plate_id) {
-    const { data: plate } = await supabase.from('plates').select('qr_image_url, status').eq('plate_id', o.plate_id).single();
-    if (plate?.qr_image_url) {
-      qrSection = `<div style="margin-top:8px;"><a href="${plate.qr_image_url}" target="_blank" style="color:#00A2E8;font-size:.78rem;">📥 Download QR (SVG)</a> &nbsp;<span style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:${plate.status==='active'?'rgba(34,197,94,.15)':'rgba(251,191,36,.12)'};color:${plate.status==='active'?'#34D399':'#FCD34D'}">${plate.status}</span></div>`;
-    } else {
-      qrSection = `<div style="margin-top:8px;color:rgba(255,255,255,.3);font-size:.75rem;">QR pending generation</div>`;
-    }
+  if (o.plate_id || o.owner_id) {
+    try {
+      const raw = localStorage.getItem('sd_admin_session');
+      const token = JSON.parse(raw || '{}')?.token;
+      if (token) {
+        const pRes = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ type: 'customer_profile', customer_id: o.owner_id }),
+        });
+        const pData = await pRes.json();
+        const plate = pData?.profile?.plate;
+        if (plate?.qr_image_url) {
+          qrSection = `<div style="margin-top:8px;"><a href="${plate.qr_image_url}" target="_blank" style="color:#00A2E8;font-size:.78rem;">📥 Download QR</a> &nbsp;<span style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:${plate.status==='active'?'rgba(34,197,94,.15)':'rgba(251,191,36,.12)'};color:${plate.status==='active'?'#34D399':'#FCD34D'}">${plate.status}</span></div>`;
+        } else {
+          qrSection = `<div style="margin-top:8px;color:rgba(255,255,255,.3);font-size:.75rem;">QR pending generation</div>`;
+        }
+      }
+    } catch {}
   }
 
   const actions = [];
@@ -1741,17 +1794,26 @@ window.openOrderDetail = async function(orderId) {
 
 window.adminMarkShipped = async function(orderId, plateId) {
   if (!confirm('Mark this order as shipped?')) return;
-  const { error } = await supabase.from('orders').update({
-    manufacturing_status: 'dispatched',
-    tracking_status:      'shipped',
-    updated_at:           new Date().toISOString(),
-  }).eq('id', orderId);
 
-  if (error) { showToast('Error: ' + error.message, 'error'); return; }
+  // FIX: Direct anon update blocked by RLS (orders_service_all requires service_role).
+  // Route through admin-data Edge Function which uses service_role.
+  const raw = localStorage.getItem('sd_admin_session');
+  let token = null;
+  try { token = JSON.parse(raw || '{}')?.token; } catch {}
 
-  await supabase.from('tracking_events').insert({
-    order_id: orderId, event_type: 'shipped', event_label: 'Shipped', actor: 'admin',
+  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({
+      type: 'update_order',
+      order_id: orderId,
+      updates: { manufacturing_status: 'dispatched', tracking_status: 'shipped' },
+      tracking_event: { event_type: 'shipped', event_label: 'Shipped', actor: 'admin' },
+    }),
   });
+
+  const data = await res.json();
+  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
 
   showToast('✅ Order marked as shipped', 'success');
   loadOrders(currentOrderFilter);
@@ -1951,16 +2013,13 @@ async function loadSubscriptions(statusFilter = null) {
   const tbody = document.getElementById('subsTable');
   tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
 
-  let qb = supabase
-    .from('subscriptions')
-    .select(`*, users!owner_id(full_name, phone, plate_id)`)
-    .order('created_at', { ascending: false })
-    .limit(100);
-
-  if (statusFilter && statusFilter !== 'all') qb = qb.eq('status', statusFilter);
-
-  const { data } = await qb;
-  const subs = data || [];
+  // FIX: Use admin-data Edge Function (service_role) instead of anon key.
+  const res = await getSubscriptionList({ statusFilter, limit: 100 });
+  if (!res.success) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`;
+    return;
+  }
+  const subs = res.subscriptions || [];
 
   if (!subs.length) {
     tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🔄</div><div class="text">No subscriptions found</div></div></td></tr>';
@@ -2004,18 +2063,52 @@ window.filterSubs = function(status, el) {
 
 window.extendSub = async function(subId) {
   const days = prompt('Extend by how many days?', '30');
-  if (!days) return;
-  const { data: sub } = await supabase.from('subscriptions').select('expiry_date').eq('id', subId).single();
-  const newExpiry = new Date(sub.expiry_date);
+  if (!days || isNaN(parseInt(days))) return;
+
+  const raw = localStorage.getItem('sd_admin_session');
+  let token = null;
+  try { token = JSON.parse(raw || '{}')?.token; } catch {}
+
+  // First get current expiry via subscription list (already loaded in memory ideally),
+  // but to be safe, fetch it through a slim admin-data call.
+  const subsRes = await getSubscriptionList({ limit: 500 });
+  const sub = (subsRes.subscriptions || []).find(s => s.id === subId);
+  if (!sub) { showToast('Subscription not found', 'error'); return; }
+
+  const newExpiry = new Date(sub.expiry_date || Date.now());
   newExpiry.setDate(newExpiry.getDate() + parseInt(days));
-  await supabase.from('subscriptions').update({ expiry_date: newExpiry.toISOString() }).eq('id', subId);
+
+  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({
+      type: 'update_subscription',
+      sub_id: subId,
+      updates: { expiry_date: newExpiry.toISOString() },
+    }),
+  });
+  const data = await res.json();
+  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
+
   showToast(`Subscription extended by ${days} days`, 'success');
   loadSubscriptions();
 };
 
 window.cancelSub = async function(subId) {
   if (!confirm('Cancel this subscription?')) return;
-  await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', subId);
+
+  const raw = localStorage.getItem('sd_admin_session');
+  let token = null;
+  try { token = JSON.parse(raw || '{}')?.token; } catch {}
+
+  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ type: 'update_subscription', sub_id: subId, updates: { status: 'cancelled' } }),
+  });
+  const data = await res.json();
+  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
+
   showToast('Subscription cancelled', 'success');
   loadSubscriptions();
 };
@@ -2510,9 +2603,28 @@ window.loadSystemHealth = async function() {
 
 async function loadTeam() {
   const tbody = document.getElementById('teamTable');
-  const { data } = await supabase
-    .from('admin_users')
-    .select('*, admin_roles!role_id(name, label, color)');
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+
+  // admin_users is RLS-blocked — use callAdminEF which sends the admin session token
+  const raw = localStorage.getItem('sd_admin_session');
+  let token = null;
+  try { token = JSON.parse(raw || '{}')?.token; } catch {}
+
+  if (!token) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="text">Session expired. Please reload.</div></div></td></tr>';
+    return;
+  }
+
+  let data = null;
+  try {
+    const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ type: 'team_list' }),
+    });
+    const json = await res.json();
+    data = json?.team || null;
+  } catch {}
 
   if (!data?.length) {
     tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🛡️</div><div class="text">No admin users found</div></div></td></tr>';
@@ -2540,7 +2652,20 @@ async function loadTeam() {
 
 window.toggleAdminStatus = async function(adminId, newStatus) {
   if (!confirm(`${newStatus ? 'Activate' : 'Deactivate'} this admin?`)) return;
-  await supabase.from('admin_users').update({ is_active: newStatus }).eq('id', adminId);
+
+  // admin_users has no anon write policy — must go through admin-data EF
+  const raw = localStorage.getItem('sd_admin_session');
+  let token = null;
+  try { token = JSON.parse(raw || '{}')?.token; } catch {}
+
+  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ type: 'toggle_admin_status', admin_id: adminId, is_active: newStatus }),
+  });
+  const data = await res.json();
+  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
+
   showToast(`Admin ${newStatus ? 'activated' : 'deactivated'}`, 'success');
   loadTeam();
 };
