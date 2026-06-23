@@ -378,7 +378,10 @@ function _getSessionId() {
   const KEY = 'sd_monitor_session';
   let id = sessionStorage.getItem(KEY);
   if (!id) {
-    id = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const randomPart = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    id = 'sess_' + randomPart + Date.now().toString(36);
     sessionStorage.setItem(KEY, id);
   }
   return id;
