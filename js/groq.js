@@ -329,6 +329,15 @@ Do NOT say "The owner" — write from the first person perspective of the househ
   function getLastError() { return _lastError; }
   function getRequestCount() { return _requestCount; }
 
+  // FIX: setApiKey was in the return object but never defined — this caused
+  // a ReferenceError that crashed the entire IIFE, leaving window.GroqService
+  // undefined and making every AI Receptionist call fail with "Cannot read
+  // properties of undefined". The GROQ_API_KEY is now server-side only
+  // (groq-proxy Edge Function), so this is a no-op stub kept for API compat.
+  function setApiKey(_key) {
+    console.warn('[GroqService] setApiKey() is a no-op — API key is server-side only (groq-proxy Edge Function).');
+  }
+
   // ────────── EXPORTS ──────────
   return {
     classifyVisitorIntent,
