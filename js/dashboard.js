@@ -699,7 +699,17 @@ const DashboardModule = (() => {
 
         try {
           const message = await window.GroqService.generateStatusMessage(rawNote);
-          if (outputEl) outputEl.innerHTML = `<div style="white-space:pre-line;font-size:0.88rem;color:#C8E8F8;line-height:1.7;animation:slide-in-up 0.3s ease;">${message}</div>`;
+          if (outputEl) {
+            const messageEl = document.createElement('div');
+            messageEl.style.whiteSpace = 'pre-line';
+            messageEl.style.fontSize = '0.88rem';
+            messageEl.style.color = '#C8E8F8';
+            messageEl.style.lineHeight = '1.7';
+            messageEl.style.animation = 'slide-in-up 0.3s ease';
+            messageEl.textContent = message;
+            outputEl.textContent = '';
+            outputEl.appendChild(messageEl);
+          }
           if (useEl) { useEl.style.display = 'flex'; useEl._generatedMessage = message; }
         } catch {
           showToast('AI generation failed. Please try again.', 'danger');
