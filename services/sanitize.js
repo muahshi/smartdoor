@@ -22,15 +22,12 @@ export const sanitize = {
     if (raw == null) return '';
     let clean = String(raw);
 
-    // Repeatedly strip multi-character dangerous patterns to avoid incomplete sanitization
-    // (e.g., overlapping inputs that can recreate tags/protocols after one pass).
+    // Strip HTML delimiters as single characters to avoid incomplete multi-character sanitization
+    // and regex corner-cases that can leave behind executable tag fragments.
     let prev;
-    do {
-      prev = clean;
-      clean = clean
-        .replace(/<[^>]*>/g, '')            // Strip HTML tags
-        .replace(/javascript:/gi, '');      // Strip js: protocol
-    } while (clean !== prev);
+    clean = clean
+      .replace(/[<>]/g, '')                 // Remove tag delimiters directly
+      .replace(/javascript:/gi, '');        // Strip js: protocol
 
     // Strip common injection chars after multi-character patterns are exhausted
     clean = clean.replace(/[<>"'`]/g, '');
