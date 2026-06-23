@@ -20,14 +20,23 @@ export const sanitize = {
    */
   text(raw, maxLen = 255) {
     if (raw == null) return '';
-    let clean = String(raw)
-      .replace(/<[^>]*>/g, '')              // Strip HTML tags
-      .replace(/[<>"'`]/g, '')             // Strip common injection chars
-      .replace(/javascript:/gi, '');        // Strip js: protocol
+    let clean = String(raw);
+
+    // Repeatedly strip multi-character dangerous patterns to avoid incomplete sanitization
+    // (e.g., overlapping inputs that can recreate tags/protocols after one pass).
+    let prev;
+    do {
+      prev = clean;
+      clean = clean
+        .replace(/<[^>]*>/g, '')            // Strip HTML tags
+        .replace(/javascript:/gi, '');      // Strip js: protocol
+    } while (clean !== prev);
+
+    // Strip common injection chars after multi-character patterns are exhausted
+    clean = clean.replace(/[<>"'`]/g, '');
 
     // Strip event handlers repeatedly to avoid incomplete multi-character sanitization
     // (e.g., overlapping inputs that can recreate "on...=" after one replacement pass).
-    let prev;
     do {
       prev = clean;
       clean = clean.replace(/on\w+\s*=/gi, '');
