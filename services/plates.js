@@ -18,22 +18,16 @@ export async function getPlateBySlug(slug) {
   try {
     const normalized = slug.trim().toUpperCase();
 
-    // Get plate + owner details (join via owner_id)
+    // FIX: Do NOT embed-join users here. The plates_public_qr_lookup RLS
+    // policy allows anon to read active plates, BUT the embedded PostgREST
+    // join to users goes through users_select_own (auth_user_id = auth.uid())
+    // which returns NULL for anon — causing the join to return no user data or
+    // silently fail. Fetch the plate row alone, then get the owner display
+    // name via the get_owner_display_for_plate() SECURITY DEFINER RPC which
+    // only exposes the non-sensitive full_name field.
     const { data: plate, error } = await supabase
       .from('plates')
-      .select(`
-        id,
-        plate_id,
-        qr_slug,
-        product_type,
-        status,
-        owner_id,
-        users!plates_owner_id_fkey (
-          id,
-          full_name,
-          phone
-        )
-      `)
+      .select('id, plate_id, qr_slug, product_type, status, owner_id')
       .eq('qr_slug', normalized)
       .eq('status', 'active')
       .single();
@@ -42,20 +36,22 @@ export async function getPlateBySlug(slug) {
       return { success: false, error: 'Plate not found or inactive.' };
     }
 
-    // Get security rules for this owner
-    const { data: rules } = await supabase
-      .from('security_rules')
-      .select('night_mode_on, night_mode_start, night_mode_end, allow_sos, allow_voice, allow_calls, call_forwarding, current_status, custom_message')
-      .eq('owner_id', plate.owner_id)
-      .single();
+    // Fetch owner display name, security rules, subscription in parallel.
+    // All three use SECURITY DEFINER RPCs or public-read policies — safe for anon.
+    const [ownerRes, rulesRes] = await Promise.all([
+      supabase.rpc('get_owner_display_for_plate', { p_plate_id: normalized }),
+      supabase
+        .from('security_rules')
+        .select('night_mode_on, night_mode_start, night_mode_end, allow_sos, allow_voice, allow_calls, call_forwarding, current_status, custom_message')
+        .eq('owner_id', plate.owner_id)
+        .single(),
+    ]);
 
-    // Get subscription status
-    const { data: sub } = await supabase
-      .from('subscriptions')
-      .select('plan, status, expiry_date')
-      .eq('owner_id', plate.owner_id)
-      .eq('status', 'active')
-      .single();
+    const ownerName = ownerRes.data?.full_name || 'Resident';
+
+    // Note: subscription is now read via the get_subscription_status_for_plate
+    // RPC in visitorExperience.js — not here — to avoid the RLS block on
+    // subscriptions_select_own (which also requires auth_user_id = auth.uid()).
 
     return {
       success: true,
@@ -66,9 +62,9 @@ export async function getPlateBySlug(slug) {
       },
       owner: {
         id: plate.owner_id,
-        name: plate.users?.full_name || 'Resident',
+        name: ownerName,
       },
-      securityRules: rules || {
+      securityRules: rulesRes.data || {
         night_mode_on: false,
         allow_sos: true,
         allow_voice: true,
@@ -77,7 +73,7 @@ export async function getPlateBySlug(slug) {
         current_status: 'available',
         custom_message: null,
       },
-      subscription: sub || null,
+      subscription: null, // resolved separately via get_subscription_status_for_plate RPC
     };
   } catch (err) {
     console.error('[Plates] getPlateBySlug error:', err);
