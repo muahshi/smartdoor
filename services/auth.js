@@ -11,6 +11,54 @@ import { supabase } from './supabase.js';
 
 const AUTH_KEY      = 'sd_owner_session';
 const DEVICE_KEY    = 'sd_device_trusted';
+const TRUST_ENC_KEY = 'sd_trust_payload_v1';
+const TRUST_ENC_ALGO = 'AES-GCM';
+
+async function _getTrustCryptoKey() {
+  const keyMaterial = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(TRUST_ENC_KEY)
+  );
+  return crypto.subtle.importKey(
+    'raw',
+    keyMaterial,
+    { name: TRUST_ENC_ALGO },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function _encryptTrustedDevicePayload(payload) {
+  const key = await _getTrustCryptoKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(JSON.stringify(payload));
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: TRUST_ENC_ALGO, iv },
+    key,
+    encoded
+  );
+
+  return JSON.stringify({
+    iv: btoa(String.fromCharCode(...iv)),
+    data: btoa(String.fromCharCode(...new Uint8Array(cipherBuffer))),
+  });
+}
+
+async function _decryptTrustedDevicePayload(payload) {
+  const parsed = JSON.parse(payload);
+  if (!parsed?.iv || !parsed?.data) return null;
+
+  const iv = Uint8Array.from(atob(parsed.iv), c => c.charCodeAt(0));
+  const cipherBytes = Uint8Array.from(atob(parsed.data), c => c.charCodeAt(0));
+  const key = await _getTrustCryptoKey();
+  const plainBuffer = await crypto.subtle.decrypt(
+    { name: TRUST_ENC_ALGO, iv },
+    key,
+    cipherBytes
+  );
+
+  return JSON.parse(new TextDecoder().decode(plainBuffer));
+}
 
 // ────────── LOGIN ──────────
 /**
@@ -53,11 +101,13 @@ export async function loginOwner(plateId, pin, rememberDevice = false) {
 
     // Store device trust if requested
     if (rememberDevice) {
-      localStorage.setItem(DEVICE_KEY, JSON.stringify({
+      const trustedPayload = {
         plateId: normalizedPlateId,
         trusted: true,
         trustedAt: new Date().toISOString(),
-      }));
+      };
+      const encryptedPayload = await _encryptTrustedDevicePayload(trustedPayload);
+      localStorage.setItem(DEVICE_KEY, encryptedPayload);
     }
 
     // Log the login event
@@ -174,11 +224,15 @@ export function onAuthStateChange(callback) {
 }
 
 // ────────── DEVICE TRUST CHECK ──────────
-export function isTrustedDevice() {
+export async function isTrustedDevice() {
   try {
     const stored = localStorage.getItem(DEVICE_KEY);
     if (!stored) return { trusted: false };
-    const data = JSON.parse(stored);
+    const data = await _decryptTrustedDevicePayload(stored);
+    if (!data) {
+      localStorage.removeItem(DEVICE_KEY);
+      return { trusted: false };
+    }
     // Trust expires after 30 days
     const trustedAt = new Date(data.trustedAt);
     const daysSince = (Date.now() - trustedAt) / (1000 * 60 * 60 * 24);
@@ -188,6 +242,7 @@ export function isTrustedDevice() {
     }
     return { trusted: true, plateId: data.plateId };
   } catch {
+    localStorage.removeItem(DEVICE_KEY);
     return { trusted: false };
   }
 }

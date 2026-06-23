@@ -254,7 +254,7 @@
   });
 
   // ── Check trusted device
-  const trust = isTrustedDevice();
+  const trust = await isTrustedDevice();
   if (trust.trusted && trust.plateId) {
     plateInput.value = trust.plateId;
     rememberChk.checked = true;
