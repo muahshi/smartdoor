@@ -577,20 +577,26 @@ function appendAIMessage(sender, text, type, color = '#00A2E8') {
       </div>
     `;
   } else {
-    div.innerHTML = `
-      <div style="
-        font-size:0.7rem;color:rgba(255,255,255,0.4);
-        margin-bottom:3px;font-family:'Space Grotesk',sans-serif;
-      ">${sender}</div>
-      <div style="
-        max-width:85%;padding:10px 14px;
-        border-radius:${isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px'};
-        background:${isUser ? 'linear-gradient(135deg,#00A2E8,#0078D7)' : `rgba(${hexToRgb(color)},0.1)`};
-        border:1px solid ${isUser ? '#00A2E8' : `rgba(${hexToRgb(color)},0.25)`};
-        font-size:0.83rem;color:${isUser ? '#fff' : '#C8E8F8'};
-        line-height:1.5;
-      ">${text}</div>
+    const senderLabel = document.createElement('div');
+    senderLabel.style.cssText = `
+      font-size:0.7rem;color:rgba(255,255,255,0.4);
+      margin-bottom:3px;font-family:'Space Grotesk',sans-serif;
     `;
+    senderLabel.textContent = sender;
+
+    const messageBubble = document.createElement('div');
+    messageBubble.style.cssText = `
+      max-width:85%;padding:10px 14px;
+      border-radius:${isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px'};
+      background:${isUser ? 'linear-gradient(135deg,#00A2E8,#0078D7)' : `rgba(${hexToRgb(color)},0.1)`};
+      border:1px solid ${isUser ? '#00A2E8' : `rgba(${hexToRgb(color)},0.25)`};
+      font-size:0.83rem;color:${isUser ? '#fff' : '#C8E8F8'};
+      line-height:1.5;
+    `;
+    messageBubble.textContent = text ?? '';
+
+    div.appendChild(senderLabel);
+    div.appendChild(messageBubble);
   }
 
   outputEl.appendChild(div);
