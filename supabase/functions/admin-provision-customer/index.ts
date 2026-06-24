@@ -198,6 +198,28 @@ serve(async (req) => {
       subscription = sub || null;
     }
 
+    // ── Auto-create security_rules for the new owner ──
+    // Visitor PWA reads security_rules to show night mode / status.
+    // Without this row, getPlateBySlug falls back to defaults (fine), but
+    // creating it here ensures realtime subscriptions and owner dashboard work immediately.
+    await supabaseAdmin
+      .from('security_rules')
+      .upsert(
+        {
+          owner_id: user.id,
+          night_mode_on: false,
+          night_mode_start: '22:00:00',
+          night_mode_end: '07:00:00',
+          allow_sos: true,
+          allow_voice: true,
+          allow_calls: true,
+          call_forwarding: true,
+          current_status: 'available',
+          custom_message: null,
+        },
+        { onConflict: 'owner_id', ignoreDuplicates: true }
+      );
+
     // ── Audit trail ──
     await supabaseAdmin.from('activation_events').insert({
       plate_id: plateId,
