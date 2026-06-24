@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # 1. Node.js Packages (npm) ko auto-update karne ke liye
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # 2. GitHub Actions / Pipelines ko auto-update karne ke liye
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
