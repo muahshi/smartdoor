@@ -280,6 +280,16 @@
       background: rgba(0,162,232,0.07);
       border: 1px solid rgba(0,162,232,0.12);
     }
+    /* ai-subtitle: smaller, dimmer bubble for English translation under Hinglish */
+    .msg-row.ai-subtitle .msg-bubble {
+      background: rgba(0,162,232,0.06);
+      border: 1px dashed rgba(0,162,232,0.15);
+      border-bottom-left-radius: 4px;
+      color: rgba(200,223,240,0.55);
+      font-size: 0.73rem;
+      font-style: italic;
+      margin-top: -6px;
+    }
     .msg-meta { font-size: 0.6rem; color: rgba(255,255,255,0.2); margin-top: 2px; text-align: center; }
 
     .intent-badge {
@@ -428,7 +438,7 @@
   const plateSlug = (params.get('plate') || '').trim().toUpperCase();
 
   // ── TTS: Hindi female voice AI receptionist ──
-  let voiceEnabled = false;
+  let voiceEnabled = true; // Default ON — auto-speak after user's first interaction (browser gesture)
   let speechSynth = window.speechSynthesis;
   let hindiVoice = null;
 
@@ -459,6 +469,35 @@
     utt.volume = 1;
     if (hindiVoice) utt.voice = hindiVoice;
     speechSynth.speak(utt);
+  }
+
+  // autoSpeak — plays audio regardless of voiceEnabled toggle.
+  // Used for the opening greeting only. Requires a prior user gesture
+  // (browser autoplay policy). Falls back silently if no gesture yet.
+  function autoSpeak(text, lang = 'hi-IN') {
+    if (!speechSynth) return;
+    try {
+      speechSynth.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = lang;
+      utt.rate = 0.90;
+      utt.pitch = 1.05;
+      utt.volume = 1;
+      if (hindiVoice) utt.voice = hindiVoice;
+      speechSynth.speak(utt);
+    } catch { /* browser blocked autoplay — silently ignore */ }
+  }
+
+  // detectLang — returns 'hi-IN', 'hi-IN' (Hinglish Roman), or 'en-IN'
+  // Based on presence of Devanagari script or common Hinglish romanised words.
+  function detectLang(text) {
+    if (!text) return 'hi-IN';
+    // Devanagari Unicode block
+    if (/[\u0900-\u097F]/.test(text)) return 'hi-IN';
+    // Common Hinglish / Roman Hindi markers
+    const hinglishWords = /\b(kya|hai|hoon|aap|main|mujhe|yahan|thik|accha|nahi|abhi|bhai|didi|ji|kaisa|bahut|aana|jana|karo|karo|mera|tera|humara|tumhara|ghar|bahar|andar|sahib|madam|paisa|kaam|shukriya|namaste|theek)\b/i;
+    if (hinglishWords.test(text)) return 'hi-IN';
+    return 'en-IN';
   }
 
   // Map English AI responses to Hindi TTS
@@ -499,14 +538,13 @@
 
   // ── Pending screen ──
   function renderPending(info) {
-    const safeSlug = info.slug ? encodeURIComponent(info.slug) : '';
     shell.innerHTML = `
       <div class="pending-wrap">
         <div class="pending-icon">🚪</div>
         <div class="pending-title">Activation Pending</div>
         <div class="pending-sub">This Smart Door plate isn't active yet. If you're the resident, finish setup by logging in below.</div>
         ${info.pendingInfo ? `<div class="pending-stage">${_esc(info.pendingInfo.message || '')}</div>` : ''}
-        <a href="/login.html${safeSlug ? '?plate=' + safeSlug : ''}" style="margin-top:20px;color:#00A2E8;font-size:0.85rem;font-weight:600;text-decoration:none;">Owner? Login to activate →</a>
+        <a href="/login.html${info.slug ? '?plate=' + info.slug : ''}" style="margin-top:20px;color:#00A2E8;font-size:0.85rem;font-weight:600;text-decoration:none;">Owner? Login to activate →</a>
         <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
       </div>`;
   }
@@ -609,7 +647,7 @@
             <div class="ai-name">Priya — AI Receptionist</div>
             <div class="ai-status-text">Online · Powered by GROQ AI</div>
           </div>
-          <button class="voice-toggle" id="voice-toggle-btn" onclick="toggleVoice()">🔈 Voice</button>
+          <button class="voice-toggle active" id="voice-toggle-btn" onclick="toggleVoice()">🔊 Voice On</button>
           <span class="ai-groq-badge">GROQ</span>
         </div>
 
@@ -683,13 +721,17 @@
   // ── AI Chat Receptionist ──
   function initAIChat(s) {
     const ownerFirst = (s.owner.name || 'the resident').split(' ')[0];
-    const greetings = [
-      `Namaste! 🙏 Main Priya hoon, ${_esc(ownerFirst)} ji ka AI receptionist. Aap kaise madad kar sakti hoon?`,
-      `Welcome! I'm Priya, the AI receptionist for ${_esc(s.owner.name)}. How can I help you today?`,
-    ];
-    // Show Hindi greeting first, then English subtitle
-    appendAIMsg(greetings[0], 'ai');
-    if (voiceEnabled) speak(greetings[0]);
+    // Hinglish greeting (Roman script — readable + speakable)
+    const hinglishGreeting = `Namaste! 🙏 Main Priya hoon, ${_esc(ownerFirst)} ji ki taraf se aapka swagat karta hoon. Aap mujhse Hindi, Hinglish, ya English mein baat kar sakte hain — main samjhunga! Kaise madad kar sakta hoon?`;
+    const englishSubtitle  = `Welcome! I'm Priya, AI receptionist for ${_esc(s.owner.name)}. You can speak Hindi, Hinglish, or English — I understand all three!`;
+
+    // Dual-bubble greeting: Hinglish first, English subtitle below
+    appendAIMsg(hinglishGreeting, 'ai');
+    appendAIMsg(englishSubtitle, 'ai-subtitle');
+
+    // Auto-speak the greeting — works after any user gesture on the page.
+    // Voice toggle button is shown so user can enable for subsequent replies.
+    autoSpeak(hinglishGreeting, 'hi-IN');
 
     const sendBtn = document.getElementById('ai-send');
     const input   = document.getElementById('ai-input');
@@ -738,6 +780,9 @@
     const thinkId = 'think-' + Date.now();
     appendThinking(thinkId);
 
+    // Detect visitor language for adaptive AI response
+    const inputLang = detectLang(text);
+
     // Call Groq proxy
     let intentData = null;
     try {
@@ -749,11 +794,11 @@
           headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
           body: JSON.stringify({
             model: 'llama3-70b-8192',
-            max_tokens: 300,
+            max_tokens: 400,
             temperature: 0.3,
             messages: [{
               role: 'system',
-              content: `You are Priya, a smart AI receptionist for Smart Door. Analyze the visitor's message. Respond ONLY with valid JSON: {"intent":"Delivery|Emergency / SOS|Spam / Promotional|Known Guest / Family|General Visitor","priority":"Low|Normal|High|Critical","action":"Blocked|Notify Owner|Ring Bell + Notify|Bypass All Rules","color":"hex","emoji":"emoji","response":"short English response","hindi_response":"Hindi response in Devanagari script for TTS","confidence":0.0-1.0}`
+              content: `You are Priya, AI receptionist for Smart Door, used across India. LANGUAGE RULES: Visitor language detected: ${inputLang === 'hi-IN' ? 'Hindi/Hinglish' : 'English'}. Always reply with THREE fields: "response" (English 1-2 sentences), "hinglish_response" (Hinglish Roman script — warmly blend Hindi+English, e.g. "Aapka parcel gate pe chhod dein, owner ko notify kar diya. Shukriya!"), "hindi_tts" (pure Devanagari for TTS). Respond ONLY with valid JSON, no markdown: {"intent":"Delivery|Emergency / SOS|Spam / Promotional|Known Guest / Family|General Visitor","priority":"Low|Normal|High|Critical","action":"Blocked|Notify Owner|Ring Bell + Notify|Bypass All Rules","color":"#hex","emoji":"emoji","response":"English","hinglish_response":"Hinglish Roman","hindi_tts":"Devanagari","confidence":0.9}`
             }, { role: 'user', content: text }],
           }),
         });
@@ -772,13 +817,22 @@
       intentData = mockClassify(text);
     }
 
-    // Render intent badge + response
+    // Render intent badge
     appendIntentBadge(intentData);
-    appendAIMsg(intentData.response, 'ai', intentData.color);
 
-    // Hindi TTS
-    const hindiText = intentData.hindi_response || toHindi(intentData.response, intentData.intent);
-    if (voiceEnabled) speak(hindiText, 'hi-IN');
+    // Dual-bubble: Hinglish primary + English subtitle
+    const hinglishReply = intentData.hinglish_response || intentData.response || '';
+    const englishReply  = intentData.response || '';
+    appendAIMsg(hinglishReply, 'ai', intentData.color);
+    if (englishReply && englishReply !== hinglishReply) {
+      appendAIMsg(englishReply, 'ai-subtitle');
+    }
+
+    // TTS — always auto-speak after response (needs prior user gesture)
+    const ttsText = intentData.hindi_tts || intentData.hindi_response || toHindi(intentData.response, intentData.intent);
+    autoSpeak(ttsText, 'hi-IN');
+    // Honour voiceEnabled for repeat/explicit speaks
+    if (voiceEnabled && ttsText) speak(ttsText, 'hi-IN');
 
     // Auto-actions
     if (intentData.action === 'Blocked') {
@@ -847,22 +901,46 @@
       btn.classList.toggle('active', voiceEnabled);
     }
     if (voiceEnabled) {
-      speak('Awaaj feature chalu kar diya gaya hai. Main Priya, aapki madad ke liye hoon!', 'hi-IN');
-      showToast('🔊 Hindi voice enabled', 'success');
+      autoSpeak('Awaaz feature chalu hai. Main Priya, aapki madad ke liye hoon!', 'hi-IN');
+      showToast('🔊 Awaaz chalu ho gayi', 'success');
     } else {
       speechSynth?.cancel();
-      showToast('🔈 Voice disabled', 'info');
+      showToast('🔈 Voice band kar diya', 'info');
     }
   };
 
-  // ── Mock classifier ──
+  // ── Mock classifier (offline fallback) ──
   function mockClassify(text) {
     const t = text.toLowerCase();
-    if (['emergency','sos','help','fire','accident','urgent'].some(k=>t.includes(k))) return { intent:'Emergency / SOS', priority:'Critical', action:'Bypass All Rules', color:'#EF4444', emoji:'🚨', response:'Emergency detected! Alerting all family members immediately. Please stay calm.', hindi_response:'Aapaat sthiti detect hui hai! Turant madad bheji ja rahi hai. Shant rahein!', confidence:0.97 };
-    if (['deliver','parcel','amazon','courier','flipkart','food','swiggy','zomato','box'].some(k=>t.includes(k))) return { intent:'Delivery', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'📦', response:'Please leave the parcel at the gate. Owner has been notified.', hindi_response:'Kripya parcel darwaze par chhod dein. Maalik ko soochana de di gayi hai.', confidence:0.91 };
-    if (['sell','loan','insurance','offer','discount','promotion'].some(k=>t.includes(k))) return { intent:'Spam / Promotional', priority:'Low', action:'Blocked', color:'#EF4444', emoji:'🚫', response:'We do not accept promotional requests. Thank you.', hindi_response:'Maafi chahte hain, hum promotional nivedan sweekar nahi karte.', confidence:0.93 };
-    if (['family','friend','relative','guest','visit','know'].some(k=>t.includes(k))) return { intent:'Known Guest / Family', priority:'High', action:'Ring Bell + Notify', color:'#22C55E', emoji:'👨‍👩‍👧', response:'Welcome! Owner notified of your arrival.', hindi_response:'Aapka swagat hai! Maalik ko aapke aane ki soochana de di gayi hai.', confidence:0.88 };
-    return { intent:'General Visitor', priority:'Normal', action:'Notify Owner', color:'#00A2E8', emoji:'👋', response:'Thank you for visiting! The owner has been notified.', hindi_response:'Aapka swagat hai! Maalik ko soochana de di gayi hai. Kripya pratiksha karein.', confidence:0.82 };
+    if (['emergency','sos','help','fire','accident','urgent'].some(k=>t.includes(k)))
+      return { intent:'Emergency / SOS', priority:'Critical', action:'Bypass All Rules', color:'#EF4444', emoji:'🚨',
+        response:'Emergency detected! Alerting all family members immediately. Please stay calm.',
+        hinglish_response:'🚨 Emergency detect hua! Sabhi family members ko turant alert kar diya gaya hai. Shant rahein, madad aa rahi hai!',
+        hindi_tts:'आपातकालीन स्थिति का पता चला है। सभी परिवार के सदस्यों को तुरंत सूचित किया जा रहा है। शांत रहें।',
+        confidence:0.97 };
+    if (['deliver','parcel','amazon','courier','flipkart','food','swiggy','zomato','box'].some(k=>t.includes(k)))
+      return { intent:'Delivery', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'📦',
+        response:'Please leave the parcel at the gate. Owner has been notified.',
+        hinglish_response:'📦 Parcel gate ke paas chhod dein ji. Owner ko notify kar diya gaya hai. Shukriya!',
+        hindi_tts:'कृपया पार्सल गेट के पास छोड़ दें। मालिक को सूचित कर दिया गया है।',
+        confidence:0.91 };
+    if (['sell','loan','insurance','offer','discount','promotion','leaflet'].some(k=>t.includes(k)))
+      return { intent:'Spam / Promotional', priority:'Low', action:'Blocked', color:'#EF4444', emoji:'🚫',
+        response:'We do not accept promotional requests. Thank you.',
+        hinglish_response:'🚫 Maafi chahenge, hum promotional ya sales requests accept nahi karte. Shukriya aane ka!',
+        hindi_tts:'माफी चाहते हैं, हम प्रचार संबंधी अनुरोध स्वीकार नहीं करते।',
+        confidence:0.93 };
+    if (['family','friend','relative','guest','visit','know','neighbour'].some(k=>t.includes(k)))
+      return { intent:'Known Guest / Family', priority:'High', action:'Ring Bell + Notify', color:'#22C55E', emoji:'👨‍👩‍👧',
+        response:'Welcome! The owner has been notified of your arrival.',
+        hinglish_response:'🙏 Swagat hai aapka! Owner ko aapke aane ki soochana de di gayi hai. Thodi der mein aa jaayenge!',
+        hindi_tts:'आपका स्वागत है! मालिक को आपके आने की सूचना दे दी गई है।',
+        confidence:0.88 };
+    return { intent:'General Visitor', priority:'Normal', action:'Notify Owner', color:'#00A2E8', emoji:'👋',
+      response:'Thank you for visiting! The owner has been notified of your arrival.',
+      hinglish_response:'👋 Shukriya aane ka! Owner ko aapke baare mein inform kar diya gaya hai. Thodi der pratiksha karein ya bell bajayein.',
+      hindi_tts:'आने का शुक्रिया! मालिक को सूचित कर दिया गया है। कृपया प्रतीक्षा करें।',
+      confidence:0.82 };
   }
 
   // ── Action bindings ──
