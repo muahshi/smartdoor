@@ -118,23 +118,46 @@ export function canDelete(session, resource) {
 // bcrypt compare + optional TOTP check + session issuance.
 
 export async function adminLogin(email, password, totpCode = null) {
+  // ── CRITICAL FIX (Production Recovery — Phase 5) ──────────────────────
+  // NEVER use supabase.functions.invoke() for admin-login.
+  // supabase.functions.invoke() injects the ANON KEY as "Authorization: Bearer"
+  // on every request it makes. The admin-login Edge Function itself doesn't
+  // care (it reads email+password from body), but it poisons the pattern:
+  // any dev who copies this call style for admin-data/admin-provision-customer
+  // will send the anon key as Bearer, causing verifyAdminSession() to fail
+  // with 401 → "Connection Error" / blank dashboard metrics.
+  //
+  // Use raw fetch() for ALL admin Edge Function calls from the browser.
+  // The session token (a 64-char hex secret) is then sent as the Bearer
+  // for all subsequent admin-data / admin-provision-customer calls.
+  // ──────────────────────────────────────────────────────────────────────
   try {
-    const { data, error } = await supabase.functions.invoke('admin-login', {
-      body: { email: email.trim().toLowerCase(), password, totp_code: totpCode },
+    const supabaseUrl = window.__SD_CONFIG__?.supabaseUrl;
+    if (!supabaseUrl) throw new Error('Supabase URL not configured');
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/admin-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+        totp_code: totpCode,
+      }),
     });
 
-    if (error || !data?.success) {
-      // requires2FA must survive a failed/incomplete login so the UI
-      // (admin-login.html) can reveal the TOTP input instead of just
-      // showing a generic error.
-      return { success: false, error: data?.message || 'Invalid credentials.', requires2FA: !!data?.requires2FA };
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data?.success) {
+      return {
+        success: false,
+        error: data?.message || 'Invalid credentials.',
+        requires2FA: !!data?.requires2FA,
+      };
     }
 
     const session = setAdminSession(data.admin, data.token);
-    // NOTE: admin_audit_logs blocks anon/authenticated writes (see the
-    // adminAuditLog doc comment below) — admin-login already writes its
-    // own 'login' audit row server-side with service_role, so this call
-    // is intentionally redundant/best-effort, not the source of truth.
+    // Audit log is written server-side by the Edge Function with service_role.
+    // The client-side call below is best-effort and will silently no-op under RLS.
     await adminAuditLog('login', 'admin_users', data.admin.id, {}, {}, 'Login successful');
 
     return { success: true, session };
