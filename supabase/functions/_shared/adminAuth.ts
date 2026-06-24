@@ -48,16 +48,23 @@ export async function verifyAdminSession(
   if (error || !admin || !admin.is_active) return null;
   if (!admin.session_exp || new Date(admin.session_exp).getTime() < Date.now()) return null;
 
-  // Check revocation list (e.g. password changed, admin disabled mid-session)
-  const { data: revocation } = await supabaseAdmin
-    .from('admin_session_revocations')
-    .select('id')
-    .eq('admin_id', admin.id)
-    .gte('revoked_at', new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString())
-    .limit(1)
-    .maybeSingle();
+  // Check revocation list (e.g. password changed, admin disabled mid-session).
+  // DEFENSIVE: admin_session_revocations table may not exist in all deployments.
+  // If the table is missing, skip the revocation check rather than failing auth entirely.
+  try {
+    const { data: revocation } = await supabaseAdmin
+      .from('admin_session_revocations')
+      .select('id')
+      .eq('admin_id', admin.id)
+      .gte('revoked_at', new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString())
+      .limit(1)
+      .maybeSingle();
 
-  if (revocation) return null;
+    if (revocation) return null;
+  } catch {
+    // Table doesn't exist or query failed — non-fatal, continue auth
+    console.warn('[adminAuth] admin_session_revocations check failed — skipping (table may not exist yet)');
+  }
 
   const role = (admin as unknown as { admin_roles: { name: string; permissions: Record<string, string[]> } }).admin_roles;
 
