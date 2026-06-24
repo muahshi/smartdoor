@@ -544,7 +544,7 @@
         <div class="pending-title">Activation Pending</div>
         <div class="pending-sub">This Smart Door plate isn't active yet. If you're the resident, finish setup by logging in below.</div>
         ${info.pendingInfo ? `<div class="pending-stage">${_esc(info.pendingInfo.message || '')}</div>` : ''}
-        <a href="/login.html${info.slug ? '?plate=' + info.slug : ''}" style="margin-top:20px;color:#00A2E8;font-size:0.85rem;font-weight:600;text-decoration:none;">Owner? Login to activate →</a>
+        <a href="/login.html${info.slug ? '?plate=' + encodeURIComponent(info.slug) : ''}" style="margin-top:20px;color:#00A2E8;font-size:0.85rem;font-weight:600;text-decoration:none;">Owner? Login to activate →</a>
         <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
       </div>`;
   }
