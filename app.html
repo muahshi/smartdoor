@@ -417,6 +417,32 @@
 <script src="config/env.generated.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
 
+<!-- AUTH GUARD: Owner-only page. Redirect to /login if no valid session. -->
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  (async function guardOwnerRoute() {
+    try {
+      const cfg = window.__SD_CONFIG__;
+      if (!cfg?.supabaseUrl || !cfg?.supabaseAnon) {
+        // Config not loaded — env issue, don't redirect (would loop)
+        console.error('[Guard] Missing SD config — cannot verify session.');
+        return;
+      }
+      const client = createClient(cfg.supabaseUrl, cfg.supabaseAnon, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      });
+      const { data: { session } } = await client.auth.getSession();
+      if (!session) {
+        // No valid owner session — redirect to login
+        window.location.replace('/login');
+      }
+    } catch (e) {
+      console.error('[Guard] Auth check failed:', e);
+      // On error, do NOT redirect (avoid login loops on transient failures)
+    }
+  })();
+</script>
+
 <!-- ════════════════════════════════════════
      DESKTOP HEADER (shown on desktop only)
 ════════════════════════════════════════ -->
