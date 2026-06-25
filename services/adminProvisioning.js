@@ -46,7 +46,7 @@ import { sendWhatsApp } from './whatsapp.js';
  * admin session token is sent as the Authorization header without being
  * overridden by the Supabase JS SDK's internal anon-key Bearer injection.
  */
-const _EDGE_BASE = `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`;
+function _edgeBase() { return `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`; }
 
 async function callAdminFunction(name, body) {
   const raw = localStorage.getItem('sd_admin_session');
@@ -57,7 +57,7 @@ async function callAdminFunction(name, body) {
   if (!token) return { success: false, error: 'Your admin session has expired. Please sign in again.' };
 
   try {
-    const res = await fetch(`${_EDGE_BASE}/${name}`, {
+    const res = await fetch(`${_edgeBase()}/${name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
