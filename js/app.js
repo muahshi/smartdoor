@@ -1,14 +1,13 @@
 /**
  * Smart Door — Main App Module
- * Visitor PWA + Owner Dashboard Interactions
- * app.js v2.0 — Communication Engine Connected
+ * Owner Dashboard Interactions (app.js v2.1)
  *
- * UI markup/behavior is unchanged from v1.0. The "visitor preview" buttons
- * (Call / Bell / Voice / SOS / AI chat) now drive the real Phase 5
- * communication services when the page is loaded in an authenticated
- * owner session (the normal case for app.html), and fall back to the
- * original purely-visual simulation if that context isn't available yet
- * (e.g. a brief moment before auth resolves).
+ * NOTE: the visitor-facing experience lives ONLY in visitor.html now.
+ * app.html is the owner-only dashboard (/app route, behind the auth
+ * guard at the top of app.html). The call/bell/voice/SOS handlers below
+ * drive real Phase 5 communication services and are reachable from the
+ * Settings tab's status controls; they no longer power a "visitor
+ * preview" tab — that embedded duplicate UI was removed from app.html.
  */
 
 import { getCurrentOwner } from '../services/auth.js';
@@ -29,8 +28,7 @@ if ('serviceWorker' in navigator) {
 
 // ────────── APP STATE ──────────
 const AppState = {
-  currentView: 'visitor', // 'visitor' | 'owner'
-  ownerName: 'Sharma Family',
+  ownerName: 'Owner', // neutral placeholder only — never a fabricated name; overwritten by real data in _loadCommContext()
   currentStatus: 'available',
   callForwarding: true,
   isCallActive: false,
