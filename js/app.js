@@ -61,6 +61,17 @@ async function _loadCommContext() {
     AppState.ownerName = owner.full_name || AppState.ownerName;
     AppState.plateId = owner.plate_id;
 
+    // Update ALL DOM elements that show the owner name (removes placeholder)
+    const name = AppState.ownerName;
+    [
+      'owner-display-name',
+      'owner-greeting-name',
+      'owner-panel-name',
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = name;
+    });
+
     const familyResult = await getFamilyMembers(owner.id);
     if (familyResult.success) {
       AppState.familyMembers = familyResult.members || [];
