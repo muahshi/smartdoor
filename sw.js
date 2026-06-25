@@ -1,15 +1,25 @@
-// Smart Door Service Worker v1.0
-const CACHE_NAME = 'smartdoor-v1';
+// Smart Door Service Worker v1.1
+// v1.1: fixed a bug where a failed navigation to ANY route (including a
+// visitor's /p/:slug QR link) fell back to the cached owner dashboard
+// (app.html). A visitor must never see app.html, even offline.
+const CACHE_NAME = 'smartdoor-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/app.html',
+  '/visitor.html',
   '/css/styles.css',
   '/js/app.js',
   '/js/groq.js',
   '/js/dashboard.js',
   '/manifest.json'
 ];
+
+// Routes that must NEVER fall back to the owner dashboard.
+function isVisitorRoute(url) {
+  const path = url.pathname;
+  return path.startsWith('/p/') || path.startsWith('/pass/') || path === '/visitor.html';
+}
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -77,8 +87,15 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Return offline page for navigation requests
+          // Navigation fell through with nothing cached for this exact URL.
+          // Visitor routes (QR scans) must NEVER fall back to the owner
+          // dashboard — fall back to visitor.html instead, or a plain
+          // offline response for the owner app itself.
           if (event.request.mode === 'navigate') {
+            const url = new URL(event.request.url);
+            if (isVisitorRoute(url)) {
+              return caches.match('/visitor.html');
+            }
             return caches.match('/app.html');
           }
           return new Response('Offline - Smart Door', {

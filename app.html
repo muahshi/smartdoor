@@ -74,16 +74,13 @@
       }
       .dual-panel {
         display: grid;
-        grid-template-columns: 420px 1fr;
+        grid-template-columns: 1fr;
         gap: 0;
         width: 100%;
         min-height: calc(100vh - 72px);
       }
       .app-shell {
-        height: calc(100vh - 72px);
-        max-width: 420px;
-        border-right: 1px solid rgba(255,255,255,0.06);
-        overflow: hidden;
+        display: none;
       }
       .owner-panel {
         overflow-y: auto;
@@ -463,21 +460,6 @@
     <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;background:linear-gradient(135deg,#fff,#C8E8F8,#00A2E8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">SMART DOOR</span>
   </a>
 
-  <!-- Preview tabs -->
-  <div style="display:flex;gap:8px;">
-    <button data-view-tab="visitor" onclick="switchDesktopView('visitor',this)" style="
-      padding:8px 18px;border-radius:10px;border:1px solid rgba(0,162,232,0.4);
-      background:linear-gradient(135deg,rgba(0,162,232,0.15),rgba(0,120,215,0.08));
-      color:#00A2E8;font-size:0.82rem;font-weight:700;cursor:pointer;
-      font-family:'Space Grotesk',sans-serif;
-    ">📲 Visitor View</button>
-    <button data-view-tab="owner" onclick="switchDesktopView('owner',this)" style="
-      padding:8px 18px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);
-      background:transparent;color:rgba(255,255,255,0.5);font-size:0.82rem;font-weight:700;cursor:pointer;
-      font-family:'Space Grotesk',sans-serif;transition:all 0.2s;
-    " onmouseover="this.style.borderColor='rgba(0,162,232,0.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">⚙️ Owner Panel</button>
-  </div>
-
   <div style="display:flex;align-items:center;gap:12px;">
     <div class="secure-tag">
       <span style="width:6px;height:6px;border-radius:50%;background:#22C55E;animation:pulse-dot 2s infinite;"></span>
@@ -517,186 +499,17 @@
           <span style="width:5px;height:5px;border-radius:50%;background:#22C55E;animation:pulse-dot 2s infinite;"></span>
           Secured
         </div>
-        <!-- Visitor/Owner quick switch (mobile) -->
-        <button onclick="mobileToggleView()" style="
-          background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
-          border-radius:8px;padding:6px 10px;color:rgba(255,255,255,0.6);
-          cursor:pointer;font-size:0.7rem;font-family:'Space Grotesk',sans-serif;font-weight:600;
-        " id="mobile-view-toggle">Owner →</button>
       </div>
     </div>
 
     <!-- Tab bar (mobile) -->
     <div class="tab-bar" id="mobile-tab-bar">
-      <button class="tab-btn active" data-tab="visitor" onclick="switchMobileTab('visitor',this)">📲 Visitor</button>
-      <button class="tab-btn" data-tab="dashboard" onclick="switchMobileTab('dashboard',this)">📊 Analytics</button>
+      <button class="tab-btn active" data-tab="dashboard" onclick="switchMobileTab('dashboard',this)">📊 Analytics</button>
       <button class="tab-btn" data-tab="settings" onclick="switchMobileTab('settings',this)">⚙️ Settings</button>
     </div>
 
-    <!-- ═══════ VISITOR VIEW ═══════ -->
-    <div class="view-area" id="tab-visitor">
-
-      <!-- Welcome Header -->
-      <div class="visitor-header">
-        <div style="font-size:0.8rem;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:'Space Grotesk',sans-serif;">Welcome to</div>
-        <div class="owner-name-display" id="owner-display-name">…</div>
-        <div style="font-size:0.85rem;color:rgba(255,255,255,0.5);margin-top:2px;">Residence</div>
-
-        <!-- Live Status -->
-        <div style="margin-top:14px;display:inline-flex;" id="visitor-status-badge">
-          <div class="status-badge status-available">
-            <span class="status-dot"></span>
-            <span id="status-text-display">Available — We'll respond shortly</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Night Mode Banner (hidden by default) -->
-      <div id="night-mode-banner" style="display:none;margin:0 16px 8px;">
-        <div class="night-banner" style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:1.2rem;">🌙</span>
-          <div>
-            <div style="font-size:0.82rem;font-weight:700;color:#A5B4FC;font-family:'Space Grotesk',sans-serif;">Night Security Mode Active</div>
-            <div style="font-size:0.72rem;color:rgba(165,180,252,0.6);">Only SOS calls accepted until morning</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-
-        <!-- Call -->
-        <button class="action-btn primary-action" id="btn-call">
-          <div class="action-icon" style="background:linear-gradient(135deg,rgba(0,162,232,0.25),rgba(0,120,215,0.15));border:1px solid rgba(0,162,232,0.3);position:relative;">
-            📞
-            <div class="call-wave"></div>
-            <div class="call-wave"></div>
-          </div>
-          <div style="flex:1;">
-            <div class="action-title">Call Owner Securely</div>
-            <div class="action-sub">Your number is safe with us</div>
-          </div>
-          <div style="font-size:0.65rem;color:rgba(0,162,232,0.6);font-weight:600;font-family:'Space Grotesk',sans-serif;">MASKED</div>
-        </button>
-
-        <!-- Bell -->
-        <button class="action-btn" id="btn-bell">
-          <div class="action-icon" style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);">
-            <span id="bell-icon">🔔</span>
-          </div>
-          <div style="flex:1;">
-            <div class="action-title">Ring Digital Bell</div>
-            <div class="action-sub">Instant alert on owner's phone</div>
-          </div>
-          <div style="font-size:0.65rem;color:rgba(245,158,11,0.7);font-weight:600;font-family:'Space Grotesk',sans-serif;">PUSH</div>
-        </button>
-
-        <!-- Voice -->
-        <button class="action-btn" id="btn-voice">
-          <div class="action-icon" style="background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);">🎤</div>
-          <div style="flex:1;">
-            <div class="action-title">Leave a Voice Note</div>
-            <div id="voice-status" class="action-sub">Speak & leave a 10-sec note</div>
-          </div>
-          <div id="voice-timer" style="font-size:0.72rem;color:#A855F7;font-weight:700;font-family:'Space Grotesk',sans-serif;"></div>
-        </button>
-
-        <!-- SOS -->
-        <button class="action-btn sos-action sos-animate" id="btn-sos">
-          <div class="action-icon" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);">🚨</div>
-          <div style="flex:1;">
-            <div class="action-title" style="color:#EF4444;">Emergency SOS</div>
-            <div class="action-sub">For urgent help only</div>
-          </div>
-          <div style="font-size:0.65rem;color:rgba(239,68,68,0.7);font-weight:700;font-family:'Space Grotesk',sans-serif;">HOLD 2s</div>
-        </button>
-      </div>
-
-      <!-- AI Assistant -->
-      <div style="margin:0 16px 24px;padding:16px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:16px;position:relative;overflow:hidden;">
-        <div style="position:absolute;top:-30%;right:-15%;width:140px;height:140px;background:radial-gradient(circle,rgba(168,85,247,0.12) 0%,transparent 70%);pointer-events:none;"></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;position:relative;">
-          <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,rgba(168,85,247,0.25),rgba(99,102,241,0.15));border:1px solid rgba(168,85,247,0.3);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🤖</div>
-          <div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.82rem;color:#fff;">AI Receptionist</div>
-            <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);">Powered by Groq LLaMA-3</div>
-          </div>
-          <div style="margin-left:auto;display:flex;align-items:center;gap:4px;">
-            <span style="width:5px;height:5px;border-radius:50%;background:#22C55E;animation:pulse-dot 2s infinite;"></span>
-            <span style="font-size:0.65rem;color:#22C55E;font-weight:600;">Live</span>
-          </div>
-        </div>
-
-        <!-- Chat area -->
-        <div class="ai-chat-area" id="ai-output">
-          <div style="display:flex;flex-direction:column;align-items:flex-start;margin-bottom:4px;">
-            <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);margin-bottom:3px;font-family:'Space Grotesk',sans-serif;">Smart Door AI</div>
-            <div style="max-width:90%;padding:8px 12px;border-radius:10px 10px 10px 2px;background:rgba(0,162,232,0.1);border:1px solid rgba(0,162,232,0.2);font-size:0.78rem;color:#C8E8F8;line-height:1.5;">
-              👋 Hello! I'm your AI assistant. Tell me the purpose of your visit and I'll help you connect with the resident.
-            </div>
-          </div>
-        </div>
-
-        <!-- Input area -->
-        <div style="display:flex;gap:8px;margin-top:10px;">
-          <input
-            id="ai-visitor-input"
-            type="text"
-            placeholder="Type or speak your message..."
-            style="
-              flex:1;padding:9px 12px;
-              background:rgba(255,255,255,0.04);
-              border:1px solid rgba(255,255,255,0.1);
-              border-radius:10px;color:#E2ECF4;
-              font-size:0.8rem;outline:none;
-              font-family:'Inter',sans-serif;
-              transition:border-color 0.2s;
-            "
-            onfocus="this.style.borderColor='rgba(0,162,232,0.5)'"
-            onblur="this.style.borderColor='rgba(255,255,255,0.1)'"
-          />
-          <button id="ai-mic-btn" style="
-            width:36px;height:36px;border-radius:10px;
-            background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);
-            display:flex;align-items:center;justify-content:center;
-            cursor:pointer;font-size:0.9rem;transition:all 0.2s;flex-shrink:0;
-          " onmouseover="this.style.background='rgba(168,85,247,0.22)'" onmouseout="this.style.background='rgba(168,85,247,0.12)'">🎙</button>
-          <button id="ai-send-btn" style="
-            width:36px;height:36px;border-radius:10px;
-            background:linear-gradient(135deg,#00A2E8,#0078D7);border:none;
-            display:flex;align-items:center;justify-content:center;
-            cursor:pointer;font-size:0.85rem;transition:all 0.2s;flex-shrink:0;
-            box-shadow:0 2px 10px rgba(0,162,232,0.3);
-          " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">➤</button>
-        </div>
-      </div>
-
-      <!-- Privacy footer -->
-      <div style="
-        margin:0 16px 24px;
-        display:flex;align-items:center;justify-content:center;gap:8px;
-        padding:10px;
-        background:rgba(34,197,94,0.05);
-        border:1px solid rgba(34,197,94,0.12);
-        border-radius:10px;
-      ">
-        <span style="font-size:0.9rem;">🔒</span>
-        <span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">Your Privacy is 100% Protected</span>
-        <span style="font-size:0.72rem;color:rgba(255,255,255,0.25);">•</span>
-        <span style="font-size:0.72rem;color:rgba(255,255,255,0.4);">No numbers shared</span>
-      </div>
-
-      <!-- Powered by -->
-      <div style="text-align:center;padding-bottom:24px;">
-        <span style="font-size:0.65rem;color:rgba(255,255,255,0.2);font-family:'Space Grotesk',sans-serif;letter-spacing:1px;">SECURED BY</span>
-        <div style="font-size:0.72rem;color:rgba(0,162,232,0.5);font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:2px;margin-top:2px;">⊙ SMART DOOR</div>
-      </div>
-
-    </div>
-    <!-- END VISITOR VIEW -->
-
     <!-- ═══════ DASHBOARD TAB (mobile) ═══════ -->
-    <div class="view-area" id="tab-dashboard" style="display:none;padding:16px;">
+    <div class="view-area" id="tab-dashboard" style="padding:16px;">
 
       <!-- Owner greeting -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
@@ -969,11 +782,7 @@
 
     <!-- Bottom Navigation (mobile) -->
     <div class="bottom-nav" id="mobile-bottom-nav">
-      <button class="bottom-nav-item active" onclick="switchMobileTab('visitor', null, this)">
-        <span class="nav-icon">📲</span>
-        <span class="nav-label">Visitor</span>
-      </button>
-      <button class="bottom-nav-item" onclick="switchMobileTab('dashboard', null, this)">
+      <button class="bottom-nav-item active" onclick="switchMobileTab('dashboard', null, this)">
         <span class="nav-icon">📊</span>
         <span class="nav-label">Analytics</span>
       </button>
@@ -991,7 +800,7 @@
   <!-- END APP SHELL -->
 
   <!-- ══ RIGHT: OWNER PANEL (desktop only) ══ -->
-  <div class="owner-panel" id="owner-panel-desktop" style="display:none;">
+  <div class="owner-panel" id="owner-panel-desktop">
 
     <!-- Owner Panel Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;">
@@ -1283,40 +1092,10 @@
 <script type="module" src="js/app.js"></script>
 
 <script>
-  // ── Desktop view switcher ──
-  function switchDesktopView(view, btn) {
-    const allBtns = document.querySelectorAll('[data-view-tab]');
-    allBtns.forEach(b => {
-      b.style.background = 'transparent';
-      b.style.borderColor = 'rgba(255,255,255,0.08)';
-      b.style.color = 'rgba(255,255,255,0.5)';
-    });
-    btn.style.background = 'linear-gradient(135deg,rgba(0,162,232,0.15),rgba(0,120,215,0.08))';
-    btn.style.borderColor = 'rgba(0,162,232,0.4)';
-    btn.style.color = '#00A2E8';
-
-    const ownerPanel = document.getElementById('owner-panel-desktop');
-    const appShell = document.querySelector('.app-shell');
-    const dualPanel = document.getElementById('dual-panel-root');
-
-    if (view === 'owner') {
-      ownerPanel.style.display = 'block';
-      appShell.style.display = 'none';
-      dualPanel.style.gridTemplateColumns = '1fr';
-      dualPanel.dataset.mode = 'owner';
-      setTimeout(() => { if (window.DashboardModule) DashboardModule.init(); }, 100);
-    } else {
-      ownerPanel.style.display = 'none';
-      appShell.style.display = 'flex';
-      dualPanel.style.gridTemplateColumns = '420px 1fr';
-      dualPanel.dataset.mode = 'visitor';
-    }
-  }
-
   // ── Mobile tab switcher ──
   function switchMobileTab(tab, tabBtn, navBtn) {
     // Hide all views
-    ['visitor','dashboard','settings'].forEach(t => {
+    ['dashboard','settings'].forEach(t => {
       const el = document.getElementById('tab-' + t);
       if (el) el.style.display = 'none';
     });
@@ -1339,16 +1118,6 @@
     // Init dashboard when needed
     if (tab === 'dashboard' || tab === 'settings') {
       setTimeout(() => { if (window.DashboardModule) DashboardModule.init(); }, 100);
-    }
-  }
-
-  // ── Mobile toggle between visitor/owner ──
-  function mobileToggleView() {
-    const tabs = document.querySelectorAll('.tab-btn');
-    const dashTab = document.querySelector('[data-tab="dashboard"]');
-    if (dashTab) {
-      switchMobileTab('dashboard', dashTab, null);
-      dashTab.classList.add('active');
     }
   }
 
@@ -1393,13 +1162,6 @@
 
   // ── Initialize on load ──
   document.addEventListener('DOMContentLoaded', () => {
-    // Check if desktop
-    if (window.innerWidth >= 900) {
-      // Show visitor by default on desktop
-      const ownerPanel = document.getElementById('owner-panel-desktop');
-      if (ownerPanel) ownerPanel.style.display = 'none';
-    }
-
     // Init Dashboard for stats/charts
     if (window.DashboardModule) {
       DashboardModule.init();
