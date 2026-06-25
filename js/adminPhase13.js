@@ -14,7 +14,7 @@
 
 import { getAdminSession, hasPermission, PERMISSIONS } from '../services/admin.js';
 
-const EDGE_BASE = `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`;
+function getEdgeBase() { return `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`; }
 
 async function callAdmin(fn, body) {
   const raw = localStorage.getItem('sd_admin_session');
@@ -24,7 +24,7 @@ async function callAdmin(fn, body) {
   const token = session?.token;
   if (!token) return { success: false, error: 'Session expired' };
   try {
-    const res = await fetch(`${EDGE_BASE}/${fn}`, {
+    const res = await fetch(`${getEdgeBase()}/${fn}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
