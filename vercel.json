@@ -1,6 +1,14 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.mysmartdoor.in" }],
+      "destination": "https://mysmartdoor.in/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/login", "destination": "/login.html" },
     { "source": "/p/:slug", "destination": "/visitor.html?plate=:slug" },
