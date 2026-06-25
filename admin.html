@@ -1766,15 +1766,12 @@ window.printProductionSheet = function(){showToast('Print sheet coming soon','in
 window.downloadQR = function(plateId,fmt){showToast(`QR ${fmt.toUpperCase()} for ${plateId}`,'success');};
 
 // ── QR MANAGEMENT ──
-function escapeHTML(str){
-  return String(str).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-}
 window.searchQR = async function() {
   const q=document.getElementById('qrSearchInput')?.value?.trim(); if(!q) return;
   const re=document.getElementById('qrResults'); if(!re) return;
   re.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
   const res=await adminCall('qr_search',{plate_id:q});
-  if(!res.success||!res.results?.length){re.innerHTML=`<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records for: ${escapeHTML(q)}</div></div>`;return;}
+  if(!res.success||!res.results?.length){re.innerHTML=`<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records for: ${q}</div></div>`;return;}
   re.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Plate ID</th><th>Order #</th><th>Customer</th><th>Product</th><th>Status</th><th>Actions</th></tr></thead><tbody>${res.results.map(item=>`<tr>
     <td><span style="font-family:monospace;font-weight:600">${item.plate_id}</span></td>
     <td><span style="font-family:monospace;font-size:11px;color:var(--muted)">${item.orders?.order_number||'—'}</span></td>

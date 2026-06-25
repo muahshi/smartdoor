@@ -137,6 +137,48 @@ serve(async (req) => {
     // Success — reset lockout
     await supabaseAdmin.rpc('reset_pin_lockout', { p_plate_id: normalizedPlateId });
 
+    // ── Activate-on-login (the actual fix for "Owner? Login to activate") ──
+    // The pending-activation screen on visitor.html has always told visitors
+    // "Owner? Login to activate" — but until now, login never activated
+    // anything. It only authenticated. A plate that ended up pending for any
+    // reason (admin-provisioning row with a mismatched qr_slug, a missed
+    // webhook, etc.) could never be fixed by logging in, no matter how many
+    // times the owner tried. This makes that promise true, exactly once,
+    // idempotently — does nothing if the plate is already active.
+    try {
+      const { data: ownedPlate } = await supabaseAdmin
+        .from('plates')
+        .select('id, plate_id, qr_slug, status')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (ownedPlate && ownedPlate.status !== 'active') {
+        const { error: activateErr } = await supabaseAdmin
+          .from('plates')
+          .update({
+            status: 'active',
+            qr_slug: ownedPlate.qr_slug || ownedPlate.plate_id,
+            activation_date: new Date().toISOString(),
+          })
+          .eq('id', ownedPlate.id);
+
+        if (!activateErr) {
+          await supabaseAdmin.from('activation_events').insert({
+            plate_id: ownedPlate.plate_id,
+            owner_id: user.id,
+            event_type: 'activated',
+            event_detail: 'Activated via first owner login (verify-pin)',
+            actor: 'owner',
+          });
+        } else {
+          console.error('[verify-pin] plate activation failed:', activateErr);
+        }
+      }
+    } catch (activationErr) {
+      // Non-fatal — login must still succeed even if activation bookkeeping fails.
+      console.error('[verify-pin] activate-on-login error:', activationErr);
+    }
+
     const { data: sub } = await supabaseAdmin
       .from('subscriptions')
       .select('plan, status, expiry_date')
