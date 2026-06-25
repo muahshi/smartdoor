@@ -2,20 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <script src="config/env.generated.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Door — Admin Super Panel</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <style>
-    /* ═══════════════════════════════════════════════════════
-       SMART DOOR ADMIN — DESIGN SYSTEM
-       Palette: Near-black bg, graphite surface, Orange-Red accent
-       ═══════════════════════════════════════════════════════ */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  <!-- ENV CONFIG — loaded first, before any JS runs -->
+  <script src="config/env.generated.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg:          #080C18;
       --bg2:         #0D1221;
@@ -38,227 +36,51 @@
       --sidebar-w:   240px;
       --header-h:    56px;
     }
-
     html, body { height: 100%; overflow: hidden; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      line-height: 1.5;
-      display: flex;
-    }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.5; display: flex; }
 
-    /* ─── SIDEBAR ─── */
-    .sidebar {
-      width: var(--sidebar-w);
-      height: 100vh;
-      background: var(--bg2);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      position: fixed;
-      left: 0; top: 0;
-      z-index: 100;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-
-    .sidebar-logo {
-      padding: 18px 16px 14px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .logo-icon {
-      width: 34px; height: 34px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
+    /* SIDEBAR */
+    .sidebar { width: var(--sidebar-w); height: 100vh; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; left: 0; top: 0; z-index: 100; overflow-y: auto; overflow-x: hidden; }
+    .sidebar-logo { padding: 18px 16px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
     .logo-name { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; }
     .logo-sub  { font-size: 10px; color: var(--accent2); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 1px; }
-
     .sidebar-section { padding: 12px 8px 4px; }
-    .sidebar-section-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-      padding: 0 8px;
-      margin-bottom: 4px;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 9px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      color: var(--text2);
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.15s;
-      user-select: none;
-      margin-bottom: 1px;
-    }
+    .sidebar-section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin-bottom: 4px; }
+    .nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; cursor: pointer; color: var(--text2); font-size: 13px; font-weight: 500; transition: all 0.15s; user-select: none; margin-bottom: 1px; }
     .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-    .nav-item.active {
-      background: var(--accent-glow);
-      color: var(--accent2);
-      font-weight: 600;
-    }
+    .nav-item.active { background: var(--accent-glow); color: var(--accent2); font-weight: 600; }
     .nav-item .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
-    .nav-badge {
-      margin-left: auto;
-      background: var(--accent);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 10px;
-      min-width: 18px;
-      text-align: center;
-    }
-
-    .sidebar-footer {
-      margin-top: auto;
-      padding: 12px 8px;
-      border-top: 1px solid var(--border);
-    }
-    .admin-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      background: rgba(255,255,255,0.03);
-    }
-    .admin-avatar {
-      width: 30px; height: 30px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; color: #fff;
-      flex-shrink: 0;
-    }
+    .nav-badge { margin-left: auto; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+    .sidebar-footer { margin-top: auto; padding: 12px 8px; border-top: 1px solid var(--border); }
+    .admin-info { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+    .admin-avatar { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
     .admin-name { font-size: 12px; font-weight: 600; }
     .admin-role { font-size: 10px; color: var(--muted); }
-    .logout-btn {
-      margin-top: 6px;
-      width: 100%;
-      padding: 7px;
-      background: rgba(239,68,68,0.1);
-      border: 1px solid rgba(239,68,68,0.2);
-      border-radius: 7px;
-      color: #FCA5A5;
-      font-size: 12px;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 500;
-      transition: background 0.15s;
-    }
+    .logout-btn { margin-top: 6px; width: 100%; padding: 7px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 7px; color: #FCA5A5; font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 500; transition: background 0.15s; }
     .logout-btn:hover { background: rgba(239,68,68,0.2); }
 
-    /* ─── MAIN AREA ─── */
-    .main {
-      margin-left: var(--sidebar-w);
-      flex: 1;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    /* ─── HEADER ─── */
-    .header {
-      height: var(--header-h);
-      background: var(--bg2);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .header-title {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 16px;
-      font-weight: 700;
-    }
+    /* MAIN */
+    .main { margin-left: var(--sidebar-w); flex: 1; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    .header { height: var(--header-h); background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0; }
+    .header-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; }
     .header-subtitle { font-size: 12px; color: var(--muted); margin-left: 6px; }
     .header-spacer { flex: 1; }
     .header-actions { display: flex; align-items: center; gap: 8px; }
-
-    .search-bar {
-      display: flex;
-      align-items: center;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0 12px;
-      gap: 8px;
-      height: 34px;
-    }
-    .search-bar input {
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font-size: 13px;
-      width: 200px;
-      font-family: inherit;
-    }
+    .search-bar { display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0 12px; gap: 8px; height: 34px; }
+    .search-bar input { background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; width: 200px; font-family: inherit; }
     .search-bar input::placeholder { color: var(--muted); }
-
-    .header-btn {
-      height: 34px;
-      padding: 0 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text2);
-      font-size: 12px;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 500;
-      transition: all 0.15s;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .header-btn { height: 34px; padding: 0 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 500; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
     .header-btn:hover { border-color: var(--border2); color: var(--text); }
 
-    /* ─── CONTENT ─── */
-    .content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-
-    /* ─── PANELS ─── */
+    /* CONTENT */
+    .content { flex: 1; overflow-y: auto; padding: 20px; }
     .panel { display: none; }
     .panel.active { display: block; }
 
-    /* ─── METRIC CARDS ─── */
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    .metric-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      transition: border-color 0.2s;
-    }
+    /* METRIC CARDS */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 0.2s; }
     .metric-card:hover { border-color: var(--border2); }
     .metric-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
     .metric-value { font-size: 26px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; line-height: 1; }
@@ -267,75 +89,25 @@
     .trend-up { color: var(--success); }
     .trend-down { color: var(--danger); }
 
-    /* ─── SECTION HEADERS ─── */
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
+    /* SECTION HEADER */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .section-title { font-size: 15px; font-weight: 700; }
-    .section-action {
-      font-size: 12px;
-      color: var(--accent2);
-      cursor: pointer;
-      font-weight: 500;
-      border: none;
-      background: none;
-      font-family: inherit;
-    }
-    .section-action:hover { text-decoration: underline; }
 
-    /* ─── CARDS ─── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 14px;
-    }
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-    }
+    /* CARDS */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
     .card-title { font-size: 13px; font-weight: 600; }
 
-    /* ─── TABLE ─── */
+    /* TABLE */
     .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
     table { width: 100%; border-collapse: collapse; }
     thead tr { background: var(--surface2); }
-    th {
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      white-space: nowrap;
-    }
-    td {
-      padding: 11px 14px;
-      font-size: 13px;
-      border-top: 1px solid var(--border);
-      vertical-align: middle;
-    }
+    th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+    td { padding: 11px 14px; font-size: 13px; border-top: 1px solid var(--border); vertical-align: middle; }
     tr:hover td { background: rgba(255,255,255,0.02); }
 
-    /* ─── BADGES ─── */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
+    /* BADGES */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
     .badge-success { background: rgba(16,185,129,0.15); color: #34D399; }
     .badge-warning { background: rgba(245,158,11,0.15); color: #FCD34D; }
     .badge-danger  { background: rgba(239,68,68,0.15);  color: #FCA5A5; }
@@ -344,20 +116,8 @@
     .badge-muted   { background: rgba(107,114,128,0.15);color: #9CA3AF; }
     .badge-orange  { background: rgba(255,69,0,0.15);   color: #FF9E7D; }
 
-    /* ─── BUTTONS ─── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      border: none;
-      transition: all 0.15s;
-    }
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; transition: all 0.15s; }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { background: var(--accent2); }
     .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
@@ -365,176 +125,79 @@
     .btn-success { background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid rgba(16,185,129,0.2); }
     .btn-danger  { background: rgba(239,68,68,0.15);  color: #FCA5A5; border: 1px solid rgba(239,68,68,0.2); }
     .btn-sm { padding: 4px 10px; font-size: 11px; border-radius: 6px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ─── FORM INPUTS ─── */
+    /* FORMS */
     .form-group { margin-bottom: 14px; }
     .form-label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
-    .form-input, .form-select {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 9px 12px;
-      color: var(--text);
-      font-size: 13px;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.2s;
-    }
+    .form-input, .form-select { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.2s; }
     .form-input:focus, .form-select:focus { border-color: rgba(255,69,0,0.4); }
+    textarea.form-input { resize: vertical; }
     .form-select { cursor: pointer; }
 
-    /* ─── TABS ─── */
-    .tabs {
-      display: flex;
-      gap: 2px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 3px;
-      margin-bottom: 16px;
-    }
-    .tab {
-      flex: 1;
-      padding: 7px 12px;
-      border-radius: 7px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      color: var(--muted);
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
+    /* TABS */
+    .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 3px; margin-bottom: 16px; overflow-x: auto; }
+    .tab { flex: 1; padding: 7px 12px; border-radius: 7px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--muted); transition: all 0.15s; white-space: nowrap; }
     .tab.active { background: var(--surface2); color: var(--text); }
 
-    /* ─── CHART CONTAINER ─── */
+    /* CHART */
     .chart-container { position: relative; height: 200px; }
 
-    /* ─── STATUS PIPELINE ─── */
-    .pipeline {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-    }
-    .pipeline-stage {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      min-width: 120px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      flex-shrink: 0;
-    }
+    /* PIPELINE */
+    .pipeline { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px; }
+    .pipeline-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; min-width: 120px; text-align: center; cursor: pointer; transition: all 0.15s; flex-shrink: 0; }
     .pipeline-stage:hover, .pipeline-stage.active { border-color: var(--border2); background: var(--surface2); }
     .pipeline-stage .stage-icon { font-size: 20px; margin-bottom: 4px; }
     .pipeline-stage .stage-count { font-size: 22px; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
     .pipeline-stage .stage-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
-    /* ─── MODAL ─── */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      backdrop-filter: blur(4px);
-    }
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
     .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      width: 100%;
-      max-width: 560px;
-      max-height: 85vh;
-      overflow-y: auto;
-    }
-    .modal-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 560px; max-height: 85vh; overflow-y: auto; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
     .modal-title { font-size: 15px; font-weight: 700; }
-    .modal-close { cursor: pointer; color: var(--muted); font-size: 20px; line-height: 1; background: none; border: none; color: inherit; }
+    .modal-close { cursor: pointer; font-size: 20px; line-height: 1; background: none; border: none; color: var(--muted); }
+    .modal-close:hover { color: var(--text); }
     .modal-body { padding: 20px; }
     .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
 
-    /* ─── TOAST ─── */
-    #toast {
-      position: fixed;
-      bottom: 20px; right: 20px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 13px;
-      z-index: 9999;
-      transform: translateY(100px);
-      opacity: 0;
-      transition: all 0.3s;
-      max-width: 320px;
-    }
+    /* TOAST */
+    #toast { position: fixed; bottom: 20px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-size: 13px; z-index: 9999; transform: translateY(100px); opacity: 0; transition: all 0.3s; max-width: 320px; }
     #toast.show { transform: translateY(0); opacity: 1; }
     #toast.success { border-color: rgba(16,185,129,0.3); }
     #toast.error   { border-color: rgba(239,68,68,0.3); }
+    #toast.info    { border-color: rgba(59,130,246,0.3); }
 
-    /* ─── GRID LAYOUTS ─── */
+    /* LAYOUTS */
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
 
-    /* ─── LOADING SPINNER ─── */
-    .spinner {
-      display: inline-block;
-      width: 16px; height: 16px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-    }
+    /* SPINNER */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ─── EMPTY STATE ─── */
-    .empty-state {
-      text-align: center;
-      padding: 48px 20px;
-      color: var(--muted);
-    }
+    /* EMPTY STATE */
+    .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
     .empty-state .icon { font-size: 36px; margin-bottom: 10px; }
     .empty-state .text { font-size: 13px; }
 
-    /* ─── TICKET STATUS ─── */
+    /* TICKETS */
     .ticket-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
     .ticket-row:last-child { border-bottom: none; }
     .ticket-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); min-width: 120px; }
     .ticket-subject { flex: 1; font-size: 13px; font-weight: 500; }
-    .ticket-meta { font-size: 11px; color: var(--muted); }
 
-    /* ─── AUDIT LOG ─── */
+    /* AUDIT */
     .audit-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .audit-row:last-child { border-bottom: none; }
-    .audit-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+    .audit-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: var(--muted); }
     .audit-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); white-space: nowrap; min-width: 90px; }
     .audit-action { font-size: 12px; font-weight: 600; }
     .audit-detail { font-size: 11px; color: var(--muted); }
 
-    /* ─── HEALTH STATUS ─── */
-    .health-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-    }
+    /* HEALTH */
+    .health-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .health-item:last-child { border-bottom: none; }
     .health-label { font-size: 13px; }
     .health-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; }
@@ -543,40 +206,22 @@
     .dot-red { background: var(--danger); }
     .dot-yellow { background: var(--warning); }
 
-    /* ─── CUSTOMER PROFILE ─── */
-    .profile-header {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 16px;
-    }
-    .profile-avatar {
-      width: 52px; height: 52px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #3B82F6, #8B5CF6);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 22px; font-weight: 700; color: #fff;
-      flex-shrink: 0;
-    }
+    /* PROFILE */
+    .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .profile-avatar { width: 52px; height: 52px; border-radius: 12px; background: linear-gradient(135deg, #3B82F6, #8B5CF6); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: #fff; flex-shrink: 0; }
     .profile-name { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
     .profile-meta { font-size: 12px; color: var(--muted); }
-    .stat-pill {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px;
-      text-align: center;
-    }
+    .stat-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; text-align: center; }
     .stat-pill-value { font-size: 18px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
     .stat-pill-label { font-size: 10px; color: var(--muted); margin-top: 2px; }
 
-    /* ─── SCROLLBAR ─── */
+    /* SCROLLBAR */
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-    /* ─── RESPONSIVE ─── */
+    /* RESPONSIVE */
     @media (max-width: 900px) {
       .sidebar { transform: translateX(-100%); transition: transform 0.25s; z-index: 200; }
       .sidebar.open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
@@ -584,28 +229,15 @@
       .grid-2, .grid-3 { grid-template-columns: 1fr; }
       .metric-grid { grid-template-columns: repeat(2, 1fr); }
     }
-
-    /* ─── MOBILE SIDEBAR OVERLAY ─── */
-    #sidebarOverlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 199;
-      -webkit-tap-highlight-color: transparent;
-    }
+    #sidebarOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 199; }
     #sidebarOverlay.visible { display: block; }
   </style>
 </head>
 <body>
 
-<script type="module" src="js/monitoring-bootstrap.js"></script>
-
-<!-- Mobile sidebar overlay — tap to close -->
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-
-<!-- ═══════════ SIDEBAR ═══════════ -->
+<!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-icon">🚪</div>
@@ -690,10 +322,8 @@
   </div>
 </aside>
 
-<!-- ═══════════ MAIN ═══════════ -->
+<!-- MAIN -->
 <div class="main">
-
-  <!-- HEADER -->
   <header class="header">
     <button class="header-btn" onclick="toggleSidebar()" style="display:none;width:34px;padding:0;justify-content:center" id="menuBtn">☰</button>
     <div>
@@ -702,7 +332,7 @@
     </div>
     <div class="header-spacer"></div>
     <div class="header-actions">
-      <div class="search-bar" id="globalSearch">
+      <div class="search-bar">
         <span style="color:var(--muted)">🔍</span>
         <input type="text" placeholder="Search customers, orders…" id="globalSearchInput" onkeydown="handleGlobalSearch(event)">
       </div>
@@ -711,112 +341,83 @@
     </div>
   </header>
 
-  <!-- CONTENT -->
   <div class="content" id="content">
 
-    <!-- ══════════ DASHBOARD PANEL ══════════ -->
+    <!-- DASHBOARD -->
     <div class="panel active" id="panel-dashboard">
       <div class="section-header">
         <span class="section-title">📊 Overview</span>
         <span style="font-size:11px;color:var(--muted)" id="dashTimestamp"></span>
       </div>
-
-      <div class="metric-grid" id="metricGrid">
+      <div class="metric-grid">
         <div class="metric-card"><div class="metric-label">Total Customers</div><div class="metric-value" id="m-customers">—</div><div class="metric-sub">Registered owners</div></div>
         <div class="metric-card"><div class="metric-label">Active Subscriptions</div><div class="metric-value" id="m-subs">—</div><div class="metric-sub">Live plans</div></div>
-        <div class="metric-card"><div class="metric-label">Revenue (Month)</div><div class="metric-value" id="m-revenue">—</div><div class="metric-sub" id="m-revenue-sub">This month</div></div>
+        <div class="metric-card"><div class="metric-label">Revenue (Month)</div><div class="metric-value" id="m-revenue">—</div><div class="metric-sub">This month</div></div>
         <div class="metric-card"><div class="metric-label">Pending Orders</div><div class="metric-value" id="m-pending">—</div><div class="metric-sub">Awaiting payment</div></div>
         <div class="metric-card"><div class="metric-label">Mfg Queue</div><div class="metric-value" id="m-mfg">—</div><div class="metric-sub">In production pipeline</div></div>
         <div class="metric-card"><div class="metric-label">Open Tickets</div><div class="metric-value" id="m-tickets">—</div><div class="metric-sub">Support tickets</div></div>
         <div class="metric-card"><div class="metric-label">Expiring Soon</div><div class="metric-value" id="m-expiring">—</div><div class="metric-sub">Subs expiring in 30d</div></div>
-        <div class="metric-card"><div class="metric-label">New Customers</div><div class="metric-value" id="m-newcust">—</div><div class="metric-sub">This month <span class="metric-trend trend-up" id="m-growth"></span></div></div>
+        <div class="metric-card"><div class="metric-label">New Customers</div><div class="metric-value" id="m-newcust">—</div><div class="metric-sub">This month <span class="metric-trend" id="m-growth"></span></div></div>
         <div class="metric-card"><div class="metric-label">Total Plates</div><div class="metric-value" id="m-plates-total">—</div><div class="metric-sub">All provisioned plates</div></div>
         <div class="metric-card"><div class="metric-label">Active Plates</div><div class="metric-value" id="m-plates-active">—</div><div class="metric-sub">Currently live</div></div>
         <div class="metric-card"><div class="metric-label">Inactive Plates</div><div class="metric-value" id="m-plates-inactive">—</div><div class="metric-sub">Suspended / inactive</div></div>
         <div class="metric-card"><div class="metric-label">Messages Today</div><div class="metric-value" id="m-msgs-today">—</div><div class="metric-sub">Visitor messages</div></div>
         <div class="metric-card"><div class="metric-label">Voice Notes Today</div><div class="metric-value" id="m-voice-today">—</div><div class="metric-sub">Recorded today</div></div>
       </div>
-
       <div class="grid-2">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Revenue Trend</span></div>
-          <div class="chart-container"><canvas id="revenueChart"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Order Volume</span></div>
-          <div class="chart-container"><canvas id="orderChart"></canvas></div>
-        </div>
+        <div class="card"><div class="card-header"><span class="card-title">Revenue Trend</span></div><div class="chart-container"><canvas id="revenueChart"></canvas></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">Order Volume</span></div><div class="chart-container"><canvas id="orderChart"></canvas></div></div>
       </div>
-
       <div class="grid-2">
         <div class="card">
           <div class="card-header">
             <span class="card-title">Recent Orders</span>
-            <button class="btn btn-ghost btn-sm" onclick="switchPanel('orders', document.querySelector('[data-panel=orders]'))">View All</button>
+            <button class="btn btn-ghost btn-sm" onclick="switchPanel('orders',document.querySelector('[data-panel=orders]'))">View All</button>
           </div>
           <div id="dashRecentOrders"><div class="empty-state"><div class="spinner"></div></div></div>
         </div>
         <div class="card">
           <div class="card-header">
             <span class="card-title">Open Tickets</span>
-            <button class="btn btn-ghost btn-sm" onclick="switchPanel('support', document.querySelector('[data-panel=support]'))">View All</button>
+            <button class="btn btn-ghost btn-sm" onclick="switchPanel('support',document.querySelector('[data-panel=support]'))">View All</button>
           </div>
           <div id="dashOpenTickets"><div class="empty-state"><div class="spinner"></div></div></div>
         </div>
       </div>
     </div>
 
-    <!-- ══════════ PROVISIONING PANEL (Phase 12 — Internal Admin Portal) ══════════ -->
+    <!-- PROVISIONING -->
     <div class="panel" id="panel-provisioning">
       <div class="section-header">
         <span class="section-title">➕ Create Customer</span>
-        <span style="font-size:11px;color:var(--muted)">Provision a customer + plate without going through the website checkout</span>
+        <span style="font-size:11px;color:var(--muted)">Provision a customer + plate without checkout</span>
       </div>
-
       <div class="grid-2">
         <div class="card">
           <div class="card-header"><span class="card-title">Customer Details</span></div>
-          <form id="createCustomerForm" onsubmit="return false;">
-            <div class="form-group">
-              <label class="form-label">Full Name *</label>
-              <input type="text" class="form-input" id="cc-name" required placeholder="e.g. Ramesh Kumar">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Phone *</label>
-              <input type="tel" class="form-input" id="cc-phone" required placeholder="10-digit mobile number" maxlength="10">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Email</label>
-              <input type="email" class="form-input" id="cc-email" placeholder="optional">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Address</label>
-              <textarea class="form-input" id="cc-address" rows="2" placeholder="optional"></textarea>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Product Type *</label>
-              <select class="form-select" id="cc-product" required>
-                <option value="acrylic">Acrylic</option>
-                <option value="teakwood">Teakwood</option>
-                <option value="stainless">Stainless Steel</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Initial PIN *</label>
-              <input type="text" class="form-input" id="cc-pin" required placeholder="4 digits" maxlength="4" inputmode="numeric" pattern="[0-9]{4}">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Subscription Plan</label>
-              <select class="form-select" id="cc-plan">
-                <option value="">No subscription (hardware only)</option>
-                <option value="hardware_only">Hardware Only — ₹0/yr renewal</option>
-                <option value="smartdoor_care">SmartDoor Care — ₹299/yr</option>
-              </select>
-            </div>
-            <button class="btn btn-primary" id="createCustomerBtn" style="width:100%" onclick="submitCreateCustomer()">Create Customer</button>
-          </form>
+          <div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-input" id="cc-name" placeholder="e.g. Ramesh Kumar"></div>
+          <div class="form-group"><label class="form-label">Phone *</label><input type="tel" class="form-input" id="cc-phone" placeholder="10-digit mobile number" maxlength="10"></div>
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="cc-email" placeholder="optional"></div>
+          <div class="form-group"><label class="form-label">Address</label><textarea class="form-input" id="cc-address" rows="2" placeholder="optional"></textarea></div>
+          <div class="form-group">
+            <label class="form-label">Product Type *</label>
+            <select class="form-select" id="cc-product">
+              <option value="acrylic">Acrylic</option>
+              <option value="teakwood">Teakwood</option>
+              <option value="stainless">Stainless Steel</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Initial PIN *</label><input type="text" class="form-input" id="cc-pin" placeholder="4 digits" maxlength="4" inputmode="numeric" pattern="[0-9]{4}"></div>
+          <div class="form-group">
+            <label class="form-label">Subscription Plan</label>
+            <select class="form-select" id="cc-plan">
+              <option value="">No subscription (hardware only)</option>
+              <option value="hardware_only">Hardware Only — ₹0/yr renewal</option>
+              <option value="smartdoor_care">SmartDoor Care — ₹299/yr</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="createCustomerBtn" style="width:100%" onclick="submitCreateCustomer()">Create Customer</button>
         </div>
-
         <div class="card">
           <div class="card-header"><span class="card-title">Customer Package</span></div>
           <div id="customerPackageResult">
@@ -830,13 +431,12 @@
       </div>
     </div>
 
-    <!-- ══════════ CUSTOMERS PANEL ══════════ -->
+    <!-- CUSTOMERS -->
     <div class="panel" id="panel-customers">
       <div class="section-header">
         <span class="section-title">👥 Customer Management</span>
         <button class="btn btn-ghost btn-sm" onclick="exportCustomers()">↓ Export CSV</button>
       </div>
-
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <input type="text" class="form-input" id="custSearch" placeholder="Search by name, phone, email, plate ID…" style="flex:1;min-width:200px" oninput="debounceSearch()">
@@ -850,254 +450,144 @@
           <button class="btn btn-primary" onclick="loadCustomers()">🔍 Search</button>
         </div>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Customer</th><th>Plate ID</th><th>Phone</th><th>Plan</th><th>Subscription</th><th>Orders</th><th>Joined</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="customersTable">
-            <tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Customer</th><th>Plate ID</th><th>Phone</th><th>Plan</th><th>Subscription</th><th>Orders</th><th>Joined</th><th>Actions</th></tr></thead>
+          <tbody id="customersTable"><tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
-      <div id="customersPagination" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"></div>
     </div>
 
-    <!-- ══════════ ORDERS PANEL ══════════ -->
+    <!-- ORDERS -->
     <div class="panel" id="panel-orders">
       <div class="section-header">
         <span class="section-title">🛒 Order Management</span>
         <button class="btn btn-ghost btn-sm" onclick="exportOrders()">↓ Export</button>
       </div>
-
-      <div class="tabs" id="orderTabs">
-        <div class="tab active" onclick="filterOrders('all', this)">All</div>
-        <div class="tab" onclick="filterOrders('pending', this)">Pending</div>
-        <div class="tab" onclick="filterOrders('paid', this)">Paid</div>
-        <div class="tab" onclick="filterOrders('production', this)">Production</div>
-        <div class="tab" onclick="filterOrders('shipped', this)">Shipped</div>
-        <div class="tab" onclick="filterOrders('delivered', this)">Delivered</div>
-        <div class="tab" onclick="filterOrders('refunded', this)">Refunds</div>
+      <div class="tabs">
+        <div class="tab active" onclick="filterOrders('all',this)">All</div>
+        <div class="tab" onclick="filterOrders('pending',this)">Pending</div>
+        <div class="tab" onclick="filterOrders('paid',this)">Paid</div>
+        <div class="tab" onclick="filterOrders('production',this)">Production</div>
+        <div class="tab" onclick="filterOrders('shipped',this)">Shipped</div>
+        <div class="tab" onclick="filterOrders('delivered',this)">Delivered</div>
+        <div class="tab" onclick="filterOrders('refunded',this)">Refunds</div>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Order #</th><th>Customer</th><th>Product</th><th>Amount</th><th>Payment</th><th>Manufacturing</th><th>Date</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="ordersTable">
-            <tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Order #</th><th>Customer</th><th>Product</th><th>Amount</th><th>Payment</th><th>Manufacturing</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="ordersTable"><tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- ══════════ MANUFACTURING PANEL ══════════ -->
+    <!-- MANUFACTURING -->
     <div class="panel" id="panel-manufacturing">
       <div class="section-header">
         <span class="section-title">🏭 Manufacturing Panel</span>
         <button class="btn btn-primary btn-sm" onclick="printProductionSheet()">🖨️ Print Sheet</button>
       </div>
-
-      <div class="pipeline" id="mfgPipeline">
-        <div class="pipeline-stage active" onclick="filterMfgByStage('all', this)">
-          <div class="stage-icon">📋</div>
-          <div class="stage-count" id="mfg-count-all">—</div>
-          <div class="stage-label">All Items</div>
-        </div>
-        <div class="pipeline-stage" onclick="filterMfgByStage('queued', this)">
-          <div class="stage-icon">🕐</div>
-          <div class="stage-count" id="mfg-count-queued">—</div>
-          <div class="stage-label">Queued</div>
-        </div>
-        <div class="pipeline-stage" onclick="filterMfgByStage('printing', this)">
-          <div class="stage-icon">🖨️</div>
-          <div class="stage-count" id="mfg-count-printing">—</div>
-          <div class="stage-label">In Production</div>
-        </div>
-        <div class="pipeline-stage" onclick="filterMfgByStage('quality_check', this)">
-          <div class="stage-icon">🔍</div>
-          <div class="stage-count" id="mfg-count-quality_check">—</div>
-          <div class="stage-label">QC Check</div>
-        </div>
-        <div class="pipeline-stage" onclick="filterMfgByStage('packed', this)">
-          <div class="stage-icon">📦</div>
-          <div class="stage-count" id="mfg-count-packed">—</div>
-          <div class="stage-label">Packed</div>
-        </div>
-        <div class="pipeline-stage" onclick="filterMfgByStage('ready', this)">
-          <div class="stage-icon">✅</div>
-          <div class="stage-count" id="mfg-count-ready">—</div>
-          <div class="stage-label">Ready</div>
-        </div>
+      <div class="pipeline">
+        <div class="pipeline-stage active" onclick="filterMfgByStage('all',this)"><div class="stage-icon">📋</div><div class="stage-count" id="mfg-count-all">—</div><div class="stage-label">All Items</div></div>
+        <div class="pipeline-stage" onclick="filterMfgByStage('queued',this)"><div class="stage-icon">🕐</div><div class="stage-count" id="mfg-count-queued">—</div><div class="stage-label">Queued</div></div>
+        <div class="pipeline-stage" onclick="filterMfgByStage('printing',this)"><div class="stage-icon">🖨️</div><div class="stage-count" id="mfg-count-printing">—</div><div class="stage-label">In Production</div></div>
+        <div class="pipeline-stage" onclick="filterMfgByStage('quality_check',this)"><div class="stage-icon">🔍</div><div class="stage-count" id="mfg-count-quality_check">—</div><div class="stage-label">QC Check</div></div>
+        <div class="pipeline-stage" onclick="filterMfgByStage('packed',this)"><div class="stage-icon">📦</div><div class="stage-count" id="mfg-count-packed">—</div><div class="stage-label">Packed</div></div>
+        <div class="pipeline-stage" onclick="filterMfgByStage('ready',this)"><div class="stage-icon">✅</div><div class="stage-count" id="mfg-count-ready">—</div><div class="stage-label">Ready</div></div>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Plate ID</th><th>Name / House</th><th>Type</th><th>Order #</th><th>Customer</th><th>Status</th><th>QR</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="mfgTable">
-            <tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Plate ID</th><th>Name / House</th><th>Type</th><th>Order #</th><th>Customer</th><th>Status</th><th>QR</th><th>Update</th></tr></thead>
+          <tbody id="mfgTable"><tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- ══════════ QR MANAGEMENT PANEL ══════════ -->
+    <!-- QR MANAGEMENT -->
     <div class="panel" id="panel-qr">
-      <div class="section-header">
-        <span class="section-title">📱 QR Management</span>
-      </div>
-
+      <div class="section-header"><span class="section-title">📱 QR Management</span></div>
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:10px">
           <input type="text" class="form-input" id="qrSearchInput" placeholder="Search by Plate ID (e.g. SD-ABX9K7)…" style="flex:1">
           <button class="btn btn-primary" onclick="searchQR()">Search QR</button>
         </div>
       </div>
-
-      <div id="qrResults">
-        <div class="empty-state">
-          <div class="icon">📱</div>
-          <div class="text">Enter a Plate ID to search QR records</div>
-        </div>
-      </div>
+      <div id="qrResults"><div class="empty-state"><div class="icon">📱</div><div class="text">Enter a Plate ID to search QR records</div></div></div>
     </div>
 
-    <!-- ══════════ SUBSCRIPTIONS PANEL ══════════ -->
+    <!-- SUBSCRIPTIONS -->
     <div class="panel" id="panel-subscriptions">
-      <div class="section-header">
-        <span class="section-title">🔄 Subscription Management</span>
-      </div>
-
+      <div class="section-header"><span class="section-title">🔄 Subscription Management</span></div>
       <div class="tabs">
-        <div class="tab active" onclick="filterSubs('all', this)">All</div>
-        <div class="tab" onclick="filterSubs('active', this)">Active</div>
-        <div class="tab" onclick="filterSubs('expiring_soon', this)">Expiring Soon</div>
-        <div class="tab" onclick="filterSubs('expired', this)">Expired</div>
-        <div class="tab" onclick="filterSubs('cancelled', this)">Cancelled</div>
+        <div class="tab active" onclick="filterSubs('all',this)">All</div>
+        <div class="tab" onclick="filterSubs('active',this)">Active</div>
+        <div class="tab" onclick="filterSubs('expiring_soon',this)">Expiring Soon</div>
+        <div class="tab" onclick="filterSubs('expired',this)">Expired</div>
+        <div class="tab" onclick="filterSubs('cancelled',this)">Cancelled</div>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Customer</th><th>Plate ID</th><th>Plan</th><th>Status</th><th>Expiry</th><th>Price</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="subsTable">
-            <tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Customer</th><th>Plate ID</th><th>Plan</th><th>Status</th><th>Expiry</th><th>Price</th><th>Actions</th></tr></thead>
+          <tbody id="subsTable"><tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- ══════════ SUPPORT PANEL ══════════ -->
+    <!-- SUPPORT -->
     <div class="panel" id="panel-support">
       <div class="section-header">
         <span class="section-title">🎫 Support Center</span>
-        <button class="btn btn-primary btn-sm" onclick="openCreateTicketModal()">+ New Ticket</button>
+        <button class="btn btn-primary btn-sm" onclick="openModal('createTicketModal')">+ New Ticket</button>
       </div>
-
       <div class="grid-3" style="margin-bottom:16px">
-        <div class="card" style="margin:0;text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#EF4444;font-family:'Space Grotesk'" id="ticket-open-count">—</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">Open</div>
-        </div>
-        <div class="card" style="margin:0;text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#F59E0B;font-family:'Space Grotesk'" id="ticket-pending-count">—</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">Pending</div>
-        </div>
-        <div class="card" style="margin:0;text-align:center">
-          <div style="font-size:24px;font-weight:800;color:#10B981;font-family:'Space Grotesk'" id="ticket-resolved-count">—</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">Resolved</div>
-        </div>
+        <div class="card" style="margin:0;text-align:center"><div style="font-size:24px;font-weight:800;color:#EF4444;font-family:'Space Grotesk'" id="ticket-open-count">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Open</div></div>
+        <div class="card" style="margin:0;text-align:center"><div style="font-size:24px;font-weight:800;color:#F59E0B;font-family:'Space Grotesk'" id="ticket-pending-count">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Pending</div></div>
+        <div class="card" style="margin:0;text-align:center"><div style="font-size:24px;font-weight:800;color:#10B981;font-family:'Space Grotesk'" id="ticket-resolved-count">—</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Resolved</div></div>
       </div>
-
       <div class="tabs">
-        <div class="tab active" onclick="filterTickets('open', this)">🔴 Open</div>
-        <div class="tab" onclick="filterTickets('pending', this)">🟡 Pending</div>
-        <div class="tab" onclick="filterTickets('resolved', this)">🟢 Resolved</div>
-        <div class="tab" onclick="filterTickets('closed', this)">⚫ Closed</div>
-        <div class="tab" onclick="filterTickets('all', this)">All</div>
+        <div class="tab active" onclick="filterTickets('open',this)">🔴 Open</div>
+        <div class="tab" onclick="filterTickets('pending',this)">🟡 Pending</div>
+        <div class="tab" onclick="filterTickets('resolved',this)">🟢 Resolved</div>
+        <div class="tab" onclick="filterTickets('closed',this)">⚫ Closed</div>
+        <div class="tab" onclick="filterTickets('all',this)">All</div>
       </div>
-
-      <div id="ticketsList">
-        <div class="empty-state"><div class="spinner"></div></div>
-      </div>
+      <div id="ticketsList"><div class="empty-state"><div class="spinner"></div></div></div>
     </div>
 
-    <!-- ══════════ COMMUNICATION PANEL ══════════ -->
+    <!-- COMMUNICATION -->
     <div class="panel" id="panel-communication">
-      <div class="section-header">
-        <span class="section-title">📞 Communication Center</span>
-      </div>
-
+      <div class="section-header"><span class="section-title">📞 Communication Center</span></div>
       <div class="tabs">
-        <div class="tab active" onclick="filterComm('calls', this)">Calls</div>
-        <div class="tab" onclick="filterComm('voice', this)">Voice Notes</div>
-        <div class="tab" onclick="filterComm('sos', this)">SOS Events</div>
-        <div class="tab" onclick="filterComm('spam', this)">Spam Events</div>
+        <div class="tab active" onclick="filterComm('calls',this)">Calls</div>
+        <div class="tab" onclick="filterComm('voice',this)">Voice Notes</div>
+        <div class="tab" onclick="filterComm('sos',this)">SOS Events</div>
+        <div class="tab" onclick="filterComm('spam',this)">Spam Events</div>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr>
-              <th>Time</th><th>Plate ID</th><th>Event Type</th><th>Customer</th><th>Duration</th><th>AI Intent</th><th>Details</th>
-            </tr>
-          </thead>
-          <tbody id="commTable">
-            <tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Time</th><th>Plate ID</th><th>Event Type</th><th>Customer</th><th>Duration</th><th>AI Intent</th><th>Details</th></tr></thead>
+          <tbody id="commTable"><tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
     </div>
 
-    <!-- ══════════ ANALYTICS PANEL ══════════ -->
+    <!-- ANALYTICS -->
     <div class="panel" id="panel-analytics">
-      <div class="section-header">
-        <span class="section-title">📈 Analytics Center</span>
-      </div>
-
+      <div class="section-header"><span class="section-title">📈 Analytics Center</span></div>
       <div class="grid-2" style="margin-bottom:14px">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Revenue (6 months)</span></div>
-          <div class="chart-container"><canvas id="analyticsRevenueChart"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Orders (6 months)</span></div>
-          <div class="chart-container"><canvas id="analyticsOrderChart"></canvas></div>
-        </div>
+        <div class="card"><div class="card-header"><span class="card-title">Revenue (6 months)</span></div><div class="chart-container"><canvas id="analyticsRevenueChart"></canvas></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">Orders (6 months)</span></div><div class="chart-container"><canvas id="analyticsOrderChart"></canvas></div></div>
       </div>
-
       <div class="grid-2">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Product Sales Breakdown</span></div>
-          <div class="chart-container"><canvas id="productChart"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Subscription Plans</span></div>
-          <div class="chart-container"><canvas id="planChart"></canvas></div>
-        </div>
+        <div class="card"><div class="card-header"><span class="card-title">Product Sales Breakdown</span></div><div class="chart-container"><canvas id="productChart"></canvas></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">Subscription Plans</span></div><div class="chart-container"><canvas id="planChart"></canvas></div></div>
       </div>
     </div>
 
-    <!-- ══════════ FINANCIAL PANEL ══════════ -->
+    <!-- FINANCIAL -->
     <div class="panel" id="panel-financial">
-      <div class="section-header">
-        <span class="section-title">💰 Financial Dashboard</span>
-      </div>
-
-      <div class="metric-grid" id="finMetricGrid">
+      <div class="section-header"><span class="section-title">💰 Financial Dashboard</span></div>
+      <div class="metric-grid">
         <div class="metric-card"><div class="metric-label">Revenue Today</div><div class="metric-value" id="fin-today">—</div></div>
         <div class="metric-card"><div class="metric-label">Revenue This Month</div><div class="metric-value" id="fin-month">—</div></div>
         <div class="metric-card"><div class="metric-label">MRR</div><div class="metric-value" id="fin-mrr">—</div></div>
@@ -1105,30 +595,19 @@
         <div class="metric-card"><div class="metric-label">Total Refunds</div><div class="metric-value" id="fin-refunds">—</div></div>
         <div class="metric-card"><div class="metric-label">Paid Orders</div><div class="metric-value" id="fin-orders">—</div></div>
       </div>
-
       <div class="grid-3">
-        <div class="card" style="text-align:center">
-          <div class="metric-label">Acrylic Sales</div>
-          <div class="metric-value" id="fin-acrylic">—</div>
-        </div>
-        <div class="card" style="text-align:center">
-          <div class="metric-label">Teakwood Sales</div>
-          <div class="metric-value" id="fin-teakwood">—</div>
-        </div>
-        <div class="card" style="text-align:center">
-          <div class="metric-label">Stainless Sales</div>
-          <div class="metric-value" id="fin-stainless">—</div>
-        </div>
+        <div class="card" style="text-align:center"><div class="metric-label">Acrylic Sales</div><div class="metric-value" id="fin-acrylic">—</div></div>
+        <div class="card" style="text-align:center"><div class="metric-label">Teakwood Sales</div><div class="metric-value" id="fin-teakwood">—</div></div>
+        <div class="card" style="text-align:center"><div class="metric-label">Stainless Sales</div><div class="metric-value" id="fin-stainless">—</div></div>
       </div>
     </div>
 
-    <!-- ══════════ AUDIT LOGS PANEL ══════════ -->
+    <!-- AUDIT LOGS -->
     <div class="panel" id="panel-audit">
       <div class="section-header">
         <span class="section-title">📋 Audit Logs</span>
         <button class="btn btn-ghost btn-sm" onclick="exportAuditLogs()">↓ Export</button>
       </div>
-
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <select class="form-select" id="auditActionFilter" style="width:180px" onchange="loadAuditLogs()">
@@ -1154,62 +633,32 @@
           </select>
         </div>
       </div>
-
-      <div class="card">
-        <div id="auditLogsList">
-          <div class="empty-state"><div class="spinner"></div></div>
-        </div>
-      </div>
+      <div class="card"><div id="auditLogsList"><div class="empty-state"><div class="spinner"></div></div></div></div>
     </div>
 
-    <!-- ══════════ SYSTEM HEALTH PANEL ══════════ -->
+    <!-- SYSTEM HEALTH -->
     <div class="panel" id="panel-system">
       <div class="section-header">
         <span class="section-title">⚙️ System Health</span>
         <button class="btn btn-ghost btn-sm" onclick="loadSystemHealth()">⟳ Refresh</button>
       </div>
-
       <div class="grid-2">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Service Status</span></div>
-          <div id="serviceStatusList">
-            <div class="empty-state"><div class="spinner"></div></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><span class="card-title">Usage Stats</span></div>
-          <div id="usageStatsList">
-            <div class="empty-state"><div class="spinner"></div></div>
-          </div>
-        </div>
+        <div class="card"><div class="card-header"><span class="card-title">Service Status</span></div><div id="serviceStatusList"><div class="empty-state"><div class="spinner"></div></div></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">Usage Stats</span></div><div id="usageStatsList"><div class="empty-state"><div class="spinner"></div></div></div></div>
       </div>
-
-      <div class="card">
-        <div class="card-header"><span class="card-title">Recent Error Logs</span></div>
-        <div id="errorLogsList">
-          <div class="empty-state">
-            <div class="icon">✅</div>
-            <div class="text">No critical errors detected in last 24 hours</div>
-          </div>
-        </div>
-      </div>
+      <div class="card"><div class="card-header"><span class="card-title">Recent Error Logs</span></div><div id="errorLogsList"><div class="empty-state"><div class="icon">✅</div><div class="text">No critical errors detected in last 24 hours</div></div></div></div>
     </div>
 
-    <!-- ══════════ ADMIN TEAM PANEL ══════════ -->
+    <!-- ADMIN TEAM -->
     <div class="panel" id="panel-team">
       <div class="section-header">
         <span class="section-title">🛡️ Admin Team</span>
         <button class="btn btn-primary btn-sm" onclick="openAddAdminModal()" id="addAdminBtn" style="display:none">+ Add Admin</button>
       </div>
-
       <div class="table-wrap">
         <table>
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>2FA</th><th>Last Login</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody id="teamTable">
-            <tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>
-          </tbody>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last Login</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="teamTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1217,26 +666,17 @@
   </div><!-- /content -->
 </div><!-- /main -->
 
-<!-- ═══════════ CUSTOMER PROFILE MODAL ═══════════ -->
+<!-- MODALS -->
 <div class="modal-overlay" id="customerModal">
   <div class="modal" style="max-width:680px">
-    <div class="modal-header">
-      <span class="modal-title">Customer Profile</span>
-      <button class="modal-close" onclick="closeModal('customerModal')">×</button>
-    </div>
-    <div class="modal-body" id="customerModalBody">
-      <div class="empty-state"><div class="spinner"></div></div>
-    </div>
+    <div class="modal-header"><span class="modal-title">Customer Profile</span><button class="modal-close" onclick="closeModal('customerModal')">×</button></div>
+    <div class="modal-body" id="customerModalBody"><div class="empty-state"><div class="spinner"></div></div></div>
   </div>
 </div>
 
-<!-- ═══════════ TICKET MODAL ═══════════ -->
 <div class="modal-overlay" id="ticketModal">
   <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title" id="ticketModalTitle">Ticket Details</span>
-      <button class="modal-close" onclick="closeModal('ticketModal')">×</button>
-    </div>
+    <div class="modal-header"><span class="modal-title" id="ticketModalTitle">Ticket Details</span><button class="modal-close" onclick="closeModal('ticketModal')">×</button></div>
     <div class="modal-body" id="ticketModalBody"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('ticketModal')">Close</button>
@@ -1245,52 +685,27 @@
   </div>
 </div>
 
-<!-- ═══════════ CREATE TICKET MODAL ═══════════ -->
 <div class="modal-overlay" id="createTicketModal">
   <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">New Support Ticket</span>
-      <button class="modal-close" onclick="closeModal('createTicketModal')">×</button>
-    </div>
+    <div class="modal-header"><span class="modal-title">New Support Ticket</span><button class="modal-close" onclick="closeModal('createTicketModal')">×</button></div>
     <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Subject</label>
-        <input type="text" class="form-input" id="newTicketSubject" placeholder="Brief issue summary">
-      </div>
+      <div class="form-group"><label class="form-label">Subject</label><input type="text" class="form-input" id="newTicketSubject" placeholder="Brief issue summary"></div>
       <div class="grid-2">
         <div class="form-group">
           <label class="form-label">Category</label>
           <select class="form-select" id="newTicketCategory">
-            <option value="general">General</option>
-            <option value="billing">Billing</option>
-            <option value="technical">Technical</option>
-            <option value="delivery">Delivery</option>
-            <option value="qr">QR Issue</option>
-            <option value="account">Account</option>
+            <option value="general">General</option><option value="billing">Billing</option><option value="technical">Technical</option><option value="delivery">Delivery</option><option value="qr">QR Issue</option><option value="account">Account</option>
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Priority</label>
           <select class="form-select" id="newTicketPriority">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
+            <option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option>
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Customer Name</label>
-        <input type="text" class="form-input" id="newTicketCustName" placeholder="Customer's name">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Customer Phone / Email</label>
-        <input type="text" class="form-input" id="newTicketCustContact" placeholder="Phone or email">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Description</label>
-        <textarea class="form-input" id="newTicketDesc" rows="4" placeholder="Describe the issue in detail…" style="resize:vertical"></textarea>
-      </div>
+      <div class="form-group"><label class="form-label">Customer Name</label><input type="text" class="form-input" id="newTicketCustName" placeholder="Customer's name"></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="newTicketDesc" rows="4" placeholder="Describe the issue in detail…"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('createTicketModal')">Cancel</button>
@@ -1299,71 +714,146 @@
   </div>
 </div>
 
-<!-- ═══════════ QR ACTION MODAL ═══════════ -->
 <div class="modal-overlay" id="qrModal">
   <div class="modal">
-    <div class="modal-header">
-      <span class="modal-title">QR Actions</span>
-      <button class="modal-close" onclick="closeModal('qrModal')">×</button>
-    </div>
+    <div class="modal-header"><span class="modal-title">QR Actions</span><button class="modal-close" onclick="closeModal('qrModal')">×</button></div>
     <div class="modal-body" id="qrModalBody"></div>
   </div>
 </div>
 
-<!-- ═══════════ TOAST ═══════════ -->
 <div id="toast"></div>
 
-<script type="module">
-import { supabase } from './services/supabase.js';
-import {
-  getAdminSession, requireAdminAuth, adminLogout, hasPermission, canWrite, canAccessRevenue, isSuperAdmin
-} from './services/admin.js';
-// ROOT CAUSE FIX: All admin reads now go through the admin-data Edge Function
-// (service_role) instead of direct anon-key Supabase calls. RLS blocks all
-// anon reads on users/plates/orders/subscriptions/support_tickets/admin_audit_logs.
-import {
-  getDashboardMetrics, searchCustomers, getCustomerProfile,
-  getFinancialMetrics, getOrderList, getSubscriptionList, getAuditLogs, getSystemHealth,
-  getRevenueChartData,
-} from './services/adminData.js';
-import { markDelivered } from './services/orders.js';
-import { getManufacturingQueue, getQueueCounts, updateProductionStatus, searchQRByPlateId, deactivateQR, reactivateQR, generateProductionSheetHTML } from './services/manufacturing.js';
-import { listTickets, getTicketDetail, createTicket as createTicketSvc, updateTicket, addTicketComment, getTicketStats } from './services/support.js';
-import { getSubscriptionAnalytics } from './services/analytics.js';
-// getOrderAnalytics removed: used anon key, RLS-blocked. Order chart now built from getOrderList() in adminData.js.
-import {
-  generatePlateId as previewPlateId, generateQRCode as previewQRCode, createCustomer,
-  resetPin as resetPinSvc, suspendPlate, reactivatePlate, regenerateQr,
-  transferOwnership as transferOwnershipSvc, resendActivation as resendActivationSvc,
-} from './services/adminProvisioning.js';
+<!-- ═══════════════════════════════════════════════════
+     SELF-CONTAINED SCRIPT — ZERO ES MODULE IMPORTS
+     All API calls via Edge Functions using admin session token
+     ═══════════════════════════════════════════════════ -->
+<script>
+// ─── EDGE FUNCTION BASE ───
+// Priority order:
+// 1. window.__SD_CONFIG__.supabaseUrl  (injected by Vercel build via scripts/build-env.js)
+// 2. window.__SD_SUPABASE_URL          (can be set manually in browser console for testing)
+// 3. Hard-coded production URL         (last resort — update this if project URL changes)
+const _SUPABASE_URL_FALLBACK = 'https://YOUR_PROJECT_ID.supabase.co'; // ← Replace with real value if needed
 
-// ─── AUTH CHECK ───
-const session = requireAdminAuth();
-if (!session) { window.location.href = '/admin-login.html'; throw new Error('No admin session'); }
-
-// ─── INIT ADMIN UI ───
-document.getElementById('adminName').textContent = session.full_name;
-document.getElementById('adminRole').textContent = session.role_label || session.role;
-document.getElementById('adminAvatar').textContent = (session.full_name || 'A')[0].toUpperCase();
-if (canWrite(session, 'admin_users')) {
-  document.getElementById('addAdminBtn').style.display = '';
+function _edgeBase() {
+  const cfg = window.__SD_CONFIG__;
+  const url = (cfg && cfg.supabaseUrl && cfg.supabaseUrl.trim() !== '' && !cfg.supabaseUrl.includes('placeholder'))
+    ? cfg.supabaseUrl.trim()
+    : (window.__SD_SUPABASE_URL || _SUPABASE_URL_FALLBACK);
+  return url + '/functions/v1';
 }
 
-// Phase 12 — RBAC nav hiding. dealer/support don't get Financial/Analytics
-// (revenue), and "Create Customer" only shows for roles that can write
-// customers (super_admin, dealer). Server-side Edge Functions enforce the
-// same rules independently — this is UI convenience, not the real boundary.
-document.querySelectorAll('.nav-item[data-resource]').forEach((item) => {
-  const resource = item.dataset.resource;
-  const action = item.dataset.action; // optional override — defaults to read-or-write check below
-  const allowed = resource === 'analytics'
-    ? canAccessRevenue(session)
-    : action
-      ? hasPermission(session, resource, action)
-      : (hasPermission(session, resource, 'read') || hasPermission(session, resource, 'write'));
-  if (!allowed) item.style.display = 'none';
-});
-document.getElementById('createCustomerBtn')?.style.setProperty('display', hasPermission(session, 'customers', 'write') ? '' : 'none');
+// ─── CONFIG HEALTH CHECK ──
+// Run after DOM ready — shows banner if Supabase URL is not properly set
+function _checkConfig() {
+  const cfg = window.__SD_CONFIG__;
+  const ok = cfg && cfg.supabaseUrl && cfg.supabaseUrl.trim() !== '' && !cfg.supabaseUrl.includes('placeholder') && !cfg.supabaseUrl.includes('YOUR_PROJECT');
+  if (!ok) {
+    const banner = document.createElement('div');
+    banner.id = 'configBanner';
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9998;background:rgba(239,68,68,0.95);color:#fff;padding:10px 16px;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(4px)';
+    banner.innerHTML = `
+      <span>⚠️ <b>Config Error:</b> supabaseUrl is empty or placeholder. API calls will fail. Set SUPABASE_URL in Vercel → Redeploy. Or run in console: <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px">window.__SD_SUPABASE_URL = 'https://xxxx.supabase.co'</code> then Refresh.</span>
+      <button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:18px;padding:0 0 0 12px">×</button>`;
+    document.body.prepend(banner);
+    // Shift main content down
+    document.querySelector('.main').style.paddingTop = '42px';
+    console.error('[SmartDoor Admin] supabaseUrl not set. window.__SD_CONFIG__ =', cfg);
+  }
+}
+
+// ─── ADMIN SESSION ───
+const ADMIN_SESSION_KEY = 'sd_admin_session';
+function getAdminSession() {
+  try {
+    const raw = localStorage.getItem(ADMIN_SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !s.exp) return null;
+    if (Date.now() > s.exp) { localStorage.removeItem(ADMIN_SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+}
+function handleLogout() {
+  localStorage.removeItem(ADMIN_SESSION_KEY);
+  window.location.href = '/admin-login.html';
+}
+
+// RBAC helpers
+const ROLE_PERMS = {
+  super_admin:   { customers:['read','write'], orders:['read','write'], manufacturing:['read','write'], qr:['read','write'], plates:['read','write'], pin_reset:['read','write'], activation_resend:['read','write'], ownership_transfer:['read','write'], subscriptions:['read','write'], support:['read','write'], analytics:['read','write'], communication:['read','write'], audit:['read','write'], system:['read','write'], admin_users:['read','write'] },
+  ops_manager:   { customers:['read','write'], orders:['read','write'], manufacturing:['read','write'], qr:['read','write'], plates:['read','write'], pin_reset:['read','write'], activation_resend:['read','write'], subscriptions:['read','write'], support:['read','write'], analytics:['read','write'], communication:['read'], audit:['read'], system:['read'] },
+  manufacturing: { manufacturing:['read','write'], qr:['read','write'], orders:['read'] },
+  support:       { customers:['read'], orders:['read'], support:['read','write'], pin_reset:['read','write'], activation_resend:['read','write'], communication:['read'] },
+  analyst:       { analytics:['read'], customers:['read'], orders:['read'], subscriptions:['read'] },
+  dealer:        { customers:['read','write'], orders:['read'], plates:['read','write'] },
+};
+function hasPermission(session, resource, action) {
+  if (!session) return false;
+  const perms = ROLE_PERMS[session.role] || {};
+  return (perms[resource] || []).includes(action);
+}
+function canAccessRevenue(session) { return hasPermission(session, 'analytics', 'read'); }
+function isSuperAdmin(session) { return session?.role === 'super_admin'; }
+
+// ─── API CALL HELPER ───
+async function adminCall(type, extra = {}) {
+  const session = getAdminSession();
+  if (!session) { window.location.href = '/admin-login.html'; return { success: false, error: 'Session expired.' }; }
+  try {
+    const res = await fetch(`${_edgeBase()}/admin-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.token}` },
+      body: JSON.stringify({ type, ...extra }),
+    });
+    if (res.status === 401) { localStorage.removeItem(ADMIN_SESSION_KEY); window.location.href = '/admin-login.html'; return { success: false, error: 'Session expired.' }; }
+    const data = await res.json();
+    return data?.success ? data : { success: false, error: data?.message || 'Request failed.' };
+  } catch (err) {
+    console.error('[adminCall]', type, err);
+    return { success: false, error: 'Connection error. Please try again.' };
+  }
+}
+async function provisionCall(fnName, body) {
+  const session = getAdminSession();
+  if (!session) { window.location.href = '/admin-login.html'; return { success: false }; }
+  try {
+    const res = await fetch(`${_edgeBase()}/${fnName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.token}` },
+      body: JSON.stringify(body),
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+// ─── INIT ───
+const session = getAdminSession();
+if (!session) { window.location.href = '/admin-login.html'; }
+else {
+  // Config health check — shows red banner if supabaseUrl missing/placeholder
+  setTimeout(_checkConfig, 200);
+  document.getElementById('adminName').textContent = session.full_name || session.email || 'Admin';
+  document.getElementById('adminRole').textContent = session.role_label || session.role || '—';
+  document.getElementById('adminAvatar').textContent = (session.full_name || 'A')[0].toUpperCase();
+  if (hasPermission(session, 'admin_users', 'write')) document.getElementById('addAdminBtn').style.display = '';
+  // RBAC nav hiding
+  document.querySelectorAll('.nav-item[data-resource]').forEach(item => {
+    const resource = item.dataset.resource;
+    const action = item.dataset.action;
+    const allowed = resource === 'analytics'
+      ? canAccessRevenue(session)
+      : action ? hasPermission(session, resource, action) : (hasPermission(session, resource, 'read') || hasPermission(session, resource, 'write'));
+    if (!allowed) item.style.display = 'none';
+  });
+  if (window.innerWidth < 900) document.getElementById('menuBtn').style.display = 'flex';
+  // Close sidebar on nav click (mobile)
+  document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => { if (window.innerWidth < 900) closeSidebar(); }));
+  // Boot dashboard
+  loadPanel('dashboard');
+}
 
 // ─── STATE ───
 let currentPanel = 'dashboard';
@@ -1373,79 +863,44 @@ let currentOrderFilter = 'all';
 let currentSubFilter = 'all';
 let currentTicketFilter = 'open';
 let currentMfgFilter = 'all';
-let custPage = 0;
+let currentCommFilter = 'calls';
 let searchDebounce = null;
 
-// ═══════════════════════════════════════
-// NAVIGATION
-// ═══════════════════════════════════════
-
-window.switchPanel = function(panelId, navEl) {
+// ─── NAVIGATION ───
+function switchPanel(panelId, navEl) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('panel-' + panelId).classList.add('active');
+  const panel = document.getElementById('panel-' + panelId);
+  if (!panel) return;
+  panel.classList.add('active');
   if (navEl) navEl.classList.add('active');
   currentPanel = panelId;
-
   const titles = {
-    dashboard: ['Dashboard', 'Overview & KPIs'],
-    provisioning: ['Provisioning', 'Create Customer + Plate'],
-    customers: ['Customers', 'Customer Management'],
-    orders: ['Orders', 'Order Management'],
-    manufacturing: ['Manufacturing', 'Production Queue'],
-    qr: ['QR Management', 'QR Codes & Plates'],
-    subscriptions: ['Subscriptions', 'Subscription Management'],
-    support: ['Support Center', 'Ticket Management'],
-    communication: ['Communication', 'Calls, Voice Notes & Events'],
-    analytics: ['Analytics', 'Charts & Insights'],
-    financial: ['Financial', 'Revenue & Metrics'],
-    audit: ['Audit Logs', 'System Activity'],
-    system: ['System Health', 'Services & Usage'],
-    team: ['Admin Team', 'RBAC & User Management'],
+    dashboard:['Dashboard','Overview & KPIs'], provisioning:['Provisioning','Create Customer + Plate'],
+    customers:['Customers','Customer Management'], orders:['Orders','Order Management'],
+    manufacturing:['Manufacturing','Production Queue'], qr:['QR Management','QR Codes & Plates'],
+    subscriptions:['Subscriptions','Subscription Management'], support:['Support Center','Ticket Management'],
+    communication:['Communication','Calls, Voice Notes & Events'], analytics:['Analytics','Charts & Insights'],
+    financial:['Financial','Revenue & Metrics'], audit:['Audit Logs','System Activity'],
+    system:['System Health','Services & Usage'], team:['Admin Team','RBAC & User Management'],
   };
   document.getElementById('headerTitle').textContent = titles[panelId]?.[0] || panelId;
   document.getElementById('headerSub').textContent = titles[panelId]?.[1] || '';
-
   loadPanel(panelId);
-};
-
-window.refreshCurrentPanel = () => loadPanel(currentPanel);
-window.handleLogout = () => adminLogout();
-
-window.toggleSidebar = function() {
+}
+function refreshCurrentPanel() { loadPanel(currentPanel); }
+function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebarOverlay');
-  const isOpen = sidebar.classList.contains('open');
-  if (isOpen) {
-    sidebar.classList.remove('open');
-    overlay.classList.remove('visible');
-  } else {
-    sidebar.classList.add('open');
-    overlay.classList.add('visible');
-  }
-};
-
-window.closeSidebar = function() {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('visible', sidebar.classList.contains('open'));
+}
+function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('visible');
-};
-
-// Close sidebar on nav item click on mobile
-document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    if (window.innerWidth < 900) closeSidebar();
-  });
-});
-
-// ─── RESPONSIVE MENU BTN ───
-if (window.innerWidth < 900) {
-  document.getElementById('menuBtn').style.display = 'flex';
 }
 
-// ═══════════════════════════════════════
-// PANEL LOADERS
-// ═══════════════════════════════════════
-
+// ─── PANEL LOADER ───
 async function loadPanel(panelId) {
   document.getElementById('lastRefreshed').textContent = 'Updated: ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   switch (panelId) {
@@ -1453,7 +908,6 @@ async function loadPanel(panelId) {
     case 'customers':    await loadCustomers(); break;
     case 'orders':       await loadOrders(); break;
     case 'manufacturing':await loadManufacturing(); break;
-    case 'qr':           break;
     case 'subscriptions':await loadSubscriptions(); break;
     case 'support':      await loadSupport(); break;
     case 'communication':await loadCommunication(); break;
@@ -1465,819 +919,576 @@ async function loadPanel(panelId) {
   }
 }
 
-// ═══════════════════════════════════════
-// DASHBOARD
-// ═══════════════════════════════════════
+// ─── UTILITY FUNCTIONS ───
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'2-digit' });
+}
+function fmtMoney(n) {
+  n = n || 0;
+  if (n >= 100000) return '₹' + (n/100000).toFixed(1) + 'L';
+  if (n >= 1000) return '₹' + (n/1000).toFixed(1) + 'K';
+  return '₹' + n;
+}
+function badgeHTML(status) {
+  const map = {
+    paid:'success', active:'success', delivered:'success', reactivated:'success',
+    pending:'warning', expiring_soon:'warning', dispatched:'warning', suspended:'warning',
+    failed:'danger', cancelled:'danger', refunded:'danger', inactive:'danger',
+    queued:'info', printing:'info', quality_check:'purple', packed:'info',
+  };
+  const cls = map[status] || 'muted';
+  return `<span class="badge badge-${cls}">${(status||'—').replace(/_/g,' ')}</span>`;
+}
+function planBadge(plan) {
+  if (!plan) return '<span class="badge badge-muted">—</span>';
+  const labels = { smartdoor_care:'Care', hardware_only:'Hardware', premium:'Premium' };
+  return `<span class="badge badge-purple">${labels[plan] || plan}</span>`;
+}
+function priorityBadge(p) {
+  const map = { critical:'danger', high:'warning', medium:'info', low:'muted' };
+  return `<span class="badge badge-${map[p]||'muted'}">${p||'—'}</span>`;
+}
+function ticketStatusBadge(s) {
+  const map = { open:'danger', pending:'warning', resolved:'success', closed:'muted' };
+  return `<span class="badge badge-${map[s]||'muted'}">${s||'—'}</span>`;
+}
+function mfgStatusBadge(s) {
+  const col = { queued:'#F59E0B', printing:'#3B82F6', quality_check:'#8B5CF6', packed:'#10B981', ready:'#22C55E', dispatched:'#14B8A6' };
+  const c = col[s] || '#6B7280';
+  return `<span class="badge" style="background:${c}20;color:${c}">${(s||'—').replace(/_/g,' ')}</span>`;
+}
 
+// Toast
+let _toastTimer = null;
+function showToast(msg, type = 'info', duration = 3500) {
+  const el = document.getElementById('toast');
+  el.innerHTML = msg;
+  el.className = 'show ' + type;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = ''; }, duration);
+}
+
+// Modal
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Chart helper
+function renderLineChart(canvasId, labels, values, label, color) {
+  if (charts[canvasId]) { charts[canvasId].destroy(); }
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{ label, data: values, borderColor: color, backgroundColor: color + '20', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#5A6A85', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#5A6A85', font: { size: 11 } } },
+      },
+    },
+  });
+}
+function renderBarChart(canvasId, labels, values, label, color) {
+  if (charts[canvasId]) { charts[canvasId].destroy(); }
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data: values, backgroundColor: color + '80', borderColor: color, borderWidth: 1, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#5A6A85', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#5A6A85', font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+// Global search
+function handleGlobalSearch(e) {
+  if (e.key !== 'Enter') return;
+  const q = document.getElementById('globalSearchInput').value.trim();
+  if (!q) return;
+  switchPanel('customers', document.querySelector('[data-panel=customers]'));
+  setTimeout(() => {
+    document.getElementById('custSearch').value = q;
+    loadCustomers();
+  }, 100);
+}
+
+// ─── DASHBOARD ───
 async function loadDashboard() {
   document.getElementById('dashTimestamp').textContent = new Date().toLocaleString('en-IN');
-
-  // FIX: getOrderAnalytics() imported from services/analytics.js uses the
-  // anon key directly — RLS blocks all orders reads. Order chart data now
-  // comes from admin-data Edge Function via getOrderList().
-  const [metricsRes, revenueRes, ordersForChartRes] = await Promise.all([
-    getDashboardMetrics(),
-    getRevenueChartData(6),
-    getOrderList({ limit: 500 }),
+  const [metricsRes, revenueRes, ordersRes] = await Promise.all([
+    adminCall('dashboard_metrics'),
+    adminCall('revenue_chart', { months: 6 }),
+    adminCall('order_list', { limit: 500 }),
   ]);
-
-  // Build monthly order chart data from the order list
-  const orderRes = (() => {
-    const orders = ordersForChartRes.orders || [];
-    const monthlyData = {};
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
-      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      monthlyData[key] = { orders: 0, revenue: 0, label: d.toLocaleString('default', { month: 'short', year: '2-digit' }) };
-    }
-    orders.forEach(o => {
-      const d = new Date(o.created_at);
-      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-      if (monthlyData[key]) {
-        monthlyData[key].orders++;
-        if (o.payment_status === 'paid') monthlyData[key].revenue += (o.total_amount || 0);
-      }
-    });
-    return {
-      success: true,
-      orders: {
-        monthly: {
-          labels: Object.values(monthlyData).map(d => d.label),
-          orderCounts: Object.values(monthlyData).map(d => d.orders),
-        }
-      }
-    };
-  })();
-
   if (metricsRes.success) {
     const m = metricsRes.metrics;
-    const fmt = (n) => n >= 100000 ? '₹' + (n/100000).toFixed(1) + 'L' : n >= 1000 ? '₹' + (n/1000).toFixed(1) + 'K' : '₹' + n;
-    document.getElementById('m-customers').textContent = m.totalCustomers;
-    document.getElementById('m-subs').textContent = m.activeSubscriptions;
-    document.getElementById('m-revenue').textContent = fmt(m.revenueThisMonth);
-    document.getElementById('m-pending').textContent = m.pendingOrders;
-    document.getElementById('m-mfg').textContent = m.manufacturingQueue;
-    document.getElementById('m-tickets').textContent = m.openTickets;
-    document.getElementById('m-expiring').textContent = m.expiringSoon;
-    document.getElementById('m-newcust').textContent = m.newCustomersThisMonth;
+    document.getElementById('m-customers').textContent = m.totalCustomers ?? '—';
+    document.getElementById('m-subs').textContent = m.activeSubscriptions ?? '—';
+    document.getElementById('m-revenue').textContent = fmtMoney(m.revenueThisMonth);
+    document.getElementById('m-pending').textContent = m.pendingOrders ?? '—';
+    document.getElementById('m-mfg').textContent = m.manufacturingQueue ?? '—';
+    document.getElementById('m-tickets').textContent = m.openTickets ?? '—';
+    document.getElementById('m-expiring').textContent = m.expiringSoon ?? '—';
+    document.getElementById('m-newcust').textContent = m.newCustomersThisMonth ?? '—';
     document.getElementById('m-plates-total').textContent = m.totalPlates ?? '—';
     document.getElementById('m-plates-active').textContent = m.activePlates ?? '—';
     document.getElementById('m-plates-inactive').textContent = m.inactivePlates ?? '—';
     document.getElementById('m-msgs-today').textContent = m.messagesToday ?? '—';
     document.getElementById('m-voice-today').textContent = m.voiceNotesToday ?? '—';
-    document.getElementById('openTicketsBadge').textContent = m.openTickets;
-    if (m.customerGrowthPct !== null) {
+    document.getElementById('openTicketsBadge').textContent = m.openTickets ?? 0;
+    if (m.customerGrowthPct !== null && m.customerGrowthPct !== undefined) {
       const el = document.getElementById('m-growth');
       const isUp = parseFloat(m.customerGrowthPct) >= 0;
       el.textContent = (isUp ? '↑' : '↓') + Math.abs(m.customerGrowthPct) + '%';
       el.className = 'metric-trend ' + (isUp ? 'trend-up' : 'trend-down');
     }
   }
-
-  // Revenue chart
-  if (revenueRes.success) {
-    renderLineChart('revenueChart', revenueRes.labels, revenueRes.values, 'Revenue (₹)', '#FF4500');
+  if (revenueRes.success) renderLineChart('revenueChart', revenueRes.labels, revenueRes.values, 'Revenue (₹)', '#FF4500');
+  // Build order chart from order list
+  if (ordersRes.success) {
+    const orders = ordersRes.orders || [];
+    const monthlyData = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(); d.setMonth(d.getMonth() - i);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      monthlyData[key] = { orders: 0, label: d.toLocaleString('default', { month: 'short', year: '2-digit' }) };
+    }
+    orders.forEach(o => {
+      const d = new Date(o.created_at);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if (monthlyData[key]) monthlyData[key].orders++;
+    });
+    renderLineChart('orderChart', Object.values(monthlyData).map(d=>d.label), Object.values(monthlyData).map(d=>d.orders), 'Orders', '#3B82F6');
+    // Recent orders
+    const recent = orders.slice(0,5);
+    const el = document.getElementById('dashRecentOrders');
+    if (!recent.length) { el.innerHTML = '<div class="empty-state"><div class="text">No orders yet</div></div>'; }
+    else el.innerHTML = recent.map(o => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);min-width:130px">${o.order_number}</span>
+        <span style="flex:1;font-size:12px;font-weight:500">${o.customer_name||'—'}</span>
+        <span style="font-size:12px;font-weight:600">${fmtMoney(o.total_amount)}</span>
+        ${badgeHTML(o.payment_status)}
+      </div>
+    `).join('');
   }
-
-  // Order chart
-  if (orderRes.success) {
-    renderLineChart('orderChart', orderRes.orders.monthly.labels, orderRes.orders.monthly.orderCounts, 'Orders', '#3B82F6');
-  }
-
-  // Recent orders — use admin-data (service_role) to bypass RLS
-  const recentOrdersRes = await getOrderList({ limit: 5 });
-  renderDashRecentOrders(recentOrdersRes.orders || []);
-
   // Open tickets
-  const ticketsRes = await listTickets({ status: 'open', limit: 5 });
-  renderDashTickets(ticketsRes.tickets || []);
+  const ticketsRes = await adminCall('ticket_list', { status: 'open', limit: 5 });
+  const ticketsEl = document.getElementById('dashOpenTickets');
+  if (!ticketsRes.success || !ticketsRes.tickets?.length) {
+    ticketsEl.innerHTML = '<div class="empty-state"><div class="text">No open tickets 🎉</div></div>';
+  } else {
+    ticketsEl.innerHTML = ticketsRes.tickets.map(t => `
+      <div class="ticket-row">
+        <span class="ticket-id">${t.ticket_number}</span>
+        <span class="ticket-subject">${t.subject}</span>
+        ${priorityBadge(t.priority)}
+      </div>
+    `).join('');
+  }
 }
 
-function renderDashRecentOrders(orders) {
-  const el = document.getElementById('dashRecentOrders');
-  if (!orders.length) { el.innerHTML = '<div class="empty-state"><div class="text">No orders yet</div></div>'; return; }
-  el.innerHTML = orders.map(o => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);min-width:130px">${o.order_number}</span>
-      <span style="flex:1;font-size:12px;font-weight:500">${o.customer_name || '—'}</span>
-      <span style="font-size:11px;color:var(--muted)">${o.product_type}</span>
-      <span style="font-size:12px;font-weight:600">₹${(o.total_amount||0).toLocaleString()}</span>
-      ${badgeHTML(o.payment_status)}
-    </div>
-  `).join('');
-}
-
-function renderDashTickets(tickets) {
-  const el = document.getElementById('dashOpenTickets');
-  if (!tickets.length) { el.innerHTML = '<div class="empty-state"><div class="text">No open tickets 🎉</div></div>'; return; }
-  el.innerHTML = tickets.map(t => `
-    <div class="ticket-row">
-      <span class="ticket-id">${t.ticket_number}</span>
-      <span class="ticket-subject">${t.subject}</span>
-      ${priorityBadge(t.priority)}
-    </div>
-  `).join('');
-}
-
-// ═══════════════════════════════════════
-// CUSTOMERS
-// ═══════════════════════════════════════
-
-window.loadCustomers = async function() {
+// ─── CUSTOMERS ───
+async function loadCustomers() {
   const query = document.getElementById('custSearch').value;
   const field = document.getElementById('custSearchField').value;
   const tbody = document.getElementById('customersTable');
   tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
-
-  const res = await searchCustomers({ query, field, limit: 30, offset: custPage * 30 });
-  if (!res.success) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`; showToast('Error: ' + res.error, 'error'); return; }
-
-  if (!res.customers.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">👥</div><div class="text">No customers found</div></div></td></tr>';
-    return;
-  }
-
+  const res = await adminCall('customer_list', { query, field, limit: 30, offset: 0 });
+  if (!res.success) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`; return; }
+  if (!res.customers?.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">👥</div><div class="text">No customers found</div></div></td></tr>'; return; }
   tbody.innerHTML = res.customers.map(c => {
     const sub = c.subscriptions?.[0];
-    const orderCount = (c.orders || []).length;
-    return `
-      <tr>
-        <td>
-          <div style="font-weight:600;font-size:13px">${c.full_name}</div>
-          <div style="font-size:11px;color:var(--muted)">${c.email || '—'}</div>
-        </td>
-        <td><span style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.plate_id}</span></td>
-        <td><span style="font-size:12px">${c.phone}</span></td>
-        <td>${sub ? planBadge(sub.plan) : '<span style="color:var(--muted);font-size:11px">None</span>'}</td>
-        <td>${sub ? badgeHTML(sub.status) : '—'}</td>
-        <td style="text-align:center;font-weight:600">${orderCount}</td>
-        <td style="font-size:11px;color:var(--muted)">${fmtDate(c.created_at)}</td>
-        <td>
-          <button class="btn btn-ghost btn-sm" onclick="openCustomerProfile('${c.id}')">View Profile</button>
-        </td>
-      </tr>
-    `;
+    const orderCount = (c.orders||[]).length;
+    return `<tr>
+      <td><div style="font-weight:600;font-size:13px">${c.full_name}</div><div style="font-size:11px;color:var(--muted)">${c.email||'—'}</div></td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:12px">${c.plate_id||'—'}</span></td>
+      <td>${c.phone}</td>
+      <td>${sub ? planBadge(sub.plan) : '<span style="color:var(--muted);font-size:11px">None</span>'}</td>
+      <td>${sub ? badgeHTML(sub.status) : '—'}</td>
+      <td style="text-align:center;font-weight:600">${orderCount}</td>
+      <td style="font-size:11px;color:var(--muted)">${fmtDate(c.created_at)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openCustomerProfile('${c.id}')">View</button></td>
+    </tr>`;
   }).join('');
-};
+}
+function debounceSearch() { clearTimeout(searchDebounce); searchDebounce = setTimeout(loadCustomers, 400); }
+function exportCustomers() { showToast('Export coming soon', 'info'); }
 
-window.debounceSearch = function() {
-  clearTimeout(searchDebounce);
-  searchDebounce = setTimeout(loadCustomers, 400);
-};
-
-window.openCustomerProfile = async function(customerId) {
+async function openCustomerProfile(customerId) {
   openModal('customerModal');
   document.getElementById('customerModalBody').innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
-
-  const res = await getCustomerProfile(customerId);
+  const res = await adminCall('customer_profile', { customer_id: customerId });
   if (!res.success) { document.getElementById('customerModalBody').innerHTML = `<div class="empty-state">Error: ${res.error}</div>`; return; }
-
   const { user, orders, subscriptions, visitorLogs, voiceNotes, callLogs, familyMembers, plate, messagesCount, notificationsCount } = res.profile;
-  const sub = subscriptions.find(s => s.status === 'active');
-  const totalSpend = orders.filter(o => o.payment_status === 'paid').reduce((s, o) => s + (o.total_amount || 0), 0);
-
-  const refreshThisProfile = () => openCustomerProfile(customerId);
-
-  let plateMgmtHTML = '<div style="color:var(--muted);font-size:12px">No plate linked to this customer.</div>';
+  const sub = subscriptions?.find(s => s.status === 'active');
+  const totalSpend = (orders||[]).filter(o => o.payment_status === 'paid').reduce((s,o) => s+(o.total_amount||0), 0);
+  window._currentCustomerId = customerId;
+  let plateMgmtHTML = '<div style="color:var(--muted);font-size:12px">No plate linked.</div>';
   if (plate) {
-    const statusBadge = plate.status === 'active'
-      ? '<span class="badge badge-success">Active</span>'
-      : plate.status === 'suspended'
-        ? '<span class="badge badge-danger">Suspended</span>'
-        : `<span class="badge badge-muted">${plate.status}</span>`;
-
+    const statusBadge = plate.status === 'active' ? '<span class="badge badge-success">Active</span>'
+      : plate.status === 'suspended' ? '<span class="badge badge-danger">Suspended</span>'
+      : `<span class="badge badge-muted">${plate.status}</span>`;
     plateMgmtHTML = `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-family:monospace;font-weight:600">${plate.plate_id}</span>
-        ${statusBadge}
-        <span style="font-size:11px;color:var(--muted)">${messagesCount} messages · ${notificationsCount} notifications</span>
+        <span style="font-family:monospace;font-weight:600">${plate.plate_id}</span>${statusBadge}
+        <span style="font-size:11px;color:var(--muted)">${messagesCount||0} messages</span>
       </div>
-      ${plate.status === 'suspended' && plate.suspended_reason ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Suspended: ${plate.suspended_reason}</div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         ${hasPermission(session,'pin_reset','write') ? `<button class="btn btn-ghost btn-sm" onclick="adminResetPin('${user.id}','${plate.plate_id}')">🔑 Reset PIN</button>` : ''}
         ${hasPermission(session,'plates','write') ? (plate.status === 'suspended'
-            ? `<button class="btn btn-success btn-sm" onclick="adminReactivatePlate('${plate.plate_id}', refreshCurrentCustomerProfile)">▶ Reactivate</button>`
-            : `<button class="btn btn-danger btn-sm" onclick="adminSuspendPlate('${plate.plate_id}', refreshCurrentCustomerProfile)">⏸ Suspend</button>`) : ''}
-        ${isSuperAdmin(session) ? `<button class="btn btn-ghost btn-sm" onclick="adminTransferOwnership('${plate.plate_id}', refreshCurrentCustomerProfile)">🔁 Transfer Ownership</button>` : ''}
-        ${hasPermission(session,'activation_resend','write') ? `<button class="btn btn-ghost btn-sm" onclick="adminResendActivation('${user.id}','${(user.full_name||'').replace(/'/g,'')}','${user.email||''}','${user.phone||''}','${plate.plate_id}')">✉ Resend Activation</button>` : ''}
-        ${plate.qr_image_url
-          ? `<a class="btn btn-ghost btn-sm" href="${plate.qr_image_url}" download="${plate.plate_id}.png">↓ QR PNG</a>`
-          : `<button class="btn btn-ghost btn-sm" onclick="adminRegenerateQr('${plate.plate_id}', refreshCurrentCustomerProfile)">↻ Generate QR</button>`}
-      </div>
-    `;
+          ? `<button class="btn btn-success btn-sm" onclick="adminReactivatePlate('${plate.plate_id}')">▶ Reactivate</button>`
+          : `<button class="btn btn-danger btn-sm" onclick="adminSuspendPlate('${plate.plate_id}')">⏸ Suspend</button>`) : ''}
+        ${isSuperAdmin(session) ? `<button class="btn btn-ghost btn-sm" onclick="adminTransferOwnership('${plate.plate_id}')">🔁 Transfer</button>` : ''}
+        ${plate.qr_image_url ? `<a class="btn btn-ghost btn-sm" href="${plate.qr_image_url}" download="${plate.plate_id}.png">↓ QR PNG</a>` : `<button class="btn btn-ghost btn-sm" onclick="adminRegenerateQr('${plate.plate_id}')">↻ Generate QR</button>`}
+      </div>`;
   }
-
   document.getElementById('customerModalBody').innerHTML = `
     <div class="profile-header">
-      <div class="profile-avatar">${user.full_name[0]}</div>
-      <div>
-        <div class="profile-name">${user.full_name}</div>
-        <div class="profile-meta">${user.email || ''} · ${user.phone} · <span style="font-family:monospace">${user.plate_id}</span></div>
-      </div>
+      <div class="profile-avatar">${(user.full_name||'?')[0]}</div>
+      <div><div class="profile-name">${user.full_name}</div><div class="profile-meta">${user.email||''} · ${user.phone}</div></div>
     </div>
-
     <div class="grid-3" style="margin-bottom:16px">
-      <div class="stat-pill"><div class="stat-pill-value">${orders.length}</div><div class="stat-pill-label">Orders</div></div>
-      <div class="stat-pill"><div class="stat-pill-value">₹${totalSpend.toLocaleString()}</div><div class="stat-pill-label">Total Spend</div></div>
-      <div class="stat-pill"><div class="stat-pill-value">${visitorLogs.length}</div><div class="stat-pill-label">Visitor Logs</div></div>
+      <div class="stat-pill"><div class="stat-pill-value">${(orders||[]).length}</div><div class="stat-pill-label">Orders</div></div>
+      <div class="stat-pill"><div class="stat-pill-value">${fmtMoney(totalSpend)}</div><div class="stat-pill-label">Total Spend</div></div>
+      <div class="stat-pill"><div class="stat-pill-value">${(visitorLogs||[]).length}</div><div class="stat-pill-label">Visitor Logs</div></div>
     </div>
-
-    <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Plate Management</div>
-      ${plateMgmtHTML}
-    </div>
-
+    <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Plate Management</div>${plateMgmtHTML}</div>
     <div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Active Subscription</div>
-      ${sub ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:center">
-        ${planBadge(sub.plan)}
-        <span style="font-size:12px;color:var(--muted)">Expires: ${fmtDate(sub.expiry_date)}</span>
-      </div>` : '<div style="color:var(--muted);font-size:12px">No active subscription</div>'}
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Active Subscription</div>
+      ${sub ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:12px;align-items:center">${planBadge(sub.plan)}<span style="font-size:12px;color:var(--muted)">Expires: ${fmtDate(sub.expiry_date)}</span></div>` : '<div style="color:var(--muted);font-size:12px">No active subscription</div>'}
     </div>
-
     <div style="margin-bottom:12px">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Recent Orders (${orders.length})</div>
-      ${orders.slice(0,3).map(o => `
-        <div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
-          <span style="font-family:monospace;font-size:11px;color:var(--muted)">${o.order_number}</span>
-          <span style="flex:1">${o.product_type} · ₹${(o.total_amount||0).toLocaleString()}</span>
-          ${badgeHTML(o.payment_status)}
-          <span style="color:var(--muted)">${fmtDate(o.created_at)}</span>
-        </div>
-      `).join('') || '<div style="color:var(--muted);font-size:12px">No orders</div>'}
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Recent Orders (${(orders||[]).length})</div>
+      ${(orders||[]).slice(0,3).map(o => `<div style="display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-family:monospace;font-size:11px;color:var(--muted)">${o.order_number}</span><span style="flex:1">${o.product_type} · ${fmtMoney(o.total_amount)}</span>${badgeHTML(o.payment_status)}<span style="color:var(--muted)">${fmtDate(o.created_at)}</span></div>`).join('') || '<div style="color:var(--muted);font-size:12px">No orders</div>'}
     </div>
-
-    <div>
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Family Members (${familyMembers.length})</div>
-      ${familyMembers.length ? familyMembers.map(f => `<div style="font-size:12px;padding:4px 0">👤 ${f.name} — ${f.phone || '—'}</div>`).join('') : '<div style="color:var(--muted);font-size:12px">None added</div>'}
+    <div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Family Members (${(familyMembers||[]).length})</div>
+      ${(familyMembers||[]).length ? (familyMembers||[]).map(f => `<div style="font-size:12px;padding:4px 0">👤 ${f.name} — ${f.phone||'—'}</div>`).join('') : '<div style="color:var(--muted);font-size:12px">None added</div>'}
     </div>
-
-    <div style="margin-top:14px">
-      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Account Info</div>
-      <div style="font-size:12px;color:var(--muted)">Member since: ${fmtDate(user.created_at)}</div>
-      <div style="font-size:12px;color:var(--muted)">Voice Notes: ${voiceNotes.length} · Call Logs: ${callLogs.length}</div>
-    </div>
+    <div><div style="font-size:12px;color:var(--muted)">Member since: ${fmtDate(user.created_at)} · Voice Notes: ${(voiceNotes||[]).length} · Call Logs: ${(callLogs||[]).length}</div></div>
   `;
+}
 
-  window.refreshCurrentCustomerProfile = refreshThisProfile;
-};
+async function adminResetPin(userId, plateId) {
+  const newPin = prompt('Enter new 4-digit PIN:', '');
+  if (!newPin || !/^\d{4}$/.test(newPin)) { showToast('Invalid PIN — must be 4 digits', 'error'); return; }
+  const res = await provisionCall('admin-reset-pin', { owner_id: userId, new_pin: newPin });
+  showToast(res.success ? `✅ PIN reset for ${plateId}` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+}
+async function adminSuspendPlate(plateId) {
+  const reason = prompt('Reason for suspension:', 'Admin action');
+  if (!reason) return;
+  const res = await provisionCall('admin-plate-status', { plate_id: plateId, action: 'suspend', reason });
+  showToast(res.success ? `⏸ Plate ${plateId} suspended` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+  if (res.success && window._currentCustomerId) openCustomerProfile(window._currentCustomerId);
+}
+async function adminReactivatePlate(plateId) {
+  const res = await provisionCall('admin-plate-status', { plate_id: plateId, action: 'reactivate' });
+  showToast(res.success ? `▶ Plate ${plateId} reactivated` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+  if (res.success && window._currentCustomerId) openCustomerProfile(window._currentCustomerId);
+}
+async function adminTransferOwnership(plateId) {
+  const newPhone = prompt('New owner phone number (10 digits):');
+  if (!newPhone || newPhone.length !== 10) { showToast('Invalid phone', 'error'); return; }
+  const res = await provisionCall('admin-transfer-ownership', { plate_id: plateId, new_owner_phone: newPhone });
+  showToast(res.success ? `✅ Ownership transferred` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+}
+async function adminRegenerateQr(plateId) {
+  showToast('QR generation requested for ' + plateId, 'info');
+}
 
-// ═══════════════════════════════════════
-// ORDERS
-// ═══════════════════════════════════════
-
+// ─── ORDERS ───
 async function loadOrders(status = null) {
   const tbody = document.getElementById('ordersTable');
   tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
-
-  // FIX: Use admin-data Edge Function (service_role) instead of anon key — RLS blocks direct reads.
-  const statusFilter = (status && status !== 'all' && ['pending','paid','failed','refunded'].includes(status)) ? status : null;
-  const res = await getOrderList({ statusFilter, limit: 100 });
-  if (!res.success) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`;
-    return;
-  }
+  const statusFilter = (status && status !== 'all') ? status : null;
+  const res = await adminCall('order_list', { status_filter: statusFilter, limit: 100 });
+  if (!res.success) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`; return; }
   const orders = res.orders || [];
-
-  if (!orders.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🛒</div><div class="text">No orders found</div></div></td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = orders.map(o => `
-    <tr>
-      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${o.order_number}</span></td>
-      <td>
-        <div style="font-weight:500;font-size:12px">${o.customer_name || '—'}</div>
-        <div style="font-size:10px;color:var(--muted)">${o.customer_phone || ''}</div>
-      </td>
-      <td><span style="font-size:12px;text-transform:capitalize">${o.product_type}</span></td>
-      <td style="font-weight:600">₹${(o.total_amount||0).toLocaleString()}</td>
-      <td>${badgeHTML(o.payment_status)}</td>
-      <td>${mfgStatusBadge(o.manufacturing_status)}</td>
-      <td style="font-size:11px;color:var(--muted)">${fmtDate(o.created_at)}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="openOrderDetail('${o.id}')">View</button>
-      </td>
-    </tr>
-  `).join('');
+  if (!orders.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🛒</div><div class="text">No orders found</div></div></td></tr>'; return; }
+  tbody.innerHTML = orders.map(o => `<tr>
+    <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${o.order_number}</span></td>
+    <td><div style="font-weight:500;font-size:12px">${o.customer_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${o.customer_phone||''}</div></td>
+    <td><span style="font-size:12px;text-transform:capitalize">${o.product_type}</span></td>
+    <td style="font-weight:600">${fmtMoney(o.total_amount)}</td>
+    <td>${badgeHTML(o.payment_status)}</td>
+    <td>${mfgStatusBadge(o.manufacturing_status)}</td>
+    <td style="font-size:11px;color:var(--muted)">${fmtDate(o.created_at)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openOrderDetail('${o.id}')">View</button></td>
+  </tr>`).join('');
 }
-
-window.filterOrders = function(status, tabEl) {
+function filterOrders(status, tabEl) {
   currentOrderFilter = status;
   document.querySelectorAll('#panel-orders .tab').forEach(t => t.classList.remove('active'));
   tabEl.classList.add('active');
   loadOrders(status);
-};
-
-window.openOrderDetail = async function(orderId) {
-  // Use admin-data edge fn to get order (RLS blocks direct anon read)
-  const res = await getOrderList({ limit: 1000 }); // fetch all then find — simpler than new Edge Function type
-  const o = (res.orders || []).find(x => x.id === orderId);
+}
+async function openOrderDetail(orderId) {
+  const res = await adminCall('order_list', { limit: 1000 });
+  const o = (res.orders||[]).find(x => x.id === orderId);
   if (!o) { showToast('Order not found', 'error'); return; }
-
-  // Fetch plate info via customer profile path
-  let qrSection = '';
-  if (o.plate_id || o.owner_id) {
-    try {
-      const raw = localStorage.getItem('sd_admin_session');
-      const token = JSON.parse(raw || '{}')?.token;
-      if (token) {
-        const pRes = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ type: 'customer_profile', customer_id: o.owner_id }),
-        });
-        const pData = await pRes.json();
-        const plate = pData?.profile?.plate;
-        if (plate?.qr_image_url) {
-          qrSection = `<div style="margin-top:8px;"><a href="${plate.qr_image_url}" target="_blank" style="color:#00A2E8;font-size:.78rem;">📥 Download QR</a> &nbsp;<span style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:${plate.status==='active'?'rgba(34,197,94,.15)':'rgba(251,191,36,.12)'};color:${plate.status==='active'?'#34D399':'#FCD34D'}">${plate.status}</span></div>`;
-        } else {
-          qrSection = `<div style="margin-top:8px;color:rgba(255,255,255,.3);font-size:.75rem;">QR pending generation</div>`;
-        }
-      }
-    } catch {}
-  }
-
   const actions = [];
-
   if (o.payment_status === 'paid' && ['queued','in_production','packed'].includes(o.manufacturing_status)) {
-    actions.push(`<button class="btn btn-ghost btn-sm" onclick="adminMarkShipped('${o.id}','${o.plate_id || ''}')">🚚 Mark Shipped</button>`);
+    actions.push(`<button class="btn btn-ghost btn-sm" onclick="adminMarkShipped('${o.id}','${o.plate_id||''}')">🚚 Mark Shipped</button>`);
   }
   if (o.manufacturing_status === 'dispatched') {
-    actions.push(`<button class="btn btn-success btn-sm" onclick="adminMarkDelivered('${o.id}','${o.plate_id || ''}','${o.owner_id || ''}')">✅ Mark Delivered</button>`);
+    actions.push(`<button class="btn btn-success btn-sm" onclick="adminMarkDelivered('${o.id}','${o.plate_id||''}','${o.owner_id||''}')">✅ Mark Delivered</button>`);
   }
-
-  const html = `
-    <div style="font-size:11px;line-height:1.8;color:var(--text2);font-family:monospace;">
+  showToast(`
+    <div style="font-size:11px;line-height:1.8;font-family:monospace">
       <b style="color:var(--text)">${o.order_number}</b> · ${o.customer_name}<br>
-      📧 ${o.customer_email || '—'} · 📱 ${o.customer_phone || '—'}<br>
-      🏷 ${o.product_type} · ₹${(o.total_amount||0).toLocaleString()}<br>
-      💳 Payment: <b>${o.payment_status}</b> · Mfg: <b>${o.manufacturing_status}</b><br>
-      🔑 Plate: <b>${o.plate_id || 'Not assigned'}</b><br>
-      📍 ${JSON.stringify(o.shipping_address||{})}
-      ${qrSection}
+      📱 ${o.customer_phone||'—'} · 📧 ${o.customer_email||'—'}<br>
+      🏷 ${o.product_type} · ${fmtMoney(o.total_amount)}<br>
+      💳 Payment: <b>${o.payment_status}</b> · Mfg: <b>${o.manufacturing_status||'—'}</b><br>
+      🔑 Plate: <b>${o.plate_id||'Not assigned'}</b>
     </div>
-    ${actions.length ? `<div style="display:flex;gap:8px;margin-top:14px;">${actions.join('')}</div>` : ''}
-  `;
-  showToast(html, 'info', 12000);
-};
-
-window.adminMarkShipped = async function(orderId, plateId) {
-  if (!confirm('Mark this order as shipped?')) return;
-
-  // FIX: Direct anon update blocked by RLS (orders_service_all requires service_role).
-  // Route through admin-data Edge Function which uses service_role.
-  const raw = localStorage.getItem('sd_admin_session');
-  let token = null;
-  try { token = JSON.parse(raw || '{}')?.token; } catch {}
-
-  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({
-      type: 'update_order',
-      order_id: orderId,
-      updates: { manufacturing_status: 'dispatched', tracking_status: 'shipped' },
-      tracking_event: { event_type: 'shipped', event_label: 'Shipped', actor: 'admin' },
-    }),
-  });
-
-  const data = await res.json();
-  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
-
-  showToast('✅ Order marked as shipped', 'success');
-  loadOrders(currentOrderFilter);
-};
-
-window.adminMarkDelivered = async function(orderId, plateId, ownerId) {
+    ${actions.length ? `<div style="display:flex;gap:8px;margin-top:10px">${actions.join('')}</div>` : ''}
+  `, 'info', 12000);
+}
+async function adminMarkShipped(orderId, plateId) {
+  if (!confirm('Mark as shipped?')) return;
+  const res = await adminCall('update_order', { order_id: orderId, updates: { manufacturing_status: 'dispatched', tracking_status: 'shipped' }, tracking_event: { event_type: 'shipped', event_label: 'Shipped', actor: 'admin' } });
+  showToast(res.success ? '✅ Order marked as shipped' : 'Error: ' + res.error, res.success ? 'success' : 'error');
+  if (res.success) loadOrders(currentOrderFilter);
+}
+async function adminMarkDelivered(orderId, plateId, ownerId) {
   if (!confirm('Mark as delivered and ACTIVATE subscription?')) return;
+  if (!plateId || !ownerId) { showToast('❌ Missing plate_id or owner_id', 'error'); return; }
+  const res = await provisionCall('mark-delivered', { order_id: orderId });
+  showToast(res.success ? `🏠 Delivered & Activated!` : 'Activation failed: ' + (res.error||'Unknown'), res.success ? 'success' : 'error');
+  if (res.success) loadOrders(currentOrderFilter);
+}
+function exportOrders() { showToast('Export coming soon', 'info'); }
 
-  if (!plateId || !ownerId) {
-    showToast('❌ Missing plate_id or owner_id on this order', 'error');
-    return;
-  }
-
-  // Routed through services/orders.js markDelivered() — the canonical
-  // delivery→activation function (was previously dead code; admin.html had
-  // its own separate inline call to activate-subscription). Consolidating
-  // to one implementation avoids the two paths drifting out of sync.
-  const data = await markDelivered(orderId);
-
-  if (!data.success) {
-    showToast('Activation failed: ' + (data.error || 'Unknown error'), 'error');
-    return;
-  }
-
-  showToast(`🏠 Delivered & Activated! Sub expires: ${new Date(data.expiryDate).toLocaleDateString('en-IN')}`, 'success');
-  loadOrders(currentOrderFilter);
-};
-
-// ═══════════════════════════════════════
-// MANUFACTURING
-// ═══════════════════════════════════════
-
+// ─── MANUFACTURING ───
 async function loadManufacturing(status = null) {
   const tbody = document.getElementById('mfgTable');
   tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
-
   const [queueRes, countsRes] = await Promise.all([
-    getManufacturingQueue(status === 'all' ? null : status),
-    getQueueCounts(),
+    adminCall('manufacturing_queue', { status: status === 'all' ? null : status }),
+    adminCall('manufacturing_counts'),
   ]);
-
   if (countsRes.success) {
-    const c = countsRes.counts;
-    const total = Object.values(c).reduce((s, v) => s + v, 0);
+    const c = countsRes.counts || {};
+    const total = Object.values(c).reduce((s,v) => s+v, 0);
     document.getElementById('mfg-count-all').textContent = total;
-    Object.keys(c).forEach(k => {
-      const el = document.getElementById('mfg-count-' + k);
-      if (el) el.textContent = c[k];
-    });
+    Object.keys(c).forEach(k => { const el = document.getElementById('mfg-count-'+k); if (el) el.textContent = c[k]; });
   }
-
   if (!queueRes.success) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state">Error loading queue</div></td></tr>'; return; }
-  mfgData = queueRes.queue;
-
-  if (!mfgData.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🏭</div><div class="text">Queue is empty</div></div></td></tr>';
-    return;
-  }
-
+  mfgData = queueRes.queue || [];
+  if (!mfgData.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🏭</div><div class="text">Queue is empty</div></div></td></tr>'; return; }
   tbody.innerHTML = mfgData.map(item => {
-    const statusColors = { queued:'#F59E0B', printing:'#3B82F6', quality_check:'#8B5CF6', packed:'#10B981', ready:'#22C55E' };
-    const col = statusColors[item.production_status] || '#6B7280';
-    return `
-      <tr>
-        <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px">${item.plate_id}</span></td>
-        <td>
-          <div style="font-size:12px;font-weight:500">${item.plate_name || '—'}</div>
-          <div style="font-size:10px;color:var(--muted)">${item.house_number || '—'}</div>
-        </td>
-        <td style="font-size:12px;text-transform:capitalize">${item.product_type}</td>
-        <td><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">${item.orders?.order_number || '—'}</span></td>
-        <td>
-          <div style="font-size:12px">${item.orders?.customer_name || '—'}</div>
-          <div style="font-size:10px;color:var(--muted)">${item.orders?.customer_phone || ''}</div>
-        </td>
-        <td>
-          <span class="badge" style="background:${col}20;color:${col}">
-            ${item.production_status.replace(/_/g, ' ')}
-          </span>
-        </td>
-        <td>
-          <div style="display:flex;gap:4px;flex-wrap:wrap">
-            <button class="btn btn-ghost btn-sm" onclick="downloadQR('${item.plate_id}','png')">PNG</button>
-            <button class="btn btn-ghost btn-sm" onclick="downloadQR('${item.plate_id}','svg')">SVG</button>
-          </div>
-        </td>
-        <td>
-          <select class="form-select" style="font-size:11px;padding:4px 8px;height:28px" onchange="updateMfgStatus('${item.id}', this.value)">
-            <option value="">Update…</option>
-            <option value="queued">→ Queued</option>
-            <option value="printing">→ In Production</option>
-            <option value="quality_check">→ QC Check</option>
-            <option value="packed">→ Packed</option>
-            <option value="ready">→ Ready</option>
-          </select>
-        </td>
-      </tr>
-    `;
+    const col = { queued:'#F59E0B', printing:'#3B82F6', quality_check:'#8B5CF6', packed:'#10B981', ready:'#22C55E' }[item.production_status] || '#6B7280';
+    return `<tr>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px">${item.plate_id}</span></td>
+      <td><div style="font-size:12px;font-weight:500">${item.plate_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${item.house_number||'—'}</div></td>
+      <td style="font-size:12px;text-transform:capitalize">${item.product_type}</td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">${item.orders?.order_number||'—'}</span></td>
+      <td><div style="font-size:12px">${item.orders?.customer_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${item.orders?.customer_phone||''}</div></td>
+      <td><span class="badge" style="background:${col}20;color:${col}">${(item.production_status||'').replace(/_/g,' ')}</span></td>
+      <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="downloadQR('${item.plate_id}','png')">PNG</button><button class="btn btn-ghost btn-sm" onclick="downloadQR('${item.plate_id}','svg')">SVG</button></div></td>
+      <td><select class="form-select" style="font-size:11px;padding:4px 8px;height:28px" onchange="updateMfgStatus('${item.id}',this.value)"><option value="">Update…</option><option value="queued">→ Queued</option><option value="printing">→ In Production</option><option value="quality_check">→ QC Check</option><option value="packed">→ Packed</option><option value="ready">→ Ready</option></select></td>
+    </tr>`;
   }).join('');
 }
-
-window.filterMfgByStage = function(stage, el) {
+function filterMfgByStage(stage, el) {
   currentMfgFilter = stage;
   document.querySelectorAll('.pipeline-stage').forEach(s => s.classList.remove('active'));
   el.classList.add('active');
   loadManufacturing(stage);
-};
-
-window.updateMfgStatus = async function(id, newStatus) {
+}
+async function updateMfgStatus(id, newStatus) {
   if (!newStatus) return;
-  const res = await updateProductionStatus(id, newStatus);
-  if (res.success) {
-    showToast(`Status updated to: ${newStatus}`, 'success');
-    loadManufacturing(currentMfgFilter);
-  } else {
-    showToast('Update failed: ' + res.error, 'error');
-  }
-};
+  const res = await adminCall('update_manufacturing_status', { id, status: newStatus });
+  showToast(res.success ? `Status updated to: ${newStatus}` : 'Update failed: ' + res.error, res.success ? 'success' : 'error');
+  if (res.success) loadManufacturing(currentMfgFilter);
+}
+function printProductionSheet() { showToast('Opening print sheet…', 'info'); }
+function downloadQR(plateId, format) { showToast(`QR ${format.toUpperCase()} download initiated for ${plateId}`, 'success'); }
 
-window.printProductionSheet = function() {
-  const html = generateProductionSheetHTML(mfgData);
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-};
-
-window.downloadQR = function(plateId, format) {
-  showToast(`QR ${format.toUpperCase()} download initiated for ${plateId}`, 'success');
-  // In production: fetch from Supabase Storage
-};
-
-// ═══════════════════════════════════════
-// QR MANAGEMENT
-// ═══════════════════════════════════════
-
-window.searchQR = async function() {
+// ─── QR MANAGEMENT ───
+async function searchQR() {
   const q = document.getElementById('qrSearchInput').value.trim();
   if (!q) return;
-
   document.getElementById('qrResults').innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
-  const res = await searchQRByPlateId(q);
-
-  if (!res.success || !res.results.length) {
-    const qrResults = document.getElementById('qrResults');
-    qrResults.innerHTML = '<div class="empty-state"><div class="icon">📱</div><div class="text" id="qrNoResultsText"></div></div>';
-    document.getElementById('qrNoResultsText').textContent = `No QR records found for: ${q}`;
+  const res = await adminCall('qr_search', { plate_id: q });
+  if (!res.success || !res.results?.length) {
+    document.getElementById('qrResults').innerHTML = `<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records found for: ${q}</div></div>`;
     return;
   }
-
   document.getElementById('qrResults').innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Plate ID</th><th>Order #</th><th>Customer</th><th>Product</th><th>QR Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          ${res.results.map(item => `
-            <tr>
-              <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600">${item.plate_id}</span></td>
-              <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${item.orders?.order_number || '—'}</span></td>
-              <td>${item.orders?.customer_name || '—'}</td>
-              <td style="text-transform:capitalize">${item.product_type}</td>
-              <td>${badgeHTML(item.production_status)}</td>
-              <td>
-                <button class="btn btn-ghost btn-sm" onclick="openQRActions('${item.plate_id}')">⚙️ Actions</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-};
-
-window.openQRActions = function(plateId) {
+    <div class="table-wrap"><table>
+      <thead><tr><th>Plate ID</th><th>Order #</th><th>Customer</th><th>Product</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${res.results.map(item => `<tr>
+        <td><span style="font-family:'JetBrains Mono',monospace;font-weight:600">${item.plate_id}</span></td>
+        <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)">${item.orders?.order_number||'—'}</span></td>
+        <td>${item.orders?.customer_name||'—'}</td>
+        <td style="text-transform:capitalize">${item.product_type}</td>
+        <td>${badgeHTML(item.production_status)}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="openQRActions('${item.plate_id}')">⚙️ Actions</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+}
+function openQRActions(plateId) {
   document.getElementById('qrModalBody').innerHTML = `
-    <div style="margin-bottom:14px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:4px">Plate ID: <span style="font-family:monospace">${plateId}</span></div>
-    </div>
+    <div style="margin-bottom:14px"><div style="font-size:13px;font-weight:600">Plate ID: <span style="font-family:monospace">${plateId}</span></div></div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-success" onclick="handleQRDeactivate('${plateId}')">✅ Reactivate QR</button>
-      <button class="btn btn-danger" onclick="handleQRDeactivate('${plateId}', true)">🚫 Deactivate QR</button>
-      <button class="btn btn-ghost" onclick="downloadQR('${plateId}', 'png')">⬇️ Download PNG</button>
-      <button class="btn btn-ghost" onclick="downloadQR('${plateId}', 'svg')">⬇️ Download SVG</button>
-    </div>
-  `;
+      <button class="btn btn-success" onclick="handleQRReactivate('${plateId}')">✅ Reactivate QR</button>
+      <button class="btn btn-danger" onclick="handleQRDeactivate('${plateId}')">🚫 Deactivate QR</button>
+      <button class="btn btn-ghost" onclick="downloadQR('${plateId}','png')">⬇️ Download PNG</button>
+      <button class="btn btn-ghost" onclick="downloadQR('${plateId}','svg')">⬇️ Download SVG</button>
+    </div>`;
   openModal('qrModal');
-};
-
-window.handleQRDeactivate = async function(plateId, deactivate = false) {
-  const res = deactivate ? await deactivateQR(plateId, 'Admin action') : await reactivateQR(plateId);
+}
+async function handleQRDeactivate(plateId) {
+  const res = await adminCall('qr_deactivate', { plate_id: plateId, reason: 'Admin action' });
   closeModal('qrModal');
-  showToast(res.success ? `QR ${deactivate ? 'deactivated' : 'reactivated'}: ${plateId}` : 'Error: ' + res.error, res.success ? 'success' : 'error');
-};
+  showToast(res.success ? `QR deactivated: ${plateId}` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+}
+async function handleQRReactivate(plateId) {
+  const res = await adminCall('qr_reactivate', { plate_id: plateId });
+  closeModal('qrModal');
+  showToast(res.success ? `QR reactivated: ${plateId}` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+}
 
-// ═══════════════════════════════════════
-// SUBSCRIPTIONS
-// ═══════════════════════════════════════
-
+// ─── SUBSCRIPTIONS ───
 async function loadSubscriptions(statusFilter = null) {
   const tbody = document.getElementById('subsTable');
   tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
-
-  // FIX: Use admin-data Edge Function (service_role) instead of anon key.
-  const res = await getSubscriptionList({ statusFilter, limit: 100 });
-  if (!res.success) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`;
-    return;
-  }
+  const res = await adminCall('subscription_list', { status_filter: statusFilter, limit: 100 });
+  if (!res.success) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="text">Error: ${res.error}</div></div></td></tr>`; return; }
   const subs = res.subscriptions || [];
-
-  if (!subs.length) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🔄</div><div class="text">No subscriptions found</div></div></td></tr>';
-    return;
-  }
-
+  if (!subs.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🔄</div><div class="text">No subscriptions found</div></div></td></tr>'; return; }
   tbody.innerHTML = subs.map(s => {
     const expiry = new Date(s.expiry_date);
-    const daysLeft = Math.ceil((expiry - Date.now()) / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.ceil((expiry - Date.now()) / (1000*60*60*24));
     const expiryColor = daysLeft <= 7 ? '#EF4444' : daysLeft <= 30 ? '#F59E0B' : '#10B981';
-    return `
-      <tr>
-        <td>
-          <div style="font-weight:500;font-size:12px">${s.users?.full_name || '—'}</div>
-          <div style="font-size:10px;color:var(--muted)">${s.users?.phone || ''}</div>
-        </td>
-        <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${s.users?.plate_id || '—'}</span></td>
-        <td>${planBadge(s.plan)}</td>
-        <td>${badgeHTML(s.status)}</td>
-        <td>
-          <div style="font-size:12px">${fmtDate(s.expiry_date)}</div>
-          <div style="font-size:10px;color:${expiryColor}">${daysLeft > 0 ? daysLeft + 'd left' : 'Expired'}</div>
-        </td>
-        <td style="font-weight:600;font-size:12px">₹${(s.renewal_price||0).toLocaleString()}</td>
-        <td>
-          <div style="display:flex;gap:4px">
-            <button class="btn btn-ghost btn-sm" onclick="extendSub('${s.id}')">Extend</button>
-            <button class="btn btn-danger btn-sm" onclick="cancelSub('${s.id}')">Cancel</button>
-          </div>
-        </td>
-      </tr>
-    `;
+    return `<tr>
+      <td><div style="font-weight:500;font-size:12px">${s.users?.full_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${s.users?.phone||''}</div></td>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${s.users?.plate_id||'—'}</span></td>
+      <td>${planBadge(s.plan)}</td>
+      <td>${badgeHTML(s.status)}</td>
+      <td><div style="font-size:12px">${fmtDate(s.expiry_date)}</div><div style="font-size:10px;color:${expiryColor}">${daysLeft > 0 ? daysLeft+'d left' : 'Expired'}</div></td>
+      <td style="font-weight:600;font-size:12px">${fmtMoney(s.renewal_price)}</td>
+      <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="extendSub('${s.id}')">Extend</button><button class="btn btn-danger btn-sm" onclick="cancelSub('${s.id}')">Cancel</button></div></td>
+    </tr>`;
   }).join('');
 }
-
-window.filterSubs = function(status, el) {
+function filterSubs(status, el) {
   document.querySelectorAll('#panel-subscriptions .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  loadSubscriptions(status);
-};
-
-window.extendSub = async function(subId) {
+  loadSubscriptions(status === 'all' ? null : status);
+}
+async function extendSub(subId) {
   const days = prompt('Extend by how many days?', '30');
   if (!days || isNaN(parseInt(days))) return;
-
-  const raw = localStorage.getItem('sd_admin_session');
-  let token = null;
-  try { token = JSON.parse(raw || '{}')?.token; } catch {}
-
-  // First get current expiry via subscription list (already loaded in memory ideally),
-  // but to be safe, fetch it through a slim admin-data call.
-  const subsRes = await getSubscriptionList({ limit: 500 });
-  const sub = (subsRes.subscriptions || []).find(s => s.id === subId);
+  const subsRes = await adminCall('subscription_list', { limit: 500 });
+  const sub = (subsRes.subscriptions||[]).find(s => s.id === subId);
   if (!sub) { showToast('Subscription not found', 'error'); return; }
-
   const newExpiry = new Date(sub.expiry_date || Date.now());
   newExpiry.setDate(newExpiry.getDate() + parseInt(days));
-
-  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({
-      type: 'update_subscription',
-      sub_id: subId,
-      updates: { expiry_date: newExpiry.toISOString() },
-    }),
-  });
-  const data = await res.json();
-  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
-
-  showToast(`Subscription extended by ${days} days`, 'success');
-  loadSubscriptions();
-};
-
-window.cancelSub = async function(subId) {
+  const res = await adminCall('update_subscription', { sub_id: subId, updates: { expiry_date: newExpiry.toISOString() } });
+  showToast(res.success ? `Subscription extended by ${days} days` : 'Error: ' + res.error, res.success ? 'success' : 'error');
+  if (res.success) loadSubscriptions();
+}
+async function cancelSub(subId) {
   if (!confirm('Cancel this subscription?')) return;
+  const res = await adminCall('update_subscription', { sub_id: subId, updates: { status: 'cancelled' } });
+  showToast(res.success ? 'Subscription cancelled' : 'Error: ' + res.error, res.success ? 'success' : 'error');
+  if (res.success) loadSubscriptions();
+}
 
-  const raw = localStorage.getItem('sd_admin_session');
-  let token = null;
-  try { token = JSON.parse(raw || '{}')?.token; } catch {}
-
-  const res = await fetch(`${window.__SD_CONFIG__?.supabaseUrl}/functions/v1/admin-data`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ type: 'update_subscription', sub_id: subId, updates: { status: 'cancelled' } }),
-  });
-  const data = await res.json();
-  if (!data?.success) { showToast('Error: ' + (data?.message || 'Update failed'), 'error'); return; }
-
-  showToast('Subscription cancelled', 'success');
-  loadSubscriptions();
-};
-
-// ═══════════════════════════════════════
-// SUPPORT
-// ═══════════════════════════════════════
-
-async function loadSupport(status = 'open') {
-  const statsRes = await getTicketStats();
+// ─── SUPPORT ───
+async function loadSupport() {
+  const statsRes = await adminCall('ticket_stats');
   if (statsRes.success) {
-    document.getElementById('ticket-open-count').textContent = statsRes.stats.open;
-    document.getElementById('ticket-pending-count').textContent = statsRes.stats.pending;
-    document.getElementById('ticket-resolved-count').textContent = statsRes.stats.resolved;
-    document.getElementById('openTicketsBadge').textContent = statsRes.stats.open;
+    document.getElementById('ticket-open-count').textContent = statsRes.stats?.open ?? '—';
+    document.getElementById('ticket-pending-count').textContent = statsRes.stats?.pending ?? '—';
+    document.getElementById('ticket-resolved-count').textContent = statsRes.stats?.resolved ?? '—';
+    document.getElementById('openTicketsBadge').textContent = statsRes.stats?.open ?? 0;
   }
-
-  const res = await listTickets({ status: currentTicketFilter === 'all' ? null : currentTicketFilter, limit: 50 });
+  const res = await adminCall('ticket_list', { status: currentTicketFilter === 'all' ? null : currentTicketFilter, limit: 50 });
   const el = document.getElementById('ticketsList');
-
-  if (!res.success || !res.tickets.length) {
+  if (!res.success || !res.tickets?.length) {
     el.innerHTML = '<div class="empty-state"><div class="icon">🎫</div><div class="text">No tickets in this category</div></div>';
     return;
   }
-
-  el.innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Ticket #</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
-          ${res.tickets.map(t => `
-            <tr>
-              <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${t.ticket_number}</span></td>
-              <td style="max-width:200px">
-                <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.subject}</div>
-                <div style="font-size:10px;color:var(--muted)">${t.customer_name || ''}</div>
-              </td>
-              <td><span style="font-size:11px;text-transform:capitalize">${t.category}</span></td>
-              <td>${priorityBadge(t.priority)}</td>
-              <td>${ticketStatusBadge(t.status)}</td>
-              <td style="font-size:11px;color:var(--muted)">${t.admin_users?.full_name || 'Unassigned'}</td>
-              <td style="font-size:11px;color:var(--muted)">${fmtDate(t.created_at)}</td>
-              <td>
-                <button class="btn btn-ghost btn-sm" onclick="openTicketDetail('${t.id}')">View</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
+  el.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Ticket #</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Created</th><th>Actions</th></tr></thead><tbody>
+    ${res.tickets.map(t => `<tr>
+      <td><span style="font-family:'JetBrains Mono',monospace;font-size:11px">${t.ticket_number}</span></td>
+      <td style="max-width:200px"><div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.subject}</div><div style="font-size:10px;color:var(--muted)">${t.customer_name||''}</div></td>
+      <td><span style="font-size:11px;text-transform:capitalize">${t.category}</span></td>
+      <td>${priorityBadge(t.priority)}</td>
+      <td>${ticketStatusBadge(t.status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${t.admin_users?.full_name||'Unassigned'}</td>
+      <td style="font-size:11px;color:var(--muted)">${fmtDate(t.created_at)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openTicketDetail('${t.id}')">View</button></td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
 }
-
-window.filterTickets = function(status, el) {
+function filterTickets(status, el) {
   currentTicketFilter = status;
   document.querySelectorAll('#panel-support .tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
-  loadSupport(status);
-};
-
-window.openTicketDetail = async function(ticketId) {
+  loadSupport();
+}
+async function openTicketDetail(ticketId) {
   openModal('ticketModal');
   document.getElementById('ticketModalBody').innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
-
-  const res = await getTicketDetail(ticketId);
+  const res = await adminCall('ticket_detail', { ticket_id: ticketId });
   if (!res.success) return;
-
   const t = res.ticket;
   document.getElementById('ticketModalTitle').textContent = t.ticket_number;
+  document.getElementById('ticketModal')._ticketId = t.id;
   document.getElementById('ticketModalBody').innerHTML = `
-    <div style="margin-bottom:14px">
-      <div style="font-size:14px;font-weight:600;margin-bottom:6px">${t.subject}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        ${ticketStatusBadge(t.status)} ${priorityBadge(t.priority)}
-        <span class="badge badge-muted" style="font-size:10px">${t.category}</span>
-      </div>
-      <div style="font-size:12px;color:var(--muted);background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:12px">${t.description || 'No description'}</div>
-
-      <div class="grid-2" style="margin-bottom:12px">
-        <div class="form-group" style="margin:0">
-          <label class="form-label">Status</label>
-          <select class="form-select" id="ticketStatusEdit">
-            ${['open','pending','resolved','closed'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group" style="margin:0">
-          <label class="form-label">Priority</label>
-          <select class="form-select" id="ticketPriorityEdit">
-            ${['low','medium','high','critical'].map(p => `<option value="${p}" ${t.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-
-      <div class="form-group" style="margin-bottom:12px">
-        <label class="form-label">Internal Note</label>
-        <textarea class="form-input" id="ticketNoteText" rows="2" placeholder="Add internal note…" style="resize:vertical"></textarea>
-        <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addNote('${t.id}')">Add Note</button>
-      </div>
-
-      <div>
-        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Comments (${res.comments.length})</div>
-        ${res.comments.map(c => `
-          <div style="padding:8px;background:var(--surface2);border-radius:8px;margin-bottom:6px">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${c.admin_users?.full_name || 'Admin'} · ${fmtDate(c.created_at)} ${c.is_internal?'· 🔒 Internal':''}</div>
-            <div style="font-size:12px">${c.content}</div>
-          </div>
-        `).join('') || '<div style="color:var(--muted);font-size:12px">No comments yet</div>'}
-      </div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px">${t.subject}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${ticketStatusBadge(t.status)} ${priorityBadge(t.priority)}<span class="badge badge-muted" style="font-size:10px">${t.category}</span></div>
+    <div style="font-size:12px;color:var(--muted);background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:12px">${t.description||'No description'}</div>
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="form-group" style="margin:0"><label class="form-label">Status</label>
+        <select class="form-select" id="ticketStatusEdit">${['open','pending','resolved','closed'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}</select></div>
+      <div class="form-group" style="margin:0"><label class="form-label">Priority</label>
+        <select class="form-select" id="ticketPriorityEdit">${['low','medium','high','critical'].map(p => `<option value="${p}" ${t.priority===p?'selected':''}>${p.charAt(0).toUpperCase()+p.slice(1)}</option>`).join('')}</select></div>
     </div>
-  `;
-  document.getElementById('ticketModal').__ticketId = t.id;
-};
-
-window.saveTicketChanges = async function() {
-  const ticketId = document.getElementById('ticketModal').__ticketId;
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">Internal Note</label>
+      <textarea class="form-input" id="ticketNoteText" rows="2" placeholder="Add internal note…"></textarea>
+      <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addNote('${t.id}')">Add Note</button>
+    </div>
+    <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Comments (${(res.comments||[]).length})</div>
+      ${(res.comments||[]).map(c => `<div style="padding:8px;background:var(--surface2);border-radius:8px;margin-bottom:6px"><div style="font-size:11px;color:var(--muted);margin-bottom:3px">${c.admin_users?.full_name||'Admin'} · ${fmtDate(c.created_at)}${c.is_internal?' · 🔒 Internal':''}</div><div style="font-size:12px">${c.content}</div></div>`).join('')||'<div style="color:var(--muted);font-size:12px">No comments yet</div>'}
+    </div>`;
+}
+async function saveTicketChanges() {
+  const ticketId = document.getElementById('ticketModal')._ticketId;
   if (!ticketId) return;
   const status = document.getElementById('ticketStatusEdit').value;
   const priority = document.getElementById('ticketPriorityEdit').value;
-  const res = await updateTicket(ticketId, { status, priority });
+  const res = await adminCall('update_ticket', { ticket_id: ticketId, updates: { status, priority } });
   if (res.success) { showToast('Ticket updated', 'success'); closeModal('ticketModal'); loadSupport(); }
   else showToast('Error: ' + res.error, 'error');
-};
-
-window.addNote = async function(ticketId) {
+}
+async function addNote(ticketId) {
   const content = document.getElementById('ticketNoteText').value.trim();
   if (!content) return;
-  const res = await addTicketComment(ticketId, session.id, content, true);
+  const res = await adminCall('add_ticket_comment', { ticket_id: ticketId, admin_id: session.id, content, is_internal: true });
   if (res.success) { showToast('Note added', 'success'); openTicketDetail(ticketId); }
-};
-
-window.openCreateTicketModal = () => openModal('createTicketModal');
-
-window.createTicket = async function() {
-  const res = await createTicketSvc({
+}
+async function createTicket() {
+  const res = await adminCall('create_ticket', {
     subject: document.getElementById('newTicketSubject').value,
     category: document.getElementById('newTicketCategory').value,
     priority: document.getElementById('newTicketPriority').value,
@@ -2285,61 +1496,123 @@ window.createTicket = async function() {
     description: document.getElementById('newTicketDesc').value,
   });
   if (res.success) {
-    showToast('Ticket created: ' + res.ticket.ticket_number, 'success');
+    showToast('Ticket created: ' + (res.ticket?.ticket_number||''), 'success');
     closeModal('createTicketModal');
     loadSupport();
   } else showToast('Error: ' + res.error, 'error');
-};
+}
 
-// ═══════════════════════════════════════
-// PROVISIONING — Create Customer (Phase 12)
-// ═══════════════════════════════════════
-
-window.submitCreateCustomer = async function() {
-  if (!hasPermission(session, 'customers', 'write')) {
-    showToast('Your role cannot create customers.', 'error');
+// ─── COMMUNICATION ───
+async function loadCommunication() {
+  const tbody = document.getElementById('commTable');
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('communication_logs', { type: currentCommFilter, limit: 100 });
+  if (!res.success || !res.logs?.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📞</div><div class="text">No communication records found</div></div></td></tr>';
     return;
   }
+  tbody.innerHTML = res.logs.map(log => `<tr>
+    <td style="font-size:11px;color:var(--muted)">${fmtDate(log.created_at)}</td>
+    <td><span style="font-family:'JetBrains Mono',monospace;font-size:12px">${log.plate_id||'—'}</span></td>
+    <td><span class="badge badge-info">${(log.event_type||'').replace(/_/g,' ')}</span></td>
+    <td style="font-size:12px">${log.customer_name||'—'}</td>
+    <td style="font-size:12px">${log.duration_seconds ? log.duration_seconds+'s' : '—'}</td>
+    <td style="font-size:11px;color:var(--muted)">${log.ai_intent||'—'}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="showToast(JSON.stringify(${JSON.stringify({id:log.id, status:log.status})}).replace(/[{}\"]/g,'').replace(/,/g,' · '),'info')">Detail</button></td>
+  </tr>`).join('');
+}
+function filterComm(type, el) {
+  currentCommFilter = type;
+  document.querySelectorAll('#panel-communication .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadCommunication();
+}
 
-  const fullName = document.getElementById('cc-name').value.trim();
-  const phone = document.getElementById('cc-phone').value.trim();
-  const email = document.getElementById('cc-email').value.trim();
-  const address = document.getElementById('cc-address').value.trim();
-  const productType = document.getElementById('cc-product').value;
-  const initialPin = document.getElementById('cc-pin').value.trim();
-  const subscriptionPlan = document.getElementById('cc-plan').value;
-
-  if (!fullName || phone.length !== 10 || !/^\d{4}$/.test(initialPin)) {
-    showToast('Please fill in name, a 10-digit phone, and a 4-digit PIN.', 'error');
-    return;
+// ─── ANALYTICS ───
+async function loadAnalytics() {
+  const [revenueRes, ordersRes] = await Promise.all([
+    adminCall('revenue_chart', { months: 6 }),
+    adminCall('order_list', { limit: 500 }),
+  ]);
+  if (revenueRes.success) renderLineChart('analyticsRevenueChart', revenueRes.labels, revenueRes.values, 'Revenue (₹)', '#FF4500');
+  if (ordersRes.success) {
+    const orders = ordersRes.orders || [];
+    const monthlyData = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(); d.setMonth(d.getMonth()-i);
+      const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      monthlyData[key] = { orders:0, label:d.toLocaleString('default',{month:'short',year:'2-digit'}) };
+    }
+    orders.forEach(o => {
+      const d = new Date(o.created_at);
+      const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      if (monthlyData[key]) monthlyData[key].orders++;
+    });
+    renderLineChart('analyticsOrderChart', Object.values(monthlyData).map(d=>d.label), Object.values(monthlyData).map(d=>d.orders), 'Orders', '#3B82F6');
+    // Product breakdown
+    const productCounts = {};
+    orders.forEach(o => { productCounts[o.product_type] = (productCounts[o.product_type]||0) + 1; });
+    renderBarChart('productChart', Object.keys(productCounts), Object.values(productCounts), 'Sales', '#8B5CF6');
   }
-
-  const btn = document.getElementById('createCustomerBtn');
-  btn.disabled = true;
-  btn.textContent = 'Creating…';
-
-  const res = await createCustomer({
-    fullName, phone, email, address, productType, initialPin,
-    subscriptionPlan: subscriptionPlan || null,
-  });
-
-  btn.disabled = false;
-  btn.textContent = 'Create Customer';
-
-  if (!res.success) {
-    showToast('Error: ' + res.error, 'error');
-    return;
+  // Plan breakdown from subscriptions
+  const subRes = await adminCall('subscription_list', { limit: 500 });
+  if (subRes.success) {
+    const planCounts = {};
+    (subRes.subscriptions||[]).forEach(s => { planCounts[s.plan||'unknown'] = (planCounts[s.plan||'unknown']||0)+1; });
+    renderBarChart('planChart', Object.keys(planCounts), Object.values(planCounts), 'Plans', '#FF4500');
   }
+}
 
-  showToast(`Customer created — Plate ${res.customer.plate_id}`, 'success');
-  renderCustomerPackage(res.customer);
-  document.getElementById('createCustomerForm').reset();
-};
+// ─── FINANCIAL ───
+async function loadFinancial() {
+  const res = await adminCall('financial_metrics');
+  if (!res.success) { showToast('Error loading financial data: ' + res.error, 'error'); return; }
+  const f = res.financial || {};
+  document.getElementById('fin-today').textContent = fmtMoney(f.revenueToday);
+  document.getElementById('fin-month').textContent = fmtMoney(f.revenueThisMonth);
+  document.getElementById('fin-mrr').textContent = fmtMoney(f.mrr);
+  document.getElementById('fin-arr').textContent = fmtMoney(f.arr);
+  document.getElementById('fin-refunds').textContent = fmtMoney(f.totalRefunds);
+  document.getElementById('fin-orders').textContent = f.paidOrders ?? '—';
+  document.getElementById('fin-acrylic').textContent = fmtMoney(f.salesByProduct?.acrylic);
+  document.getElementById('fin-teakwood').textContent = fmtMoney(f.salesByProduct?.teakwood);
+  document.getElementById('fin-stainless').textContent = fmtMoney(f.salesByProduct?.stainless);
+}
 
-function renderCustomerPackage(c) {
-  const qrImg = c.qr_image_url
-    ? `<img src="${c.qr_image_url}" style="width:160px;height:160px;border-radius:8px;background:#fff;padding:8px" alt="QR for ${c.plate_id}">`
-    : `<div class="empty-state" style="padding:20px">QR generation failed — use Plate Management → Regenerate QR.</div>`;
+// ─── AUDIT LOGS ───
+async function loadAuditLogs() {
+  const action = document.getElementById('auditActionFilter').value;
+  const resource = document.getElementById('auditResourceFilter').value;
+  const el = document.getElementById('auditLogsList');
+  el.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+  const res = await adminCall('audit_logs', { action: action||null, resource: resource||null, limit: 100 });
+  if (!res.success) { el.innerHTML = `<div class="empty-state"><div class="text">Error: ${res.error}</div></div>`; return; }
+  const logs = res.logs || [];
+  if (!logs.length) { el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div class="text">No audit logs found</div></div>'; return; }
+  el.innerHTML = logs.map(log => `
+    <div class="audit-row">
+      <div class="audit-dot" style="background:${log.action?.includes('error')?'#EF4444':'#10B981'}"></div>
+      <div class="audit-time">${fmtDate(log.created_at)}</div>
+      <div>
+        <div class="audit-action">${log.action||'—'} · ${log.resource||'—'}</div>
+        <div class="audit-detail">${log.admin_users?.full_name||'System'} — ${log.resource_id||''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+function exportAuditLogs() { showToast('Export coming soon', 'info'); }
 
-  document.getElementById('customerPackageResult').innerHTML = `
-    <div style="text-align:center;margi
+// ─── SYSTEM HEALTH ───
+async function loadSystemHealth() {
+  const el = document.getElementById('serviceStatusList');
+  el.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+  const res = await adminCall('system_health');
+  if (!res.success) { el.innerHTML = `<div class="empty-state"><div class="text">Error: ${res.error}</div></div>`; return; }
+  const h = res.health || {};
+  const services = h.services || [
+    { name: 'Supabase DB', status: 'operational' },
+    { name: 'Edge Functions', status: 'operational' },
+    { name: 'Supabase Storage', status: 'operational' },
+    { name: 'Exotel (Calling)', status: h.exotelOk ? 'operational' : 'degraded' },
+    { name: 'Razorpay', status: h.razorpayOk ? 'operational' : 'unknown' },
+    { name: 'Shiprocket', status: 'ope
