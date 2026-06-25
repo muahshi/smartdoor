@@ -11,6 +11,7 @@
   ],
   "rewrites": [
     { "source": "/login", "destination": "/login.html" },
+    { "source": "/admin-login", "destination": "/admin-login.html" },
     { "source": "/p/:slug", "destination": "/visitor.html?plate=:slug" },
     { "source": "/gate/:path*", "destination": "/guard.html" },
     { "source": "/society/:path*", "destination": "/society-admin.html" },
@@ -31,15 +32,11 @@
     },
     {
       "source": "/guard.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
-      ]
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     },
     {
       "source": "/society-admin.html",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
-      ]
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     }
   ]
 }
