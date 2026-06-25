@@ -23,7 +23,7 @@
  *   getSystemHealth()         → replaces services/analytics.js getSystemHealth
  */
 
-const _EDGE_BASE = `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`;
+function _edgeBase() { return `${window.__SD_CONFIG__?.supabaseUrl || ""}/functions/v1`; }
 
 async function _call(type, extra = {}) {
   const raw = localStorage.getItem('sd_admin_session');
@@ -37,7 +37,7 @@ async function _call(type, extra = {}) {
   if (!token) return { success: false, error: 'Admin session expired. Please sign in again.' };
 
   try {
-    const res = await fetch(`${_EDGE_BASE}/admin-data`, {
+    const res = await fetch(`${_edgeBase()}/admin-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
