@@ -132,13 +132,15 @@ serve(async (req) => {
 
       const { query = '', field = 'all', limit = 30, offset = 0 } = body as any;
 
+      // FIX: PostgREST reverse-FK join `table!fk_column` is unreliable across versions.
+      // Use explicit FK name to avoid ambiguity: plates!plates_owner_id_fkey etc.
       let qb = db
         .from('users')
         .select(`
           id, full_name, phone, email, plate_id, created_at,
-          subscriptions!owner_id(status, plan, expiry_date),
-          plates!owner_id(status, product_type, qr_image_url, qr_svg_url),
-          orders!owner_id(id, payment_status, total_amount)
+          subscriptions!subscriptions_owner_id_fkey(status, plan, expiry_date),
+          plates!plates_owner_id_fkey(status, product_type, qr_image_url, qr_svg_url),
+          orders!orders_owner_id_fkey(id, payment_status, total_amount)
         `, { count: 'exact' })
         .range(Number(offset), Number(offset) + Number(limit) - 1)
         .order('created_at', { ascending: false });
