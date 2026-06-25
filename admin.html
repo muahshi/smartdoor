@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <script src="config/env.generated.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Door — Admin Super Panel</title>
   <meta name="robots" content="noindex, nofollow" />
@@ -598,8 +599,6 @@
 </head>
 <body>
 
-<!-- CONFIG: Generated at Vercel build time by scripts/build-env.js — DO NOT hardcode keys here -->
-<script src="config/env.generated.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
 
 <!-- Mobile sidebar overlay — tap to close -->
@@ -1340,7 +1339,7 @@ import {
 
 // ─── AUTH CHECK ───
 const session = requireAdminAuth();
-if (!session) { window.location.href = '/admin-login.html'; }
+if (!session) { window.location.href = '/admin-login.html'; throw new Error('No admin session'); }
 
 // ─── INIT ADMIN UI ───
 document.getElementById('adminName').textContent = session.full_name;
@@ -2342,4 +2341,5 @@ function renderCustomerPackage(c) {
     ? `<img src="${c.qr_image_url}" style="width:160px;height:160px;border-radius:8px;background:#fff;padding:8px" alt="QR for ${c.plate_id}">`
     : `<div class="empty-state" style="padding:20px">QR generation failed — use Plate Management → Regenerate QR.</div>`;
 
-  document.getElementById('customerPackageR
+  document.getElementById('customerPackageResult').innerHTML = `
+    <div style="text-align:center;margi
