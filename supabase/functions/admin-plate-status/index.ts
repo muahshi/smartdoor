@@ -129,6 +129,9 @@ serve(async (req) => {
       updatePayload.suspended_reason = null;
       updatePayload.suspended_at = null;
       updatePayload.suspended_by = null;
+      // FIX: isPlateActive() requires activation_date to be non-null.
+      // Reactivation must stamp it so QR scan resolves to 'ready', not 'pending_activation'.
+      updatePayload.activation_date = new Date().toISOString();
     }
 
     const { data: updated, error: updateErr } = await supabaseAdmin
