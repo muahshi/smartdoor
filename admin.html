@@ -1424,6 +1424,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ── UTILS ──
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
@@ -1789,7 +1797,7 @@ window.searchQR = async function() {
   const re=document.getElementById('qrResults'); if(!re) return;
   re.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
   const res=await adminCall('qr_search',{plate_id:q});
-  if(!res.success||!res.results?.length){re.innerHTML=`<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records for: ${q}</div></div>`;return;}
+  if(!res.success||!res.results?.length){re.innerHTML=`<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records for: ${escapeHtml(q)}</div></div>`;return;}
   re.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Plate ID</th><th>Order #</th><th>Customer</th><th>Product</th><th>Status</th><th>Actions</th></tr></thead><tbody>${res.results.map(item=>`<tr>
     <td><span style="font-family:monospace;font-weight:600">${item.plate_id}</span></td>
     <td><span style="font-family:monospace;font-size:11px;color:var(--muted)">${item.orders?.order_number||'—'}</span></td>
