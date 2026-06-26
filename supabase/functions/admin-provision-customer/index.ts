@@ -2,25 +2,25 @@
  * Smart Door — Edge Function: admin-provision-customer
  * supabase/functions/admin-provision-customer/index.ts
  *
- * The core of the Admin Internal Portal: SmartDoor staff (super_admin /
- * dealer) manually provision a customer who isn't coming through the
- * website checkout flow (e.g. dealer-installed, walk-in, bulk society
- * rollout). Does everything atomically, server-side, with service_role:
+ * PATCHED (Migration 25 / Master Stabilization):
+ *   — Accepts order_source ('admin_manual'|'amazon'|'flipkart'|'offline'|'whatsapp')
+ *   — Accepts external_order_id (Amazon/Flipkart order reference)
+ *   — Auto-creates orders row (ONE SOURCE OF TRUTH — every customer has an order)
+ *   — Auto-creates manufacturing row
  *
- *   1. Generate a unique Plate ID (SD-XXXXXX), retrying on collision
- *   2. bcrypt-hash the initial PIN (never hashed client-side — same rule
- *      as set-owner-pin)
- *   3. Insert `users` row
- *   4. Insert `plates` row (provisioning_source = 'admin_manual')
- *   5. Generate QR (PNG + SVG), upload to the `qr-codes` storage bucket,
- *      write the public URLs back onto the plate row
- *   6. Optionally insert a `subscriptions` row for the chosen plan
- *   7. Log to `activation_events` (event_type = 'activated') and
- *      `admin_audit_logs` (action = 'customer_provisioned')
+ * Original flow:
+ *   1. Generate unique Plate ID
+ *   2. bcrypt-hash initial PIN
+ *   3. Insert users row
+ *   4. Insert plates row
+ *   5. Generate QR (PNG + SVG) → Storage
+ *   6. Insert subscriptions row
+ *   7. Create security_rules row
+ *   8. Log activation_events + admin_audit_logs
  *
- * Reuses sql/01_schema.sql + sql/08_admin_schema.sql + sql/12 tables —
- * no new tables created, only the additive columns in
- * sql/15_admin_provisioning_schema.sql.
+ * Added (this patch):
+ *   9. Insert orders row (order_source, fulfilment_status='live')
+ *  10. Insert manufacturing row (production_status='ready')
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -30,18 +30,24 @@ import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { restrictedCors } from '../_shared/cors.ts';
 import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from '../_shared/adminAuth.ts';
 
-const APP_URL    = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
-const QR_BUCKET  = 'qr-codes';
+const APP_URL   = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
+const QR_BUCKET = 'qr-codes';
 
-// Mirrors services/subscriptions.js PLANS — keep both in sync if pricing changes.
 const PLAN_PRICES: Record<string, number> = { hardware_only: 0, smartdoor_care: 299 };
+const VALID_SOURCES = ['admin_manual', 'amazon', 'flipkart', 'offline', 'whatsapp'];
 
-const PLATE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // matches services/plates.js generatePlateId() alphabet, no ambiguous 0/O/1/I
+const PLATE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function randomPlateSuffix(): string {
   let out = '';
   for (let i = 0; i < 6; i++) out += PLATE_CHARS[Math.floor(Math.random() * PLATE_CHARS.length)];
   return `SD-${out}`;
+}
+
+function makeOrderNumber(): string {
+  const d = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const r = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `SD-ORD-${d}-${r}`;
 }
 
 serve(async (req) => {
@@ -67,9 +73,12 @@ serve(async (req) => {
     const {
       full_name, phone, email, address,
       product_type, initial_pin, subscription_plan,
+      order_source,        // NEW: 'admin_manual'|'amazon'|'flipkart'|'offline'|'whatsapp'
+      external_order_id,   // NEW: Amazon/Flipkart order number for reference
     } = body as {
       full_name?: string; phone?: string; email?: string; address?: string;
       product_type?: string; initial_pin?: string; subscription_plan?: string;
+      order_source?: string; external_order_id?: string;
     };
 
     // ── Validation ──
@@ -90,8 +99,10 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Initial PIN must be exactly 4 digits.' }, { status: 400, headers });
     }
     const plan = ['hardware_only', 'smartdoor_care'].includes(String(subscription_plan)) ? String(subscription_plan) : 'hardware_only';
+    const cleanSource = VALID_SOURCES.includes(String(order_source)) ? String(order_source) : 'admin_manual';
+    const cleanExtOrderId = external_order_id ? String(external_order_id).trim() : null;
 
-    // ── Generate a unique Plate ID (retry on collision, max 10 tries) ──
+    // ── Generate a unique Plate ID ──
     let plateId = '';
     let isUnique = false;
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -108,7 +119,7 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Could not generate a unique Plate ID. Please try again.' }, { status: 500, headers });
     }
 
-    // ── Hash PIN (bcrypt, cost 12 — matches set-owner-pin) ──
+    // ── Hash PIN ──
     const pinHash = bcryptjs.hashSync(pinStr, 12);
 
     // ── Insert user ──
@@ -141,14 +152,13 @@ serve(async (req) => {
         owner_id: user.id,
         activation_date: new Date().toISOString(),
         provisioned_by: ctx.id,
-        provisioning_source: 'admin_manual',
+        provisioning_source: cleanSource,
       })
       .select()
       .single();
 
     if (plateErr) {
       console.error('[admin-provision-customer] plate insert failed:', plateErr);
-      // Roll back the user row so we don't leave an orphaned account behind.
       await supabaseAdmin.from('users').delete().eq('id', user.id);
       return Response.json({ success: false, message: 'Failed to create plate record.' }, { status: 500, headers });
     }
@@ -174,8 +184,7 @@ serve(async (req) => {
         await supabaseAdmin.from('plates').update({ qr_image_url: qrImageUrl, qr_svg_url: qrSvgUrl }).eq('id', plate.id);
       }
     } catch (qrErr) {
-      // Non-fatal — customer + plate already exist; QR can be regenerated later from QR Management.
-      console.error('[admin-provision-customer] QR generation failed:', qrErr);
+      console.error('[admin-provision-customer] QR generation failed (non-fatal):', qrErr);
     }
 
     // ── Optional subscription ──
@@ -198,10 +207,7 @@ serve(async (req) => {
       subscription = sub || null;
     }
 
-    // ── Auto-create security_rules for the new owner ──
-    // Visitor PWA reads security_rules to show night mode / status.
-    // Without this row, getPlateBySlug falls back to defaults (fine), but
-    // creating it here ensures realtime subscriptions and owner dashboard work immediately.
+    // ── Auto-create security_rules ──
     await supabaseAdmin
       .from('security_rules')
       .upsert(
@@ -220,14 +226,65 @@ serve(async (req) => {
         { onConflict: 'owner_id', ignoreDuplicates: true }
       );
 
+    // ── AUTO-CREATE ORDER (ONE SOURCE OF TRUTH — every customer has an order row) ──
+    // Admin-provisioned customers are already "paid + delivered" from business perspective.
+    // This ensures the orders table has a complete record for every customer regardless of source.
+    const orderNumber = makeOrderNumber();
+    const { data: order } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        order_number: orderNumber,
+        owner_id: user.id,
+        plate_id: plateId,
+        product_type: productType,
+        product_price: 0,
+        subscription_price: PLAN_PRICES[plan] ?? 0,
+        shipping_price: 0,
+        total_amount: PLAN_PRICES[plan] ?? 0,
+        payment_status: 'paid',
+        manufacturing_status: 'delivered',
+        tracking_status: 'delivered',
+        fulfilment_status: 'live',    // admin-provisioned = already live
+        order_source: cleanSource,
+        external_order_id: cleanExtOrderId,
+        customer_name: user.full_name,
+        customer_phone: user.phone,
+        customer_email: user.email,
+      })
+      .select()
+      .single();
+
+    // ── AUTO-CREATE MANUFACTURING ROW ──
+    if (order) {
+      await supabaseAdmin.from('manufacturing').insert({
+        order_id: order.id,
+        plate_id: plateId,
+        plate_name: user.full_name,
+        product_type: productType,
+        qr_slug: plateId,
+        qr_png_path: qrImageUrl ? `${plateId}.png` : null,
+        qr_svg_path: qrSvgUrl ? `${plateId}.svg` : null,
+        production_status: 'ready',
+      }).catch((e: Error) => {
+        // Non-fatal — manufacturing row is for internal tracking only.
+        console.warn('[admin-provision-customer] manufacturing insert failed (non-fatal):', e.message);
+      });
+    }
+
     // ── Audit trail ──
     await supabaseAdmin.from('activation_events').insert({
       plate_id: plateId,
       owner_id: user.id,
       event_type: 'activated',
-      event_detail: 'Provisioned via Internal Admin Portal',
+      event_detail: `Provisioned via Internal Admin Portal (source: ${cleanSource})`,
       actor: 'admin',
-      metadata: { provisioned_by: ctx.email, role: ctx.role_name, product_type: productType },
+      metadata: {
+        provisioned_by: ctx.email,
+        role: ctx.role_name,
+        product_type: productType,
+        order_source: cleanSource,
+        external_order_id: cleanExtOrderId,
+      },
     });
 
     await supabaseAdmin.from('admin_audit_logs').insert({
@@ -236,8 +293,16 @@ serve(async (req) => {
       action: 'customer_provisioned',
       resource: 'customers',
       resource_id: user.id,
-      after_data: { full_name: user.full_name, phone: user.phone, plate_id: plateId, product_type: productType, plan },
-      notes: `Customer + plate ${plateId} created by ${ctx.role_name}`,
+      after_data: {
+        full_name: user.full_name,
+        phone: user.phone,
+        plate_id: plateId,
+        product_type: productType,
+        plan,
+        order_source: cleanSource,
+        order_number: orderNumber,
+      },
+      notes: `Customer + plate ${plateId} created by ${ctx.role_name} (source: ${cleanSource})`,
       ip_address: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
       user_agent: req.headers.get('user-agent')?.slice(0, 200) || null,
     });
@@ -254,6 +319,9 @@ serve(async (req) => {
         product_type: productType,
         activation_date: plate.activation_date,
         subscription_plan: plan,
+        order_source: cleanSource,
+        order_number: orderNumber,
+        order_id: order?.id || null,
         qr_url: qrTargetUrl,
         qr_image_url: qrImageUrl,
         qr_svg_url: qrSvgUrl,
