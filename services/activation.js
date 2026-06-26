@@ -2,17 +2,25 @@
  * Smart Door — Activation Engine
  * services/activation.js
  *
- * Phase 11 — Real World Operations
+ * REDESIGN (Activation Fix):
+ *
+ * REMOVED: getActivationPendingInfo()
+ *   This function was querying the `orders` table to generate a status
+ *   message for the visitor pending screen. This was architecturally wrong —
+ *   the visitor page should NEVER depend on orders, manufacturing, or
+ *   subscriptions to determine activation state.
+ *   Activation state lives entirely in the `plates` table (isPlateActive()
+ *   in services/plates.js). The pending screen now shows a simple, honest
+ *   message without any order dependency.
+ *
+ * KEPT: All audit trail, metrics, and admin functions unchanged.
+ *   activatePlateAndLog(), recordRenewal(), recordExpiry(),
+ *   deactivatePlateAndLog(), getPlateActivationHistory(), getActivationMetrics()
+ *   are all preserved — these are admin/backend tools, not visitor-facing.
  *
  * Owns the QR lifecycle audit trail and the activation funnel metrics:
  *   Order Paid → Plate ID Generated → QR Generated → Manufactured →
  *   Delivered → Customer Activates → Visitor Scans → Live Visitor Experience
- *
- * Does NOT modify services/orders.js, services/subscriptions.js, or
- * services/manufacturing.js — it wraps and logs on top of them.
- * New code (admin tools, the visitor route, etc.) should prefer
- * activatePlateAndLog() over calling subscriptions.activateFromOrder()
- * directly so the activation_events audit trail stays complete.
  */
 
 import { supabase } from './supabase.js';
@@ -59,6 +67,13 @@ export async function recordActivationEvent(plateId, ownerId, eventType, opts = 
  * Wraps subscriptions.activateFromOrder() and logs an 'activated' event.
  * Use this from admin tools / the first-login wizard instead of calling
  * subscriptions.activateFromOrder() directly.
+ *
+ * After this completes:
+ *   - plates.status = 'active'
+ *   - plates.activation_date is set
+ *   - plates.owner_id is set
+ *   → isPlateActive() in plates.js will return { active: true }
+ *   → All future QR scans immediately open visitor.html — no pending screen.
  */
 export async function activatePlateAndLog(ownerId, orderId, plateId, plan = 'hardware_only', actor = 'system') {
   const { activateFromOrder } = await import('./subscriptions.js');
@@ -90,6 +105,11 @@ export async function recordRenewal(ownerId, plateId, plan, expiryDate, actor = 
 /**
  * Subscription has crossed past the grace period — call from the renewal
  * engine / a daily cron once the plate is fully locked out.
+ *
+ * NOTE: This records the SUBSCRIPTION expiry, not plate deactivation.
+ * The plate remains status='active'; only subscription features are gated.
+ * isPlateActive() in plates.js will still return true after this.
+ * Grace period UI is handled in gracePeriod.js.
  */
 export async function recordExpiry(ownerId, plateId, actor = 'system') {
   return recordActivationEvent(plateId, ownerId, 'expired', {
@@ -100,6 +120,7 @@ export async function recordExpiry(ownerId, plateId, actor = 'system') {
 
 /**
  * Plate manually deactivated by admin (fraud, refund, support action).
+ * Sets plates.status = 'inactive' → isPlateActive() returns false → pending screen shown.
  */
 export async function deactivatePlateAndLog(plateId, ownerId, reason, actor = 'admin') {
   try {
@@ -133,68 +154,10 @@ export async function getPlateActivationHistory(plateId) {
   }
 }
 
-// ────────── ACTIVATION PENDING INFO (for the visitor "pending" screen) ──────────
-/**
- * When a visitor scans a QR for a plate that isn't active yet, show them
- * an honest "activation pending" screen instead of a dead end — backed by
- * the real order/manufacturing/shipping state, not a generic message.
- */
-export async function getActivationPendingInfo(plateId) {
-  try {
-    const normalized = plateId.toUpperCase();
-
-    const { data: order } = await supabase
-      .from('orders')
-      .select('order_number, payment_status, manufacturing_status, tracking_status, created_at')
-      .eq('plate_id', normalized)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!order) {
-      return { success: true, stage: 'unknown', message: 'This plate is not yet linked to an order.' };
-    }
-
-    const stageMessages = {
-      pending:    'Payment is being processed.',
-      failed:     'Payment failed. Please contact support.',
-      refunded:   'This order was refunded.',
-    };
-
-    if (order.payment_status !== 'paid') {
-      return {
-        success: true,
-        stage: 'awaiting_payment',
-        message: stageMessages[order.payment_status] || 'Order is being processed.',
-        orderNumber: order.order_number,
-      };
-    }
-
-    const mfgMessages = {
-      queued:        'Your Smart Door is queued for production.',
-      in_production: 'Your Smart Door is being manufactured.',
-      packed:        'Your Smart Door is packed and ready to ship.',
-      dispatched:    'Your Smart Door is on the way.',
-      delivered:     'Delivered — waiting for the owner to complete first-login setup.',
-    };
-
-    return {
-      success: true,
-      stage: order.manufacturing_status,
-      message: mfgMessages[order.manufacturing_status] || 'Your Smart Door is being prepared.',
-      orderNumber: order.order_number,
-      trackingStatus: order.tracking_status,
-    };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-}
-
-// ────────── ACTIVATION METRICS (real, computed — no placeholders) ──────────
+// ────────── ACTIVATION METRICS (admin dashboard — unchanged) ──────────
 /**
  * Reads sql/12_real_world_operations.sql:activation_metrics_view.
- * Falls back to a manual computation if the view isn't deployed yet so
- * admin dashboards never silently show zeros without explanation.
+ * Falls back to a manual computation if the view isn't deployed yet.
  */
 export async function getActivationMetrics() {
   try {
@@ -239,7 +202,6 @@ async function _computeActivationMetricsManually() {
     const pendingActivation = (paidOrdersData || []).filter((o) => !activatedSet.has(o.plate_id)).length;
     const activationRatePct = paidOrders > 0 ? Math.round((activatedPlates / paidOrders) * 10000) / 100 : 0;
 
-    // Avg activation time: match paid orders to their plate's activation_date
     const activationByPlate = new Map((activePlates || []).map((p) => [p.plate_id, p.activation_date]));
     const diffs = [];
     for (const o of paidOrdersData || []) {
