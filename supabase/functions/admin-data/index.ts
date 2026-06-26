@@ -711,7 +711,9 @@ serve(async (req) => {
 
     if (type === 'qr_reactivate') {
       const { plate_id: rpid } = body as any;
-      await db.from('plates').update({ status: 'active', updated_at: new Date().toISOString() }).eq('plate_id', rpid);
+      // FIX: isPlateActive() requires activation_date != null. Stamp it here so the
+      // QR scan path (visitorExperience → isPlateActive) resolves to 'ready'.
+      await db.from('plates').update({ status: 'active', activation_date: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('plate_id', rpid);
       await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'qr_reactivate', resource: 'plates', resource_id: rpid });
       return Response.json({ success: true }, { headers });
     }
