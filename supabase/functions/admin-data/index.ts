@@ -626,6 +626,119 @@ serve(async (req) => {
       return Response.json({ success: true, fulfilment_status: to_status }, { headers });
     }
 
+    // ── TICKET HANDLERS ─────────────────────────────────────────────────────
+    if (type === 'ticket_list') {
+      const limit2 = Number((body as any).limit) || 50;
+      const offset2 = Number((body as any).offset) || 0;
+      let q = db.from('support_tickets')
+        .select('id, ticket_number, subject, status, priority, created_at, updated_at, user_id')
+        .order('created_at', { ascending: false })
+        .range(offset2, offset2 + limit2 - 1);
+      if ((body as any).status) q = q.eq('status', (body as any).status);
+      const { data: tdata, error: terr } = await q;
+      if (terr) return Response.json({ success: false, message: terr.message }, { status: 500, headers });
+      return Response.json({ success: true, tickets: tdata || [] }, { headers });
+    }
+
+    if (type === 'ticket_stats') {
+      const { data: tsdata } = await db.from('support_tickets').select('id, status, priority');
+      const ts = tsdata || [];
+      return Response.json({ success: true, stats: {
+        open: ts.filter((x: any) => x.status === 'open').length,
+        pending: ts.filter((x: any) => x.status === 'pending').length,
+        resolved: ts.filter((x: any) => x.status === 'resolved').length,
+        closed: ts.filter((x: any) => x.status === 'closed').length,
+        critical: ts.filter((x: any) => x.priority === 'critical').length,
+        high: ts.filter((x: any) => x.priority === 'high').length,
+      }}, { headers });
+    }
+
+    if (type === 'ticket_detail') {
+      const { data: td } = await db.from('support_tickets').select('*').eq('id', (body as any).ticket_id).maybeSingle();
+      const { data: tc } = await db.from('ticket_comments').select('*').eq('ticket_id', (body as any).ticket_id).order('created_at', { ascending: true });
+      return Response.json({ success: true, ticket: td, comments: tc || [] }, { headers });
+    }
+
+    if (type === 'update_ticket') {
+      const { ticket_id: tid2, updates: tupdates } = body as any;
+      await db.from('support_tickets').update({ ...tupdates, updated_at: new Date().toISOString() }).eq('id', tid2);
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (type === 'add_ticket_comment') {
+      const { ticket_id: tcid, admin_id: taid, content: tcontent, is_internal: tis } = body as any;
+      await db.from('ticket_comments').insert({ ticket_id: tcid, content: tcontent, is_internal: !!tis, author_id: taid || ctx.id, author_type: 'admin', created_at: new Date().toISOString() });
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (type === 'create_ticket') {
+      const { subject: ts2, description: td2, priority: tp2, user_id: tu2, category: tc2 } = body as any;
+      const tnum = 'TKT-' + Date.now().toString(36).toUpperCase();
+      const { data: tnew } = await db.from('support_tickets').insert({ ticket_number: tnum, subject: ts2, description: td2, priority: tp2 || 'medium', status: 'open', user_id: tu2 || null, category: tc2 || 'general', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }).select().single();
+      return Response.json({ success: true, ticket: tnew }, { headers });
+    }
+
+    // ── COMMUNICATION LOGS ──────────────────────────────────────────────────
+    if (type === 'communication_logs') {
+      const climit = Number((body as any).limit) || 100;
+      const ctype = (body as any).type;
+      const logs: any = {};
+      if (!ctype || ctype === 'calls') { const { data } = await db.from('call_logs').select('*').order('created_at', { ascending: false }).limit(climit); logs.calls = data || []; }
+      if (!ctype || ctype === 'messages') { const { data } = await db.from('message_logs').select('*').order('created_at', { ascending: false }).limit(climit); logs.messages = data || []; }
+      if (!ctype || ctype === 'voice_notes') { const { data } = await db.from('voice_notes').select('*').order('created_at', { ascending: false }).limit(climit); logs.voice_notes = data || []; }
+      return Response.json({ success: true, logs }, { headers });
+    }
+
+    // ── ADMIN TEAM ──────────────────────────────────────────────────────────
+    if (type === 'admin_team') {
+      const { data: ateam } = await db.from('admin_users').select('id, email, full_name, is_active, last_login_at, role_id, admin_roles(name, label, color)').order('created_at', { ascending: false });
+      return Response.json({ success: true, team: ateam || [] }, { headers });
+    }
+
+    // ── QR MANAGEMENT ───────────────────────────────────────────────────────
+    if (type === 'qr_search') {
+      const { plate_id: qpid } = body as any;
+      const { data: qplate } = await db.from('plates').select('plate_id, status, qr_image_url, qr_svg_url, owner_id, created_at').eq('plate_id', qpid).maybeSingle();
+      return Response.json({ success: true, plate: qplate }, { headers });
+    }
+
+    if (type === 'qr_deactivate') {
+      const { plate_id: dpid, reason: dreason } = body as any;
+      await db.from('plates').update({ status: 'suspended', updated_at: new Date().toISOString() }).eq('plate_id', dpid);
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'qr_deactivate', resource: 'plates', resource_id: dpid, notes: dreason || 'Admin action' });
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (type === 'qr_reactivate') {
+      const { plate_id: rpid } = body as any;
+      await db.from('plates').update({ status: 'active', updated_at: new Date().toISOString() }).eq('plate_id', rpid);
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'qr_reactivate', resource: 'plates', resource_id: rpid });
+      return Response.json({ success: true }, { headers });
+    }
+
+    // ── MANUFACTURING ────────────────────────────────────────────────────────
+    if (type === 'manufacturing_queue') {
+      const mstatus = (body as any).status;
+      let mq = db.from('manufacturing').select('*, plates(plate_id, status), orders(order_number, total_amount)').order('created_at', { ascending: false });
+      if (mstatus) mq = mq.eq('production_status', mstatus);
+      const { data: mdata } = await mq;
+      return Response.json({ success: true, queue: mdata || [] }, { headers });
+    }
+
+    if (type === 'manufacturing_counts') {
+      const { data: mrows } = await db.from('manufacturing').select('production_status');
+      const mr = mrows || [];
+      const cnt = (s: string) => mr.filter((r: any) => r.production_status === s).length;
+      return Response.json({ success: true, counts: { queued: cnt('queued'), in_production: cnt('in_production'), printing: cnt('printing'), quality_check: cnt('quality_check'), packed: cnt('packed'), ready: cnt('ready'), dispatched: cnt('dispatched'), delivered: cnt('delivered') }}, { headers });
+    }
+
+    if (type === 'update_manufacturing_status') {
+      const { id: muid, status: mustatus } = body as any;
+      await db.from('manufacturing').update({ production_status: mustatus, updated_at: new Date().toISOString() }).eq('id', muid);
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'update_manufacturing_status', resource: 'manufacturing', resource_id: muid, after_data: { production_status: mustatus } });
+      return Response.json({ success: true }, { headers });
+    }
+
     return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });
 
   } catch (err) {
