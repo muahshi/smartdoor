@@ -2,7 +2,7 @@
 // v1.1: fixed a bug where a failed navigation to ANY route (including a
 // visitor's /p/:slug QR link) fell back to the cached owner dashboard
 // (app.html). A visitor must never see app.html, even offline.
-const CACHE_NAME = 'smartdoor-v2';
+const CACHE_NAME = 'smartdoor-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -72,8 +72,10 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses
-        if (response.status === 200) {
+        // NEVER cache navigation requests — /p/:slug URLs would lose ?plate= query param
+        const isNavigation = event.request.mode === 'navigate';
+        const isHtml = (event.request.headers.get('accept') || '').includes('text/html');
+        if (response.status === 200 && !isNavigation && !isHtml) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
