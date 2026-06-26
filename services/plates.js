@@ -36,7 +36,7 @@ export async function isPlateActive(slugOrPlateId) {
     const { data: plate, error } = await supabase
       .from('plates')
       .select('id, plate_id, qr_slug, product_type, status, owner_id, activation_date')
-      .or(`qr_slug.eq.${normalized},plate_id.eq.${normalized}`)
+      .or(`qr_slug.eq."${normalized}",plate_id.eq."${normalized}"`)
       .maybeSingle();
 
     if (error) {
@@ -89,7 +89,7 @@ export async function getPlateBySlug(slugOrPlateId) {
     const { data: plate, error } = await supabase
       .from('plates')
       .select('id, plate_id, qr_slug, product_type, status, owner_id, activation_date')
-      .or(`qr_slug.eq.${normalized},plate_id.eq.${normalized}`)
+      .or(`qr_slug.eq."${normalized}",plate_id.eq."${normalized}"`)
       .maybeSingle();
 
     if (error || !plate) {
