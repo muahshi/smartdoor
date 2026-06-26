@@ -1351,16 +1351,34 @@ function isSuperAdmin(s) { return s?.role === 'super_admin'; }
 function canAccessRevenue(s) { return s?.role !== 'dealer' && (hasPermission(s,'analytics') || isSuperAdmin(s)); }
 
 // ── EDGE CALL ──
+let _authFailCount = 0;
+const _AUTH_FAIL_THRESHOLD = 3; // require 3 consecutive 401s before redirecting
 async function adminCall(type, extra = {}) {
   const s = getAdminSession();
   if (!s) { window.location.href = '/admin-login.html'; return { success: false }; }
+  const edgeBase = EDGE();
+  if (!edgeBase || edgeBase === '/functions/v1') {
+    // __SD_CONFIG__.supabaseUrl is empty — config not loaded
+    console.error('[SmartDoor] supabaseUrl not configured. Check Vercel env vars.');
+    showToast('Configuration error: Supabase URL missing. Contact dev team.', 'error', 10000);
+    return { success: false, error: 'config_missing' };
+  }
   try {
-    const res = await fetch(EDGE() + '/admin-data', {
+    const res = await fetch(edgeBase + '/admin-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s.token}` },
       body: JSON.stringify({ type, ...extra }),
     });
-    if (res.status === 401) { localStorage.removeItem(ADMIN_SESSION_KEY); window.location.href = '/admin-login.html'; return { success: false }; }
+    if (res.status === 401) {
+      _authFailCount++;
+      console.warn('[SmartDoor] 401 on', type, '— fail count:', _authFailCount);
+      if (_authFailCount >= _AUTH_FAIL_THRESHOLD) {
+        localStorage.removeItem(ADMIN_SESSION_KEY);
+        window.location.href = '/admin-login.html';
+      }
+      return { success: false, error: 'auth_401' };
+    }
+    _authFailCount = 0; // reset on any successful response
     const data = await res.json();
     return data?.success ? data : { success: false, error: data?.message || 'Failed' };
   } catch (e) { return { success: false, error: 'Connection error' }; }
