@@ -41,6 +41,14 @@
     {
       "source": "/society-admin.html",
       "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/visitor.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/services/:file*",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     }
   ]
 }
