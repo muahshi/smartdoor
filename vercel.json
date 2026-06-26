@@ -10,25 +10,29 @@
     }
   ],
   "rewrites": [
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/admin-login", "destination": "/admin-login.html" },
-    { "source": "/p/:slug", "destination": "/visitor.html?plate=:slug" },
-    { "source": "/gate/:path*", "destination": "/guard.html" },
+    { "source": "/login",          "destination": "/login.html" },
+    { "source": "/admin-login",    "destination": "/admin-login.html" },
+    { "source": "/app",            "destination": "/app.html" },
+    { "source": "/admin",          "destination": "/admin.html" },
+    { "source": "/onboarding",     "destination": "/onboarding.html" },
+    { "source": "/gate/:path*",    "destination": "/guard.html" },
     { "source": "/society/:path*", "destination": "/society-admin.html" },
-    { "source": "/pass/:code", "destination": "/visitor.html?plate=:code" },
-    { "source": "/app", "destination": "/app.html" },
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/onboarding", "destination": "/onboarding.html" }
+    { "source": "/p/:slug",        "destination": "/visitor.html?plate=:slug" },
+    { "source": "/pass/:code",     "destination": "/visitor.html?plate=:code" }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Frame-Options",        "value": "DENY" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(self), microphone=()" }
+        { "key": "Referrer-Policy",        "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy",     "value": "camera=(self), microphone=()" }
       ]
+    },
+    {
+      "source": "/app.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     },
     {
       "source": "/guard.html",

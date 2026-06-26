@@ -129,7 +129,7 @@
     <h1 style="text-align:center;">You're Live!</h1>
     <p class="sub" style="text-align:center;">Your Smart Door is being manufactured. Once it arrives, scan the QR to activate it.</p>
     <p style="text-align:center; color:rgba(255,255,255,.35); font-size:.8rem; margin-bottom:28px;" id="done-plate-id"></p>
-    <button class="btn" onclick="window.location.href='/login.html'">Go to Dashboard →</button>
+    <button class="btn" onclick="window.location.href='/login'">Go to Dashboard →</button>
   </div>
 
   <!-- STEP: Error -->
@@ -225,7 +225,7 @@
         email:    state.email,
         password: state.pin + state.ownerId.slice(0, 8), // deterministic, PIN-coupled password
         options: {
-          emailRedirectTo: `${window.location.origin}/app.html`,
+          emailRedirectTo: `${window.location.origin}/app`,
           data: { plate_id: state.plateId, owner_id: state.ownerId },
         },
       });
