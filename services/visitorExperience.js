@@ -2,56 +2,86 @@
  * Smart Door — Visitor Experience Orchestrator
  * services/visitorExperience.js
  *
- * Phase 11 — Real World Operations
+ * REDESIGN (Activation Fix):
  *
- * Single entry point for visitor.html (the public /p/:plateId route).
- * Combines: plate lookup, lifecycle/grace-period evaluation, QR-scan
- * logging, and the SOS family-member fan-out RPC — without ever touching
- * services/plates.js, services/communication.js, or RLS-protected tables
- * directly from a new policy. Pure orchestration on top of existing,
- * unmodified building blocks.
+ * Old (broken) flow:
+ *   getPlateBySlug() → fails if status != 'active' → immediately pending_activation
+ *   getActivationPendingInfo() → queries orders table (wrong dependency)
+ *   Result: ALWAYS shows "Activation Pending" even on active plates
+ *
+ * New (correct) flow:
+ *   isPlateActive()    → Single source of truth (owner_id + status + activation_date)
+ *   ↓ not active       → state: 'pending_activation' (no order/subscription lookup)
+ *   ↓ active           → getPlateBySlug() → fetch owner + security rules
+ *                      → evaluate grace period (subscription only, not activation)
+ *                      → state: 'ready'
+ *
+ * The visitor page NEVER depends on: orders, subscriptions, manufacturing, notifications.
+ * Activation is evaluated ONCE via isPlateActive(). Past that gate, it's never re-checked.
+ *
+ * Duplicate activation checks REMOVED from this file:
+ *   - getActivationPendingInfo() call (was querying orders table)
+ *   - Inline status check on getPlateBySlug() failure
+ *   - getSubscriptionForPlate (still present for grace-period UI only, not activation gate)
  */
 
 import { supabase } from './supabase.js';
-import { getPlateBySlug } from './plates.js';
+import { isPlateActive, getPlateBySlug } from './plates.js';
 import { evaluateAccess } from './gracePeriod.js';
-import { getActivationPendingInfo } from './activation.js';
 
 /**
- * Full resolution flow for a visitor scanning /p/:plateId.
- * @param {string} slug
+ * Full resolution flow for a visitor scanning /p/:plateId or /p/:qrSlug.
+ *
+ * @param {string} slugOrPlateId  — value from URL, e.g. "SD-ABX9K7"
  * @returns {{
  *   success: boolean,
- *   state: 'not_found'|'pending_activation'|'ready',
- *   plate?, owner?, securityRules?, subscription?,
- *   access?, pendingInfo?, error?
+ *   state: 'not_found' | 'pending_activation' | 'ready',
+ *   plate?, owner?, securityRules?, subscription?, access?, slug?, error?
  * }}
  */
-export async function resolveVisitorRoute(slug) {
-  const plateResult = await getPlateBySlug(slug);
+export async function resolveVisitorRoute(slugOrPlateId) {
+  const normalized = (slugOrPlateId || '').trim().toUpperCase();
 
-  if (!plateResult.success) {
-    // Plate not found OR found-but-inactive. Distinguish the two so we
-    // can show a proper "activation pending" screen instead of a dead end.
-    const pendingInfo = await getActivationPendingInfo(slug);
+  if (!normalized) {
+    return { success: true, state: 'not_found', slug: '' };
+  }
+
+  // ── STEP 1: Single activation gate ──────────────────────────────────────
+  // isPlateActive() is the ONE place where activation state is evaluated.
+  // It checks: owner_id exists + status='active' + activation_date not null.
+  // If any condition fails, we show pending. We do NOT check orders/subscriptions here.
+  const activationCheck = await isPlateActive(normalized);
+
+  if (!activationCheck.active) {
+    // Plate is genuinely not active. Show pending screen.
+    // reason is for debugging only — not shown to visitor.
     return {
       success: true,
       state: 'pending_activation',
-      pendingInfo: pendingInfo.success ? pendingInfo : null,
-      slug: slug.toUpperCase(),
+      slug: normalized,
+      // No pendingInfo from orders table — activation screen is simple and honest.
     };
   }
 
-  // Log the scan (existing visitor_logs table + event_type already
-  // supports 'qr_scan' — see sql/01_schema.sql).
+  // ── STEP 2: Load visitor experience data ────────────────────────────────
+  // Past the activation gate. Now fetch display data (owner name, security rules).
+  const plateResult = await getPlateBySlug(normalized);
+
+  if (!plateResult.success) {
+    // This should be rare — activation check just confirmed the plate exists.
+    // Could be a brief race or RPC failure. Treat as not_found, not pending.
+    console.error('[VisitorExperience] getPlateBySlug failed after activation confirmed:', plateResult.error);
+    return { success: false, state: 'not_found', slug: normalized, error: plateResult.error };
+  }
+
+  // Log the scan asynchronously — never block visitor render on this.
   _logQrScan(plateResult.owner.id, plateResult.plate.plateId).catch(() => {});
 
-  // getPlateBySlug() filters its subscription lookup on status='active',
-  // which the renewal pipeline doesn't reliably flip on expiry. Read the
-  // real expiry_date via the dedicated RPC instead (see
-  // sql/12_real_world_operations.sql) so grace-period detection works
-  // regardless of that flag's state.
-  const subscription = await _getSubscriptionForPlate(slug);
+  // ── STEP 3: Evaluate subscription grace period (NOT activation) ──────────
+  // Subscription lookup is ONLY used to compute grace-period UI banners and
+  // feature gating (voice notes, etc.). It has NOTHING to do with activation.
+  // hardware_only plates (null subscription) get full access — see gracePeriod.js.
+  const subscription = await _getSubscriptionForPlate(normalized);
 
   const access = evaluateAccess({
     plate: plateResult.plate,
@@ -69,10 +99,11 @@ export async function resolveVisitorRoute(slug) {
   };
 }
 
-async function _getSubscriptionForPlate(slug) {
+// ── Private: subscription for grace-period evaluation only ──────────────────
+async function _getSubscriptionForPlate(slugOrPlateId) {
   try {
     const { data, error } = await supabase
-      .rpc('get_subscription_status_for_plate', { p_plate_id: slug })
+      .rpc('get_subscription_status_for_plate', { p_plate_id: slugOrPlateId })
       .maybeSingle();
     if (error || !data) return null;
     return { plan: data.plan, status: data.status, expiry_date: data.expiry_date };
@@ -81,6 +112,7 @@ async function _getSubscriptionForPlate(slug) {
   }
 }
 
+// ── Private: fire-and-forget QR scan log ────────────────────────────────────
 async function _logQrScan(ownerId, plateId) {
   return supabase.from('visitor_logs').insert({
     owner_id: ownerId,
@@ -92,8 +124,7 @@ async function _logQrScan(ownerId, plateId) {
 
 /**
  * Fetches the minimal family-member fields needed for SOS fan-out via the
- * SECURITY DEFINER RPC (see sql/12_real_world_operations.sql). Never reads
- * family_members directly — that table's RLS stays owner-only.
+ * SECURITY DEFINER RPC. Never reads family_members directly.
  */
 export async function getFamilyMembersForSos(plateId) {
   try {
