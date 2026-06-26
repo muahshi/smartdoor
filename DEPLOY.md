@@ -1,66 +1,115 @@
-# SmartDoor Production Recovery — Deployment Guide
-## File Map
+# SmartDoor — Patch 26: Admin Auth Stabilization
 
-| Patched File | What Changed | Priority |
-|---|---|---|
-| `services/admin.js` | `adminLogin()` now uses raw `fetch()` instead of `supabase.functions.invoke()` — fixes the anon-key-as-Bearer bug that caused every admin API call to return 401 | CRITICAL |
-| `supabase/functions/_shared/adminAuth.ts` | `admin_session_revocations` query wrapped in try/catch — missing table no longer crashes `verifyAdminSession()` | CRITICAL |
-| `visitor.html` | Hinglish AI Receptionist, dual-bubble (Hinglish + English subtitle), auto-speak on response, voiceEnabled defaults ON, ai-subtitle CSS, detectLang(), autoSpeak(), mockClassify with hindi_tts | HIGH |
-| `js/groq.js` | No changes needed — groq.js is correct; visitor.html now inlines the Groq call with the new system prompt | INFO |
-| `sql/21_production_recovery.sql` | Adds missing columns, RLS policies, RPCs, revocations table, indexes | CRITICAL |
-| `sql/21b_storage_rls.sql` | Storage bucket RLS for qr-codes | HIGH |
+## ROOT CAUSE (Confirmed)
 
-## Deployment Order
+**Primary:** `verifyAdminSession()` in `adminAuth.ts` returns `null` because
+`admin_users.session_token` in the DB became stale (nulled or mismatched)
+after the Migration 25 schema changes. Even though the client has a valid
+localStorage token, the DB lookup finds no matching row → returns null →
+`admin-data` returns 401 → `admin.html` line 1363 clears session + redirects.
 
-### 1. Database (Supabase Dashboard > SQL Editor)
-```
-Run: sql/21_production_recovery.sql
-Then: sql/21b_storage_rls.sql (after creating qr-codes bucket)
-```
+**Secondary (contributing):** `admin.html` `adminCall()` had zero tolerance —
+a single 401 from ANY call immediately redirected. Now requires 3 consecutive
+401s before redirecting (prevents false positives from transient errors).
 
-### 2. Storage (Supabase Dashboard > Storage)
-```
-Create bucket: qr-codes
-Public: YES
-File size: 5MB
-```
+**Tertiary:** `admin-data` was missing 14 type handlers called by `admin.html`
+(ticket_list, manufacturing_queue, etc.) — these returned status 400 which
+doesn't redirect, but are now fixed for full panel functionality.
 
-### 3. Edge Functions (supabase CLI)
+---
+
+## DEPLOYMENT ORDER (STRICT)
+
+### STEP 1 — Run SQL Migration 26 (Supabase SQL Editor)
+File: `26_auth_stabilization.sql`
+- Clears all stale session tokens (forces fresh login)
+- Adds performance indexes
+- Verify output shows `with_active_session = 0` after running
+
+### STEP 2 — Deploy Edge Functions
 ```bash
-supabase functions deploy admin-login
-supabase functions deploy admin-data
-supabase functions deploy admin-provision-customer
-supabase functions deploy generate-qr
-supabase functions deploy groq-proxy
+supabase functions deploy admin-data --project-ref YOUR_PROJECT_REF
 ```
-Edge Function secrets must include:
-- SUPABASE_SERVICE_ROLE_KEY
-- APP_URL=https://mysmartdoor.in
+File to deploy: `admin-data__index.ts` → goes to `supabase/functions/admin-data/index.ts`
 
-### 4. Frontend (Vercel)
-Copy these files into your repo and push:
-- services/admin.js → services/admin.js
-- visitor.html → visitor.html
-
-Verify vercel.json has the /p/:slug rewrite:
-```json
-{ "source": "/p/:slug", "destination": "/visitor.html?plate=:slug" }
-```
-
-### 5. QR Backfill (for existing customers)
-For each plate with NULL qr_image_url, call generate-qr:
+Also deploy updated shared auth:
 ```bash
-curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/generate-qr \
-  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"plate_id":"SD-XXXXXX"}'
+# adminAuth.ts goes to supabase/functions/_shared/adminAuth.ts
+# (re-deploy any function that imports it)
+supabase functions deploy admin-login --project-ref YOUR_PROJECT_REF
+supabase functions deploy admin-data --project-ref YOUR_PROJECT_REF
+supabase functions deploy admin-provision-customer --project-ref YOUR_PROJECT_REF
 ```
-Or use Admin Panel > QR Management > Regenerate.
 
-## Quick Verification
-1. Admin login → DevTools Network → admin-login response has `{success:true,token:"..."}`
-2. Dashboard loads → #m-customers shows a number (not blank)
-3. Customer Management loads without "Connection Error"
-4. Create customer → customer appears in list, QR is not broken
-5. Scan QR → visitor.html opens (not app.html), shows correct owner name
-6. AI Receptionist → type "parcel deliver karna hai" → Hinglish reply + auto audio
+### STEP 3 — Deploy Frontend to Vercel
+Files changed:
+- `admin.html` → root of project
+- `config/env.generated.js` → config/env.generated.js (create this file in repo)
+
+**CRITICAL — Verify Vercel env vars are set:**
+Go to Vercel → Project → Settings → Environment Variables
+Required:
+- `SUPABASE_URL` (or `VITE_SUPABASE_URL`)
+- `SUPABASE_ANON_KEY` (or `VITE_SUPABASE_ANON_KEY`)
+
+If these are missing, the build will produce empty `supabaseUrl` and ALL
+API calls will fail silently.
+
+Push to git → Vercel auto-deploys → build runs `node scripts/build-env.js`
+→ writes real values to `config/env.generated.js`.
+
+### STEP 4 — Clear browser localStorage
+After deploy, open browser console on admin-login page and run:
+```js
+localStorage.removeItem('sd_admin_session');
+```
+Then do a fresh login.
+
+---
+
+## VERIFICATION CHECKLIST
+
+- [ ] SQL ran successfully, `with_active_session = 0`
+- [ ] Edge functions deployed
+- [ ] Vercel deploy is green (Ready)
+- [ ] Vercel build logs show: `supabaseUrl: ***` (NOT `(empty)`)
+- [ ] Fresh login on `/admin-login.html` succeeds
+- [ ] Dashboard loads and stays (no redirect loop)
+- [ ] Dashboard metrics show real numbers (not —)
+- [ ] Network tab: `admin-data` POST returns 200 (not 401)
+- [ ] Manufacturing panel loads
+- [ ] Support tickets panel loads
+- [ ] QR management panel loads
+- [ ] No redirect after 5+ minutes on dashboard
+
+---
+
+## ROLLBACK
+
+If regression introduced:
+1. Revert `admin.html` to previous version
+2. Revert `admin-data/index.ts` to previous version
+3. No SQL rollback needed (Migration 26 is additive — only cleared tokens)
+4. Admins will need to re-login regardless (tokens were stale anyway)
+
+---
+
+## FILES CHANGED
+
+| File | Change |
+|------|--------|
+| `admin.html` | `adminCall()` — 3-strike 401 guard, config check |
+| `supabase/functions/admin-data/index.ts` | +14 missing type handlers |
+| `supabase/functions/_shared/adminAuth.ts` | +debug logging on null returns |
+| `config/env.generated.js` | NEW — proper placeholder (build overwrites) |
+| `sql/26_auth_stabilization.sql` | Clear stale tokens + indexes |
+
+---
+
+## DO NOT TOUCH (Unchanged)
+- `admin-login.html` — login logic correct, no change
+- `services/admin.js` — not used by admin.html directly
+- `services/adminData.js` — not used by admin.html directly  
+- `vercel.json` — routing correct, no change
+- `visitor.html` / `app.html` — not affected
+- All other Edge Functions — not affected
