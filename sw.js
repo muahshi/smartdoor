@@ -2,7 +2,7 @@
 // v1.1: fixed a bug where a failed navigation to ANY route (including a
 // visitor's /p/:slug QR link) fell back to the cached owner dashboard
 // (app.html). A visitor must never see app.html, even offline.
-const CACHE_NAME = 'smartdoor-v3';
+const CACHE_NAME = 'smartdoor-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
