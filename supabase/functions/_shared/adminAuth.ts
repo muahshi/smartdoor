@@ -45,7 +45,18 @@ export async function verifyAdminSession(
     .eq('session_token', token)
     .maybeSingle();
 
-  if (error || !admin || !admin.is_active) return null;
+  if (error) {
+    console.error('[adminAuth] DB error looking up session_token:', error.message);
+    return null;
+  }
+  if (!admin) {
+    console.warn('[adminAuth] No admin found for token — user must re-login after schema changes');
+    return null;
+  }
+  if (!admin.is_active) {
+    console.warn('[adminAuth] Admin account inactive:', admin.email);
+    return null;
+  }
   if (!admin.session_exp || new Date(admin.session_exp).getTime() < Date.now()) return null;
 
   // Check revocation list (e.g. password changed, admin disabled mid-session).
