@@ -18,4 +18,3 @@ window.__SD_CONFIG__ = {
   "buildTime": "2026-06-26T00:00:00.000Z",
   "buildEnv": "production"
 };
-
