@@ -529,7 +529,7 @@
       const { data: plate, error: plateErr } = await supabase
         .from('plates')
         .select('id, plate_id, qr_slug, product_type, owner_id')
-        .or(`qr_slug.eq.${plateSlug},plate_id.eq.${plateSlug}`)
+        .or(`qr_slug.eq."${plateSlug}",plate_id.eq."${plateSlug}"`)
         .maybeSingle();
 
       if (plateErr || !plate || !plate.owner_id) {
