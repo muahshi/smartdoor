@@ -525,7 +525,7 @@
     if (!result.success) { renderPending({ slug: plateSlug }); return; }
     state = result;
     if (state.state === 'pending_activation') {
-      renderPending(state);
+      renderPending({ ...state, slug: plateSlug });
     } else {
       renderVisitorExperience(state);
       unsubscribeStatus = subscribeToStatusChanges(state.owner.id, (rules) => {
