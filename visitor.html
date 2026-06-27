@@ -591,10 +591,12 @@
       };
 
       // Log scan async — never block render
-      supabase.from('visitor_logs').insert({
-        owner_id: plate.owner_id, plate_id: plate.plate_id,
-        event_type: 'qr_scan', user_agent: navigator.userAgent,
-      }).catch(() => {});
+      try {
+        supabase.from('visitor_logs').insert({
+          owner_id: plate.owner_id, plate_id: plate.plate_id,
+          event_type: 'qr_scan', user_agent: navigator.userAgent,
+        });
+      } catch (_) {}
 
       renderVisitorExperience(state);
 
