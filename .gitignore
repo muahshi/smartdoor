@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Generated at build time — NEVER commit, contains secrets
+config/env.generated.js
+
+# Local env files
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
