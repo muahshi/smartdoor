@@ -841,11 +841,16 @@
     });
   }
 
+  let _aiSending = false; // double-submit guard
   async function handleAISend(s) {
+    if (_aiSending) return;
     const input = document.getElementById('ai-input');
     const text = input?.value?.trim();
     if (!text) return;
+    _aiSending = true;
     input.value = '';
+    const sendBtn = document.getElementById('ai-send');
+    if (sendBtn) sendBtn.disabled = true;
 
     appendAIMsg(text, 'user');
 
@@ -921,6 +926,11 @@
         messageType: intentData.priority === 'Critical' ? 'emergency' : 'text',
       }).catch(() => {});
     }
+
+    // Release double-submit guard
+    _aiSending = false;
+    const _sendBtn = document.getElementById('ai-send');
+    if (_sendBtn) _sendBtn.disabled = false;
   }
 
   function appendAIMsg(text, role, color) {
