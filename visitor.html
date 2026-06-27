@@ -526,11 +526,27 @@
     try {
       // Direct fetch — no isPlateActive gate, no activation check
       // Visitor always sees experience if plate + owner_id exists in DB
-      const { data: plate, error: plateErr } = await supabase
+      // Try qr_slug first, fallback to plate_id
+      let plate = null;
+      let plateErr = null;
+
+      const res1 = await supabase
         .from('plates')
         .select('id, plate_id, qr_slug, product_type, owner_id')
-        .or(`qr_slug.eq."${plateSlug}",plate_id.eq."${plateSlug}"`)
+        .eq('qr_slug', plateSlug)
         .maybeSingle();
+
+      if (res1.data) {
+        plate = res1.data;
+      } else {
+        const res2 = await supabase
+          .from('plates')
+          .select('id, plate_id, qr_slug, product_type, owner_id')
+          .eq('plate_id', plateSlug)
+          .maybeSingle();
+        plate = res2.data;
+        plateErr = res2.error;
+      }
 
       if (plateErr || !plate || !plate.owner_id) {
         renderNotFound();
