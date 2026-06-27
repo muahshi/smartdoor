@@ -290,7 +290,7 @@
     if (result.success) {
       loginBtn.innerHTML = '✅ Login successful!';
       const _rp = new URLSearchParams(window.location.search);
-      const _rplate = _rp.get('plate') || _rp.get('from_plate');
+      const _rplate = _rp.get('from_plate'); // only redirect to visitor if explicitly from_plate param — never plain 'plate'
       setTimeout(() => { window.location.href = _rplate ? '/visitor.html?plate=' + _rplate : '/app'; }, 600);
     } else {
       showError(result.error || 'Login failed. Please try again.');
