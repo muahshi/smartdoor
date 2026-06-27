@@ -289,7 +289,9 @@
 
     if (result.success) {
       loginBtn.innerHTML = '✅ Login successful!';
-      setTimeout(() => { window.location.href = '/app'; }, 600);
+      const _rp = new URLSearchParams(window.location.search);
+      const _rplate = _rp.get('plate') || _rp.get('from_plate');
+      setTimeout(() => { window.location.href = _rplate ? '/visitor.html?plate=' + _rplate : '/app'; }, 600);
     } else {
       showError(result.error || 'Login failed. Please try again.');
       loginBtn.disabled  = false;
