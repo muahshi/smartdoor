@@ -117,12 +117,16 @@ export async function dispatch({ ownerId, type, title, body, payload = {}, prior
     .then(() => {})
     .catch(() => {});
 
-  // Audit trail
-  supabase.from('audit_logs').insert({
-    owner_id: ownerId,
-    action: 'notification_sent',
-    details: { type, channels, deliveryStatus },
-  }).then(() => {}).catch(() => {});
+  // Audit trail — only authenticated owners can write audit_logs (RLS enforced)
+  // Visitor (anon) calls skip this silently to avoid 400 errors
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (!session) return; // anon visitor — skip
+    supabase.from('audit_logs').insert({
+      owner_id: ownerId,
+      action: 'notification_sent',
+      details: { type, channels, deliveryStatus },
+    }).then(() => {}).catch(() => {});
+  });
 
   return { success: true, notification: created.notification, deliveryStatus };
 }

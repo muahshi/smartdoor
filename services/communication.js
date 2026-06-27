@@ -24,9 +24,12 @@ import * as twilio from './twilio.js';
 // appended here — nothing else in this file needs to change.
 const PROVIDERS = [exotel, twilio];
 
-// ────────── AUDIT LOGGING (fail-silent, mirrors services/auth.js pattern) ──────────
+// ────────── AUDIT LOGGING (fail-silent, authenticated only) ──────────
 async function _audit(ownerId, action, details = {}) {
   try {
+    // audit_logs RLS requires auth.uid() = owner_id — skip for anon visitors
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
     await supabase.from('audit_logs').insert({
       owner_id: ownerId,
       action,
