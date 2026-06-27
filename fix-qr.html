@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fix QR Codes</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+h2 { color: #fff; margin-bottom: 8px; }
+.sub { color: #94a3b8; font-size: 0.85rem; margin-bottom: 20px; }
+.row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #1e293b; }
+.pid { font-weight: 600; font-family: monospace; }
+.badge { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; background: #1e293b; color: #64748b; }
+.badge.ok { background: #14532d; color: #86efac; }
+.badge.err { background: #7f1d1d; color: #fca5a5; }
+.badge.run { background: #1e3a8a; color: #93c5fd; }
+button { width: 100%; background: #2563eb; color: #fff; border: none; border-radius: 8px; padding: 12px; font-size: 1rem; cursor: pointer; margin-top: 16px; }
+button:disabled { background: #1e293b; color: #475569; }
+.log { background: #020617; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 0.72rem; font-family: monospace; color: #94a3b8; max-height: 180px; overflow-y: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h2>🔧 SmartDoor — Fix QR Codes</h2>
+<p class="sub">Sabhi plates ka QR regenerate karega correct mysmartdoor.in/p/PLATE URL ke saath</p>
+
+<div id="list">Loading...</div>
+<button id="btn" onclick="runAll()">🚀 Regenerate All QR Codes</button>
+<div class="log" id="log">Ready.\n</div>
+
+<script>
+const SUPA_URL  = 'https://auyapulcqkhuizqsbzol.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1eWFwdWxjcWtodWl6cXNiem9sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjA2NzEsImV4cCI6MjA5NzI5NjY3MX0.84XwozWRwbvGjjv0hZIh3HYrFN-rMlPZwmb8025qSlU';
+const EDGE      = `${SUPA_URL}/functions/v1/admin-plate-status`;
+
+let plates = [];
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+function badge(id, cls, txt) {
+  const el = document.getElementById('b-' + id);
+  if (el) { el.className = 'badge ' + cls; el.textContent = txt; }
+}
+
+function getToken() {
+  for (const k of Object.keys(localStorage)) {
+    try {
+      const v = JSON.parse(localStorage.getItem(k));
+      if (v?.access_token) return v.access_token;
+      if (v?.session?.access_token) return v.session.access_token;
+      // Supabase v2 format
+      if (typeof v === 'object' && v !== null) {
+        const str = JSON.stringify(v);
+        const m = str.match(/"access_token":"(eyJ[^"]+)"/);
+        if (m) return m[1];
+      }
+    } catch(e) {}
+  }
+  return null;
+}
+
+async function loadPlates() {
+  const r = await fetch(`${SUPA_URL}/rest/v1/plates?select=plate_id,status&order=created_at.desc`, {
+    headers: { 'apikey': SUPA_ANON, 'Authorization': 'Bearer ' + SUPA_ANON }
+  });
+  plates = await r.json();
+  document.getElementById('list').innerHTML = plates.map(p =>
+    `<div class="row"><span class="pid">${p.plate_id}</span><span class="badge" id="b-${p.plate_id}">Pending</span></div>`
+  ).join('');
+  log(`${plates.length} plates loaded.`);
+}
+
+async function runAll() {
+  const btn = document.getElementById('btn');
+  btn.disabled = true; btn.textContent = '⏳ Processing...';
+
+  const token = getToken();
+  if (!token) {
+    log('❌ Admin token nahi mila!\nPehle mysmartdoor.in/adm pe login karo, phir is page pe aao.');
+    btn.disabled = false; btn.textContent = '🚀 Regenerate All QR Codes';
+    return;
+  }
+  log('✅ Admin token mila.');
+
+  for (const p of plates) {
+    badge(p.plate_id, 'run', 'Running...');
+    log(`→ ${p.plate_id}...`);
+    try {
+      const r = await fetch(EDGE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ plate_id: p.plate_id, action: 'regenerate_qr' })
+      });
+      const d = await r.json();
+      if (d.success) { badge(p.plate_id, 'ok', '✓ Done'); log(`  ✅ ${p.plate_id} done`); }
+      else { badge(p.plate_id, 'err', 'Error'); log(`  ❌ ${p.plate_id}: ${d.message}`); }
+    } catch(e) {
+      badge(p.plate_id, 'err', 'Error'); log(`  ❌ ${p.plate_id}: ${e.message}`);
+    }
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  btn.textContent = '✅ All Done! Ab QR scan karo.';
+  log('\n🎉 Complete! Naya QR scan karo test ke liye.');
+}
+
+loadPlates();
+</script>
+</body>
+</html>
