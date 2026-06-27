@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartDoor — Bulk QR Regenerate</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 24px; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; color: #fff; }
+  p  { font-size: 0.85rem; color: #94a3b8; margin-bottom: 24px; }
+  .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .plate-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #334155; }
+  .plate-row:last-child { border-bottom: none; }
+  .plate-id { font-weight: 600; font-size: 0.95rem; }
+  .status { font-size: 0.8rem; padding: 3px 10px; border-radius: 20px; }
+  .status.pending  { background: #334155; color: #94a3b8; }
+  .status.running  { background: #1d4ed8; color: #fff; }
+  .status.success  { background: #166534; color: #86efac; }
+  .status.error    { background: #7f1d1d; color: #fca5a5; }
+  button { background: #3b82f6; color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 0.9rem; cursor: pointer; width: 100%; margin-top: 16px; }
+  button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+  .log { background: #0f172a; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 0.75rem; color: #94a3b8; max-height: 200px; overflow-y: auto; font-family: monospace; }
+  .warn { background: #451a03; border: 1px solid #92400e; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 0.82rem; color: #fcd34d; }
+</style>
+</head>
+<body>
+
+<h1>🔄 Bulk QR Regenerate</h1>
+<p>Sabhi plates ka QR correct mysmartdoor.in/p/PLATE-ID URL ke saath regenerate karta hai</p>
+
+<div class="warn">
+  ⚠️ Yeh page sirf admin session ke saath kaam karega. Pehle <a href="/adm" style="color:#fbbf24">admin panel</a> mein login karo, phir yahan aao.
+</div>
+
+<div class="card">
+  <div id="plate-list">Loading plates...</div>
+  <button id="run-btn" onclick="runAll()">🚀 Regenerate All QR Codes</button>
+</div>
+
+<div class="log" id="log">Ready...\n</div>
+
+<script type="module">
+// ── Config from env ──
+const CFG = window.__SD_CONFIG__;
+if (!CFG?.supabaseUrl || !CFG?.supabaseAnon) {
+  document.getElementById('plate-list').innerHTML = '<span style="color:#f87171">❌ Config not loaded. Check env.generated.js</span>';
+}
+
+const SUPABASE_URL  = CFG?.supabaseUrl;
+const SUPABASE_ANON = CFG?.supabaseAnon;
+const EDGE_BASE     = `${SUPABASE_URL}/functions/v1`;
+
+let plates = [];
+
+function log(msg) {
+  const el = document.getElementById('log');
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+function setStatus(plateId, cls, text) {
+  const el = document.getElementById('s-' + plateId);
+  if (el) { el.className = 'status ' + cls; el.textContent = text; }
+}
+
+async function getAdminToken() {
+  // Read from localStorage where admin panel stores session
+  const keys = Object.keys(localStorage);
+  for (const k of keys) {
+    try {
+      const val = JSON.parse(localStorage.getItem(k));
+      if (val?.access_token) return val.access_token;
+      if (val?.session?.access_token) return val.session.access_token;
+    } catch {}
+  }
+  return null;
+}
+
+async function loadPlates() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/plates?select=plate_id,status&order=created_at.desc`, {
+    headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` }
+  });
+  plates = await res.json();
+  
+  const container = document.getElementById('plate-list');
+  if (!plates.length) { container.innerHTML = '<span style="color:#f87171">No plates found</span>'; return; }
+  
+  container.innerHTML = plates.map(p => `
+    <div class="plate-row">
+      <span class="plate-id">${p.plate_id}</span>
+      <span class="status pending" id="s-${p.plate_id}">Pending</span>
+    </div>
+  `).join('');
+  
+  log(`Loaded ${plates.length} plates`);
+}
+
+window.runAll = async function() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Running...';
+  
+  const token = await getAdminToken();
+  if (!token) {
+    log('❌ Admin token not found. Login to admin panel first, then reload this page.');
+    btn.disabled = false; btn.textContent = '🚀 Regenerate All QR Codes';
+    return;
+  }
+  
+  log(`Admin token found ✅`);
+  
+  for (const plate of plates) {
+    const pid = plate.plate_id;
+    setStatus(pid, 'running', 'Running...');
+    log(`→ Regenerating ${pid}...`);
+    
+    try {
+      const res = await fetch(`${EDGE_BASE}/admin-plate-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ plate_id: pid, action: 'regenerate_qr' })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setStatus(pid, 'success', '✓ Done');
+        log(`  ✅ ${pid} — QR regenerated`);
+      } else {
+        setStatus(pid, 'error', 'Error');
+        log(`  ❌ ${pid} — ${data.message}`);
+      }
+    } catch (err) {
+      setStatus(pid, 'error', 'Error');
+      log(`  ❌ ${pid} — ${err.message}`);
+    }
+    
+    await new Promise(r => setTimeout(r, 500)); // 500ms gap between calls
+  }
+  
+  btn.textContent = '✅ Done!';
+  log('\n🎉 All plates processed. Test QR scan karo ab.');
+};
+
+loadPlates();
+</script>
+
+<script src="/config/env.generated.js"></script>
+</body>
+</html>
