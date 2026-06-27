@@ -518,7 +518,16 @@
   let state = null;
   let unsubscribeStatus = null;
 
-  init();
+  // Wait for __SD_CONFIG__ to be available before init
+  // env.generated.js loads via <script src> before this module,
+  // but on slow connections it may not be parsed yet.
+  function waitForConfig(cb, tries = 0) {
+    if (window.__SD_CONFIG__?.supabaseUrl) { cb(); return; }
+    if (tries > 20) { renderNotFound(); return; } // 2s timeout
+    setTimeout(() => waitForConfig(cb, tries + 1), 100);
+  }
+
+  waitForConfig(init);
 
   async function init() {
     if (!plateSlug) { renderNotFound(); return; }
