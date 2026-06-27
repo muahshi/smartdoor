@@ -7,7 +7,6 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#060d1a" />
   <title>Smart Door</title>
-  <base href="/" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -435,8 +434,14 @@
   import { isNightModeActive } from './services/security.js';
 
   const shell = document.getElementById('shell');
+
+  // Extract plate slug from BOTH sources:
+  // 1. Query param: visitor.html?plate=SD-UMBAU4 (direct URL)
+  // 2. Path: /p/SD-UMBAU4 (Vercel rewrite — browser sees path, not ?plate=)
   const params = new URLSearchParams(window.location.search);
-  const plateSlug = (params.get('plate') || '').trim().toUpperCase();
+  const slugFromQuery = params.get('plate') || '';
+  const slugFromPath  = (window.location.pathname.match(/\/p\/([A-Z0-9-]+)/i) || [])[1] || '';
+  const plateSlug = (slugFromQuery || slugFromPath).trim().toUpperCase();
 
   // ── TTS: Hindi female voice AI receptionist ──
   let voiceEnabled = true; // Default ON — auto-speak after user's first interaction (browser gesture)
@@ -575,7 +580,7 @@
       state = {
         success: true,
         plate: { id: plate.id, plateId: plate.plate_id, productType: plate.product_type },
-        owner: { id: plate.owner_id, name: ownerRes.data?.full_name || 'Resident' },
+        owner: { id: plate.owner_id, name: (Array.isArray(ownerRes.data) ? ownerRes.data[0]?.full_name : ownerRes.data?.full_name) || 'Resident' },
         securityRules: rulesRes.data || {
           night_mode_on: false, allow_sos: true, allow_voice: true,
           allow_calls: true, call_forwarding: true,
