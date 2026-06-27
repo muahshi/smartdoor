@@ -426,7 +426,8 @@
 </div>
 
 <script type="module">
-  import { resolveVisitorRoute, getFamilyMembersForSos } from './services/visitorExperience.js';
+  import { getFamilyMembersForSos } from './services/visitorExperience.js';
+  import { supabase } from './services/supabase.js';
   import { initiateMaskedCall, sendTextMessage, triggerEmergency } from './services/communication.js';
   import { notifyBellRing } from './services/notifications.js';
   import { VoiceRecorder, uploadVoiceNote } from './services/voiceNotes.js';
@@ -520,31 +521,70 @@
   init();
 
   async function init() {
-    if (!plateSlug) { renderPending({ slug: '' }); return; }
-    const result = await resolveVisitorRoute(plateSlug);
-    if (!result.success) { renderPending({ slug: plateSlug }); return; }
-    state = result;
-    if (state.state === 'pending_activation') {
-      renderPending({ ...state, slug: plateSlug });
-    } else {
+    if (!plateSlug) { renderNotFound(); return; }
+
+    try {
+      // Direct fetch — no isPlateActive gate, no activation check
+      // Visitor always sees experience if plate + owner_id exists in DB
+      const { data: plate, error: plateErr } = await supabase
+        .from('plates')
+        .select('id, plate_id, qr_slug, product_type, owner_id')
+        .or(`qr_slug.eq.${plateSlug},plate_id.eq.${plateSlug}`)
+        .maybeSingle();
+
+      if (plateErr || !plate || !plate.owner_id) {
+        renderNotFound();
+        return;
+      }
+
+      // Fetch owner name + security rules in parallel
+      const [ownerRes, rulesRes] = await Promise.all([
+        supabase.rpc('get_owner_display_for_plate', { p_plate_id: plate.plate_id }),
+        supabase
+          .from('security_rules')
+          .select('night_mode_on, night_mode_start, night_mode_end, allow_sos, allow_voice, allow_calls, call_forwarding, current_status, custom_message')
+          .eq('owner_id', plate.owner_id)
+          .maybeSingle(),
+      ]);
+
+      state = {
+        success: true,
+        plate: { id: plate.id, plateId: plate.plate_id, productType: plate.product_type },
+        owner: { id: plate.owner_id, name: ownerRes.data?.full_name || 'Resident' },
+        securityRules: rulesRes.data || {
+          night_mode_on: false, allow_sos: true, allow_voice: true,
+          allow_calls: true, call_forwarding: true,
+          current_status: 'available', custom_message: null,
+        },
+        access: { allowCall: true, allowVoice: true, allowSos: true, allowText: true },
+      };
+
+      // Log scan async — never block render
+      supabase.from('visitor_logs').insert({
+        owner_id: plate.owner_id, plate_id: plate.plate_id,
+        event_type: 'qr_scan', user_agent: navigator.userAgent,
+      }).catch(() => {});
+
       renderVisitorExperience(state);
+
       unsubscribeStatus = subscribeToStatusChanges(state.owner.id, (rules) => {
         state.securityRules = { ...state.securityRules, ...rules };
         updateStatusBadge();
         updateNightBanner();
       });
+
+    } catch (err) {
+      console.error('[visitor] init error:', err);
+      renderNotFound();
     }
   }
 
-  // ── Pending screen ──
-  function renderPending(info) {
+  function renderNotFound() {
     shell.innerHTML = `
       <div class="pending-wrap">
         <div class="pending-icon">🚪</div>
-        <div class="pending-title">Activation Pending</div>
-        <div class="pending-sub">This Smart Door plate isn't active yet. If you're the resident, finish setup by logging in below.</div>
-        ${info.pendingInfo ? `<div class="pending-stage">${_esc(info.pendingInfo.message || '')}</div>` : ''}
-        <a href="/login${info.slug ? '?plate=' + encodeURIComponent(info.slug) : ''}" style="margin-top:20px;color:#00A2E8;font-size:0.85rem;font-weight:600;text-decoration:none;">Owner? Login to activate →</a>
+        <div class="pending-title" style="color:#f87171;">Plate Not Found</div>
+        <div class="pending-sub">This Smart Door plate doesn't exist. Please check the QR code or contact support.</div>
         <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
       </div>`;
   }
