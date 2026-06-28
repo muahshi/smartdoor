@@ -215,6 +215,10 @@ const DashboardModule = (() => {
   }
 
   async function _refreshData() {
+    if (!state.owner) {
+      state.owner = await getCurrentOwner();
+      if (!state.owner) return;
+    }
     await _loadAllData();
     renderFamilyMembers();
     renderVisitorLogs();
