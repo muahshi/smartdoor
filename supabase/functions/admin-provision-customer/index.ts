@@ -271,6 +271,21 @@ serve(async (req) => {
       });
     }
 
+    // ── Welcome notification (Workflow 8 — auto-notify on customer created) ──
+    await supabaseAdmin.from('notifications').insert({
+      owner_id: user.id,
+      type: 'system',
+      title: '🎉 Welcome to Smart Door!',
+      body: `Your Smart Door plate ${plateId} is ready. Scan the QR code on your plate to get started.`,
+      priority: 'normal',
+      channels: ['in_app'],
+      delivery_status: { in_app: 'sent' },
+      read: false,
+    }).catch((e: Error) => {
+      // Non-fatal — welcome notification failure must not block provisioning.
+      console.warn('[admin-provision-customer] welcome notification failed (non-fatal):', e.message);
+    });
+
     // ── Audit trail ──
     await supabaseAdmin.from('activation_events').insert({
       plate_id: plateId,
