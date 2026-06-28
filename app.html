@@ -417,14 +417,20 @@
 <!-- AUTH GUARD: Owner-only page. Redirect to /login if no valid session. -->
 <script type="module">
   import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-  (async function guardOwnerRoute() {
+  // Wait for env.generated.js to populate window.__SD_CONFIG__
+  // env.generated.js is a sync <script src> loaded before this module,
+  // but on slow connections it may not be parsed yet. Poll up to 2s.
+  function waitForConfig(cb, tries = 0) {
+    if (window.__SD_CONFIG__?.supabaseUrl) { cb(); return; }
+    if (tries > 20) {
+      console.error('[Guard] Config timeout — cannot verify session. Check Vercel env vars.');
+      return; // Do NOT redirect on config failure — avoids login loops
+    }
+    setTimeout(() => waitForConfig(cb, tries + 1), 100);
+  }
+  waitForConfig(async function guardOwnerRoute() {
     try {
       const cfg = window.__SD_CONFIG__;
-      if (!cfg?.supabaseUrl || !cfg?.supabaseAnon) {
-        // Config not loaded — env issue, don't redirect (would loop)
-        console.error('[Guard] Missing SD config — cannot verify session.');
-        return;
-      }
       const client = createClient(cfg.supabaseUrl, cfg.supabaseAnon, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
       });
@@ -437,7 +443,7 @@
       console.error('[Guard] Auth check failed:', e);
       // On error, do NOT redirect (avoid login loops on transient failures)
     }
-  })();
+  });
 </script>
 
 <!-- ════════════════════════════════════════
