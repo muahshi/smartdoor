@@ -17,6 +17,7 @@ import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from 
 import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from '../services/logs.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
+import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
 import { getOrderSummary, subscribeToOrderTracking } from '../services/orders.js';
 import { getCommunicationLogs, subscribeToCommunicationLogs } from '../services/communication.js';
 import { getVoiceNoteUrl } from '../services/voiceNotes.js';
@@ -39,6 +40,7 @@ const DashboardModule = (() => {
     intentBreakdown: {},
     subscription: null,
     orderSummary: null,          // Phase 6: latest order tracking
+    onboarding: null,            // Setup checklist progress
     _realtimeUnsubs: [],
   };
 
@@ -94,7 +96,8 @@ const DashboardModule = (() => {
     setupSecurityTimeline();
     updateSubscriptionDays();
 
-    // Phase 6: Order tracking card dikhao agar order hai
+    // Setup checklist — new owner onboarding guidance
+    await _loadAndRenderSetupChecklist();
     if (state.orderSummary && state.orderSummary.manufacturingStatus !== 'delivered') {
       const trackCard = document.getElementById('order-tracking-card');
       if (trackCard) trackCard.style.display = 'block';
@@ -444,6 +447,9 @@ const DashboardModule = (() => {
       });
       renderFamilyMembers();
       showToast(`${name} added to family routing`, 'success');
+      // Mark onboarding step
+      markOnboardingStep(state.owner.id, 'family_setup').catch(() => {});
+      _loadAndRenderSetupChecklist();
     } else {
       showToast(result.error || 'Failed to add member', 'danger');
     }
@@ -647,6 +653,9 @@ const DashboardModule = (() => {
         // Persist
         if (state.owner) {
           await updateOwnerStatus(state.owner.id, state.currentStatus);
+          // Mark onboarding step
+          markOnboardingStep(state.owner.id, 'status_setup').catch(() => {});
+          _loadAndRenderSetupChecklist();
         }
       });
     });
@@ -871,6 +880,127 @@ const DashboardModule = (() => {
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
+
+  // ────────── SETUP CHECKLIST (First-time owner onboarding) ──────────
+
+  async function _loadAndRenderSetupChecklist() {
+    try {
+      const ownerId = state.owner?.id;
+      if (!ownerId) return;
+
+      const result = await getOnboardingProgress(ownerId);
+      if (!result.success) return;
+
+      state.onboarding = result.onboarding;
+
+      // Only show if owner has not completed the 3 key in-app steps
+      const CHECKLIST_STEPS = ['status_setup', 'family_setup', 'first_visitor_scan'];
+      const pending = CHECKLIST_STEPS.filter(key => {
+        const step = state.onboarding.steps.find(s => s.key === key);
+        return step && !step.done;
+      });
+
+      if (pending.length === 0) {
+        // All done — hide card
+        ['setup-checklist-card', 'setup-checklist-card-desktop'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = 'none';
+        });
+        return;
+      }
+
+      _renderSetupChecklist(state.onboarding, CHECKLIST_STEPS);
+    } catch (e) {
+      console.warn('[Dashboard] Setup checklist load failed:', e.message);
+    }
+  }
+
+  function _renderSetupChecklist(onboarding, keys) {
+    const steps = keys.map(key => onboarding.steps.find(s => s.key === key)).filter(Boolean);
+    const completedCount = steps.filter(s => s.done).length;
+    const totalCount = steps.length;
+    const pct = Math.round((completedCount / totalCount) * 100);
+
+    const stepHTML = steps.map(s => {
+      const done = s.done;
+      const actions = {
+        status_setup:        { label: 'Set your status',      tab: 'settings', icon: '💬' },
+        family_setup:        { label: 'Add a family member',  tab: 'settings', icon: '👨‍👩‍👧' },
+        first_visitor_scan:  { label: 'Test your QR code',    tab: null,        icon: '📱', isQR: true },
+      };
+      const a = actions[s.key] || { label: s.label, icon: '⚙️' };
+
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;
+            background:${done ? 'linear-gradient(135deg,#22C55E,#16A34A)' : 'rgba(255,255,255,0.07)'};
+            border:1.5px solid ${done ? '#22C55E' : 'rgba(255,255,255,0.15)'};
+            display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:#fff;">
+            ${done ? '✓' : a.icon}
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:0.8rem;color:${done ? 'rgba(255,255,255,0.35)' : '#fff'};
+              font-weight:${done ? '400' : '600'};
+              text-decoration:${done ? 'line-through' : 'none'};
+              font-family:'Space Grotesk',sans-serif;">
+              ${a.label}
+            </div>
+          </div>
+          ${!done ? `<button onclick="_setupChecklistAction('${s.key}')" style="
+            padding:4px 10px;border-radius:6px;font-size:0.7rem;font-weight:700;cursor:pointer;
+            background:rgba(0,162,232,0.12);border:1px solid rgba(0,162,232,0.3);
+            color:#00A2E8;font-family:'Space Grotesk',sans-serif;white-space:nowrap;">
+            Do it →
+          </button>` : ''}
+        </div>`;
+    }).join('');
+
+    const cardHTML = `
+      <div style="padding:14px 16px;border-radius:14px;margin-bottom:14px;
+        background:linear-gradient(135deg,rgba(0,162,232,0.08),rgba(99,102,241,0.05));
+        border:1px solid rgba(0,162,232,0.2);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">
+            🚀 Setup Your Smart Door
+          </div>
+          <div style="font-size:0.72rem;color:#00A2E8;font-weight:700;font-family:'Space Grotesk',sans-serif;">
+            ${completedCount}/${totalCount} done
+          </div>
+        </div>
+        <div style="height:4px;border-radius:4px;background:rgba(255,255,255,0.07);margin-bottom:14px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;border-radius:4px;
+            background:linear-gradient(90deg,#00A2E8,#6366F1);transition:width 0.5s ease;"></div>
+        </div>
+        ${stepHTML}
+      </div>`;
+
+    ['setup-checklist-card', 'setup-checklist-card-desktop'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.innerHTML = cardHTML;
+        el.style.display = 'block';
+      }
+    });
+  }
+
+  // Called by inline onclick buttons in checklist
+  window._setupChecklistAction = function(stepKey) {
+    if (stepKey === 'status_setup' || stepKey === 'family_setup') {
+      // Switch to Settings tab (mobile)
+      const settingsTab = document.querySelector('[data-tab="settings"]');
+      if (settingsTab) settingsTab.click();
+      // Scroll to relevant section
+      setTimeout(() => {
+        const target = stepKey === 'family_setup'
+          ? document.getElementById('family-members-list')
+          : document.querySelector('.status-option');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 200);
+    } else if (stepKey === 'first_visitor_scan') {
+      // Show QR test instruction toast
+      showToast('📱 Open your Smart Door QR link in another browser tab to test!', 'info');
+    }
+  };
 
   // ────────── VOICE NOTE PLAYBACK ──────────
   async function playVoiceNote(storagePath) {
