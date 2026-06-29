@@ -2063,4 +2063,31 @@ window.submitCreateCustomer = async function() {
   if(!hasPermission(session,'customers','write')){showToast('Your role cannot create customers.','error');return;}
   const fullName=document.getElementById('cc-name')?.value?.trim();
   const phone=document.getElementById('cc-phone')?.value?.trim();
-  const email=document.getElementById('cc-email')?.v
+  const email=document.getElementById('cc-email')?.value?.trim();
+  const address=document.getElementById('cc-address')?.value?.trim();
+  const productType=document.getElementById('cc-product')?.value;
+  const initialPin=document.getElementById('cc-pin')?.value?.trim();
+  const subscriptionPlan=document.getElementById('cc-plan')?.value;
+  if(!fullName||phone?.length!==10||!/^\d{4}$/.test(initialPin)){showToast('Fill name, 10-digit phone, 4-digit PIN.','error');return;}
+  const btn=document.getElementById('createCustomerBtn');
+  if(btn){btn.disabled=true;btn.textContent='Creating…';}
+  const res=await provisionCall('admin-provision-customer',{full_name:fullName,phone,email:email||null,address:address||null,product_type:productType,initial_pin:initialPin,subscription_plan:subscriptionPlan||null});
+  if(btn){btn.disabled=false;btn.textContent='Create Customer';}
+  if(!res.success){showToast('Error: '+(res.error||res.message||'Unknown'),'error');return;}
+  showToast(`✅ Customer created — Plate ${res.customer?.plate_id}`,'success');
+  const c=res.customer||{};
+  const qrImg=(c.qr_svg_url||c.qr_image_url)?`<img src="${c.qr_svg_url||c.qr_image_url}" style="width:160px;height:160px;border-radius:8px;background:#fff;padding:8px" alt="QR">`:'<div class="empty-state" style="padding:20px">QR pending</div>';
+  const pr=document.getElementById('customerPackageResult');
+  if(pr) pr.innerHTML=`<div style="text-align:center;margin-bottom:16px">${qrImg}</div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:2">
+      <div><b>Plate ID:</b> <span style="font-family:monospace;color:var(--accent2)">${c.plate_id}</span></div>
+      <div><b>Name:</b> ${c.full_name}</div><div><b>Phone:</b> ${c.phone}</div><div><b>Product:</b> ${c.product_type}</div>
+      ${c.subscription?`<div><b>Plan:</b> ${c.subscription.plan}</div>`:''}
+    </div>
+    ${(c.qr_svg_url||c.qr_image_url)?`<a class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:12px" href="${c.qr_svg_url||c.qr_image_url}" download="${c.plate_id}.svg">⬇️ Download QR</a>`:''}`;
+  ['cc-name','cc-phone','cc-email','cc-address','cc-pin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+};
+
+</script>
+</body>
+</html>
