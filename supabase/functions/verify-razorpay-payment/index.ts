@@ -244,6 +244,32 @@ serve(async (req) => {
       console.error("[verify-payment] Activation email failed:", emailErr);
     }
 
+    // ── In-app lifecycle notifications ──
+    if (ownerId) {
+      try {
+        await supabase.from("notifications").insert([
+          {
+            id: crypto.randomUUID(), owner_id: ownerId, type: "status_change",
+            title: "🛒 Order Confirmed", priority: "normal", channels: ["in_app"], delivery_status: {},
+            body: `Order ${order.order_number} received. Plate ${plateId} is in production.`,
+            payload: { plateId, orderNumber: order.order_number },
+          },
+          {
+            id: crypto.randomUUID(), owner_id: ownerId, type: "status_change",
+            title: "📱 QR Code Generated", priority: "normal", channels: ["in_app"], delivery_status: {},
+            body: `Your Smart Door QR code for ${plateId} is ready.`,
+            payload: { plateId },
+          },
+          {
+            id: crypto.randomUUID(), owner_id: ownerId, type: "status_change",
+            title: "🏭 In Production", priority: "normal", channels: ["in_app"], delivery_status: {},
+            body: "Your Smart Door nameplate is being manufactured.",
+            payload: { plateId },
+          },
+        ]);
+      } catch (_ne) { /* non-fatal */ }
+    }
+
     return Response.json({
       success:     true,
       plateId,

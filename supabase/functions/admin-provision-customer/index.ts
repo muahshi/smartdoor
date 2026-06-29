@@ -298,6 +298,30 @@ serve(async (req) => {
       });
     }
 
+    // ── Lifecycle notifications ──
+    // Notify the owner (in-app) that their order is ready and QR is generated.
+    // These are fire-and-forget — provisioning must not fail if notifications fail.
+    try {
+      const notifBase = { owner_id: user.id, channels: ['in_app'], delivery_status: {} };
+      const notifs: object[] = [
+        {
+          ...notifBase, id: crypto.randomUUID(), type: 'status_change', priority: 'normal',
+          title: '🛒 Order Confirmed',
+          body: `Order ${orderNumber} received. Your plate ${plateId} is being prepared.`,
+          payload: { plateId, orderNumber },
+        },
+      ];
+      if (qrImageUrl || qrSvgUrl) {
+        notifs.push({
+          ...notifBase, id: crypto.randomUUID(), type: 'status_change', priority: 'normal',
+          title: '📱 QR Code Generated',
+          body: `Your Smart Door QR code for ${plateId} is ready.`,
+          payload: { plateId },
+        });
+      }
+      await supabaseAdmin.from('notifications').insert(notifs);
+    } catch (_ne) { /* non-fatal */ }
+
     // ── Audit trail ──
     await supabaseAdmin.from('activation_events').insert({
       plate_id: plateId,

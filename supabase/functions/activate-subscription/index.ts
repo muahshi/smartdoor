@@ -87,6 +87,34 @@ serve(async (req) => {
       actor:       "system",
     });
 
+    // ── 5. Lifecycle notifications ──
+    try {
+      const notifBase = {
+        owner_id: owner_id,
+        channels: ["in_app"],
+        priority: "high",
+        delivery_status: {},
+      };
+      await supabase.from("notifications").insert([
+        {
+          ...notifBase,
+          id: crypto.randomUUID(),
+          type: "status_change",
+          title: "🏠 Delivered!",
+          body: `Your Smart Door plate ${plate_id} has been delivered. Login to activate.`,
+          payload: { plateId: plate_id },
+        },
+        {
+          ...notifBase,
+          id: crypto.randomUUID(),
+          type: "status_change",
+          title: "✅ Smart Door Activated!",
+          body: `Your Smart Door ${plate_id} is live. Visitors can now reach you.`,
+          payload: { plateId: plate_id },
+        },
+      ]);
+    } catch (_ne) { /* non-fatal — activation must not fail due to notification error */ }
+
     return Response.json({
       success:    true,
       startDate:  startDate.toISOString(),

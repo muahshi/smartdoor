@@ -170,6 +170,18 @@ serve(async (req) => {
             event_detail: 'Activated via first owner login (verify-pin)',
             actor: 'owner',
           });
+          // Notify owner their Smart Door is now live
+          supabaseAdmin.from('notifications').insert({
+            id: crypto.randomUUID(),
+            owner_id: user.id,
+            type: 'status_change',
+            title: '✅ Smart Door Activated!',
+            body: `Your Smart Door ${ownedPlate.plate_id} is live. Visitors can now reach you.`,
+            payload: { plateId: ownedPlate.plate_id },
+            priority: 'high',
+            channels: ['in_app'],
+            delivery_status: {},
+          }).catch(() => {});
         } else {
           console.error('[verify-pin] plate activation failed:', activateErr);
         }

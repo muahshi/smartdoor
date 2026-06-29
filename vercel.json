@@ -35,6 +35,18 @@
       "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     },
     {
+      "source": "/admin.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/login.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/admin-login.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
       "source": "/guard.html",
       "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     },

@@ -813,6 +813,20 @@
                 <option value="smartdoor_care">SmartDoor Care — ₹299/yr</option>
               </select>
             </div>
+            <div class="form-group">
+              <label class="form-label">Order Source *</label>
+              <select class="form-select" id="cc-source" required>
+                <option value="admin_manual">Admin Manual</option>
+                <option value="amazon">Amazon</option>
+                <option value="flipkart">Flipkart</option>
+                <option value="offline">Offline Dealer</option>
+                <option value="whatsapp">WhatsApp</option>
+              </select>
+            </div>
+            <div class="form-group" id="cc-extorder-wrap" style="display:none">
+              <label class="form-label">External Order ID</label>
+              <input type="text" class="form-input" id="cc-extorder" placeholder="Amazon/Flipkart order number">
+            </div>
             <button class="btn btn-primary" id="createCustomerBtn" style="width:100%" onclick="submitCreateCustomer()">Create Customer</button>
           </form>
         </div>
@@ -1408,6 +1422,14 @@ document.addEventListener('DOMContentLoaded', function() {
   if (el('adminRole')) el('adminRole').textContent = session.role_label || session.role || '—';
   if (el('adminAvatar')) el('adminAvatar').textContent = (session.full_name || 'A')[0].toUpperCase();
   if (el('addAdminBtn') && isSuperAdmin(session)) el('addAdminBtn').style.display = '';
+  // Show external order ID field only for marketplace sources
+  const srcSel = el('cc-source');
+  const extWrap = el('cc-extorder-wrap');
+  if (srcSel && extWrap) {
+    srcSel.addEventListener('change', () => {
+      extWrap.style.display = ['amazon','flipkart','offline'].includes(srcSel.value) ? '' : 'none';
+    });
+  }
   // RBAC nav hiding
   document.querySelectorAll('.nav-item[data-resource]').forEach(item => {
     const resource = item.dataset.resource;
@@ -1741,8 +1763,13 @@ window.adminMarkShipped = async function(orderId) {
 window.adminMarkDelivered = async function(orderId,plateId,ownerId) {
   if(!confirm('Mark delivered + activate subscription?')) return;
   if(!plateId||!ownerId){showToast('Missing plate_id or owner_id','error');return;}
-  const res=await provisionCall('mark-delivered',{order_id:orderId});
-  showToast(res.success?'🏠 Delivered & activated!':'Error: '+(res.error||'Unknown'),res.success?'success':'error');
+  // Call activate-subscription edge function (mark-delivered does not exist)
+  const res=await provisionCall('activate-subscription',{order_id:orderId,plate_id:plateId,owner_id:ownerId});
+  if(res.success){
+    // Also update order tracking_status to delivered
+    await adminCall('update_order',{order_id:orderId,updates:{manufacturing_status:'delivered',tracking_status:'delivered'},tracking_event:{event_type:'delivered',event_label:'Delivered',actor:'admin'}}).catch(()=>{});
+  }
+  showToast(res.success?'🏠 Delivered & activated!':'Error: '+(res.error||res.message||'Unknown'),res.success?'success':'error');
   if(res.success) loadOrders(_orderFilter);
 };
 window.exportOrders = function(){showToast('Export coming soon','info');};
@@ -2088,10 +2115,12 @@ window.submitCreateCustomer = async function() {
   const productType=document.getElementById('cc-product')?.value;
   const initialPin=document.getElementById('cc-pin')?.value?.trim();
   const subscriptionPlan=document.getElementById('cc-plan')?.value;
+  const orderSource=document.getElementById('cc-source')?.value||'admin_manual';
+  const extOrderId=document.getElementById('cc-extorder')?.value?.trim()||null;
   if(!fullName||phone?.length!==10||!/^\d{4}$/.test(initialPin)){showToast('Fill name, 10-digit phone, 4-digit PIN.','error');return;}
   const btn=document.getElementById('createCustomerBtn');
   if(btn){btn.disabled=true;btn.textContent='Creating…';}
-  const res=await provisionCall('admin-provision-customer',{full_name:fullName,phone,email:email||null,address:address||null,product_type:productType,initial_pin:initialPin,subscription_plan:subscriptionPlan||null});
+  const res=await provisionCall('admin-provision-customer',{full_name:fullName,phone,email:email||null,address:address||null,product_type:productType,initial_pin:initialPin,subscription_plan:subscriptionPlan||null,order_source:orderSource,external_order_id:extOrderId});
   if(btn){btn.disabled=false;btn.textContent='Create Customer';}
   if(!res.success){showToast('Error: '+(res.error||res.message||'Unknown'),'error');return;}
   showToast(`✅ Customer created — Plate ${res.customer?.plate_id}`,'success');
@@ -2102,6 +2131,9 @@ window.submitCreateCustomer = async function() {
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:2">
       <div><b>Plate ID:</b> <span style="font-family:monospace;color:var(--accent2)">${c.plate_id}</span></div>
       <div><b>Name:</b> ${c.full_name}</div><div><b>Phone:</b> ${c.phone}</div><div><b>Product:</b> ${c.product_type}</div>
+      <div><b>Source:</b> ${c.order_source||orderSource}</div>
+      ${c.order_number?`<div><b>Order #:</b> ${c.order_number}</div>`:''}
+      ${extOrderId?`<div><b>Ext Order ID:</b> ${extOrderId}</div>`:''}
       ${c.subscription?`<div><b>Plan:</b> ${c.subscription.plan}</div>`:''}
     </div>
     <button onclick="downloadQR('${c.plate_id}','png')" class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:12px">⬇️ Download Branded QR</button>`;
@@ -2116,6 +2148,8 @@ window.submitCreateCustomer = async function() {
     }
   }
   ['cc-name','cc-phone','cc-email','cc-address','cc-pin'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('cc-source').value='admin_manual';
+  const extEl=document.getElementById('cc-extorder');if(extEl)extEl.value='';;
 };
 
 </script>

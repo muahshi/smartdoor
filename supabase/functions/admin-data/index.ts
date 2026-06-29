@@ -433,6 +433,26 @@ serve(async (req) => {
         await db.from('tracking_events').insert({ order_id, ...tracking_event, created_at: new Date().toISOString() });
       }
 
+      // ── Fire shipped notification when order is marked dispatched ──
+      if (updates.manufacturing_status === 'dispatched' || updates.tracking_status === 'shipped') {
+        try {
+          const { data: ord } = await db.from('orders').select('owner_id, plate_id').eq('id', order_id).maybeSingle();
+          if ((ord as any)?.owner_id && (ord as any)?.plate_id) {
+            await db.from('notifications').insert({
+              id: crypto.randomUUID(),
+              owner_id: (ord as any).owner_id,
+              type: 'status_change',
+              title: '🚚 Shipped!',
+              body: 'Your Smart Door nameplate is on the way.',
+              payload: { plateId: (ord as any).plate_id },
+              priority: 'high',
+              channels: ['in_app'],
+              delivery_status: {},
+            });
+          }
+        } catch (_ne) { /* non-fatal */ }
+      }
+
       // Audit log
       await db.from('admin_audit_logs').insert({
         admin_id: ctx.id,
@@ -738,6 +758,39 @@ serve(async (req) => {
       const { id: muid, status: mustatus } = body as any;
       await db.from('manufacturing').update({ production_status: mustatus, updated_at: new Date().toISOString() }).eq('id', muid);
       await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'update_manufacturing_status', resource: 'manufacturing', resource_id: muid, after_data: { production_status: mustatus } });
+
+      // ── Fire lifecycle notification to owner ──
+      try {
+        const { data: mfgRow } = await db.from('manufacturing')
+          .select('plate_id, order_id, orders(owner_id)')
+          .eq('id', muid)
+          .maybeSingle();
+        const ownerId = (mfgRow as any)?.orders?.owner_id;
+        const plateId = (mfgRow as any)?.plate_id;
+        if (ownerId && plateId) {
+          const notifMap: Record<string, { title: string; body: string; notif_type: string }> = {
+            printing:      { title: '🏭 In Production', body: 'Your Smart Door nameplate is being manufactured.', notif_type: 'status_change' },
+            quality_check: { title: '🔍 Quality Check', body: 'Your nameplate is undergoing quality inspection.', notif_type: 'status_change' },
+            packed:        { title: '📦 Packed & Ready', body: 'Your package is packed and ready for dispatch.', notif_type: 'status_change' },
+            ready:         { title: '✅ Ready to Ship', body: 'Your Smart Door nameplate is ready to be shipped.', notif_type: 'status_change' },
+          };
+          const n = notifMap[mustatus];
+          if (n) {
+            await db.from('notifications').insert({
+              id: crypto.randomUUID(),
+              owner_id: ownerId,
+              type: n.notif_type,
+              title: n.title,
+              body: n.body,
+              payload: { plateId, production_status: mustatus },
+              priority: 'normal',
+              channels: ['in_app'],
+              delivery_status: {},
+            });
+          }
+        }
+      } catch (_ne) { /* non-fatal */ }
+
       return Response.json({ success: true }, { headers });
     }
 
