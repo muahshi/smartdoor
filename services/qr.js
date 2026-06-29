@@ -41,24 +41,27 @@ export function getQrUrl(plateId) {
   return `${QR_BASE_URL}/p/${plateId.toUpperCase()}`;
 }
 
-// ────────── SHIELD LOCK SVG PATH ──────────
-function _shieldLockSvg(size) {
-  const s = size;
-  // Shield with lock — inline SVG string for canvas embedding
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 100 110">
-      <defs>
-        <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#D4AF37"/>
-          <stop offset="100%" style="stop-color:#C9972A"/>
-        </linearGradient>
-      </defs>
-      <path d="M50 2 L90 18 L90 50 C90 75 70 95 50 108 C30 95 10 75 10 50 L10 18 Z"
-            fill="url(#sg)" stroke="#0B0B0B" stroke-width="2"/>
-      <rect x="35" y="52" width="30" height="24" rx="4" fill="#0B0B0B"/>
-      <rect x="40" y="40" width="20" height="18" rx="10" fill="none" stroke="#0B0B0B" stroke-width="5"/>
-      <circle cx="50" cy="64" r="4" fill="${GOLD}"/>
-    </svg>`;
+// ────────── OFFICIAL LOGO ASSET PATH ──────────
+// Single source of truth — always load the official PNG asset.
+// Never draw the logo with Canvas or generate it with CSS.
+const SHIELD_LOGO_PATH = '/images/branding/smartdoor-shield.png';
+
+// Cache the loaded HTMLImageElement so we only fetch it once per session.
+let _shieldLogoCache = null;
+
+/**
+ * Official SmartDoor shield PNG asset load karta hai.
+ * Cached after first load. Never regenerates the logo.
+ * @returns {Promise<HTMLImageElement>}
+ */
+async function _loadShieldLogo() {
+  if (_shieldLogoCache) return _shieldLogoCache;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload  = () => { _shieldLogoCache = img; resolve(img); };
+    img.onerror = () => reject(new Error(`[QR] Failed to load official shield logo: ${SHIELD_LOGO_PATH}`));
+    img.src = SHIELD_LOGO_PATH;
+  });
 }
 
 // ────────── GENERATE BRANDED QR — CANVAS ──────────
@@ -85,7 +88,6 @@ export async function generateBrandedQrCanvas(plateId, ownerName = '') {
   const OFFSET_X = (PLAQUE_W - QR_AREA) / 2;
   const OFFSET_Y = ownerName ? 180 : 140;
   const FINDER = 7; // finder pattern size in modules
-  const LOGO_SIZE = Math.floor(MODULE_SIZE * 9); // logo ~9 modules wide
 
   const canvas = document.createElement('canvas');
   canvas.width  = PLAQUE_W;
@@ -177,9 +179,9 @@ export async function generateBrandedQrCanvas(plateId, ownerName = '') {
     );
   }
 
-  // Logo area center — skip modules under logo
+  // Logo area center — skip modules under logo (18% of QR area)
   const centerMod = Math.floor(count / 2);
-  const halfLogo = 5; // ~9 modules (logo ~9 wide)
+  const halfLogo = Math.ceil((count * 0.18) / 2); // matches 18% logo coverage
   function isInLogoArea(row, col) {
     return row >= centerMod - halfLogo && row <= centerMod + halfLogo &&
            col >= centerMod - halfLogo && col <= centerMod + halfLogo;
@@ -236,29 +238,26 @@ export async function generateBrandedQrCanvas(plateId, ownerName = '') {
   drawFinderBox(count - FINDER, 0); // bottom-left
   // bottom-right intentionally SKIPPED (unique design)
 
-  // ── Shield Lock Logo in center ──
-  const logoSvgStr = _shieldLockSvg(LOGO_SIZE);
-  const svgBlob = new Blob([logoSvgStr], { type: 'image/svg+xml;charset=utf-8' });
-  const svgUrl  = URL.createObjectURL(svgBlob);
+  // ── Official SmartDoor Shield Logo in center ──
+  // Always loads /images/branding/smartdoor-shield.png — never drawn or generated inline.
+  // Logo size = 18% of QR area for optimal coverage without harming scan reliability.
+  const LOGO_DRAW_SIZE = Math.round(QR_AREA * 0.18); // 18% of QR area
+  const logoX = OFFSET_X + (QR_AREA - LOGO_DRAW_SIZE) / 2;
+  const logoY = OFFSET_Y + (QR_AREA - LOGO_DRAW_SIZE) / 2;
 
-  await new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const logoX = OFFSET_X + (centerMod - halfLogo + MARGIN_MOD) * MODULE_SIZE + (LOGO_SIZE * 0.05);
-      const logoY = OFFSET_Y + (centerMod - halfLogo + MARGIN_MOD) * MODULE_SIZE + (LOGO_SIZE * 0.05);
-      const drawSize = LOGO_SIZE * 0.9;
-      // White background circle behind logo
-      ctx.beginPath();
-      ctx.arc(logoX + drawSize / 2, logoY + drawSize / 2, drawSize / 2 + 3, 0, Math.PI * 2);
-      ctx.fillStyle = BLACK;
-      ctx.fill();
-      ctx.drawImage(img, logoX, logoY, drawSize, drawSize);
-      URL.revokeObjectURL(svgUrl);
-      resolve();
-    };
-    img.onerror = reject;
-    img.src = svgUrl;
-  });
+  const shieldImg = await _loadShieldLogo();
+
+  // Black circular backing — isolates logo from QR modules beneath
+  const logoCx = logoX + LOGO_DRAW_SIZE / 2;
+  const logoCy = logoY + LOGO_DRAW_SIZE / 2;
+  const backingR = LOGO_DRAW_SIZE / 2 + 4;
+  ctx.beginPath();
+  ctx.arc(logoCx, logoCy, backingR, 0, Math.PI * 2);
+  ctx.fillStyle = BLACK;
+  ctx.fill();
+
+  // Draw official logo — perfectly centered, square aspect ratio preserved
+  ctx.drawImage(shieldImg, logoX, logoY, LOGO_DRAW_SIZE, LOGO_DRAW_SIZE);
 
   // ── Bottom branding ──
   const brandY = OFFSET_Y + QR_AREA + 30;
