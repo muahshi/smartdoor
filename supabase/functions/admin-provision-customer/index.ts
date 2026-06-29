@@ -163,20 +163,41 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Failed to create plate record.' }, { status: 500, headers });
     }
 
+    // ── Center lock icon inject karo SVG mein ──
+    function injectCenterLogo(svgString: string): string {
+      const size = 400, logoSize = 80, iconSize = 46;
+      const cx = size / 2, cy = size / 2;
+      const scale = iconSize / 24;
+      const tx = cx - (24 * scale) / 2;
+      const ty = cy - (24 * scale) / 2;
+      const overlay = `
+  <circle cx="${cx}" cy="${cy}" r="${logoSize / 2}" fill="white" />
+  <circle cx="${cx}" cy="${cy}" r="${logoSize / 2 - 2}" fill="white" stroke="#000" stroke-width="1.5" />
+  <g transform="translate(${tx}, ${ty}) scale(${scale})">
+    <path d="M12 2L3 6v6c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V6L12 2z" fill="#111"/>
+    <rect x="9" y="11" width="6" height="5" rx="1" fill="white"/>
+    <path d="M10 11V9a2 2 0 1 1 4 0v2" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <circle cx="12" cy="13.5" r="0.8" fill="#111"/>
+    <rect x="11.6" y="13.5" width="0.8" height="1.2" rx="0.3" fill="#111"/>
+  </g>`;
+      return svgString.replace('</svg>', overlay + '\n</svg>');
+    }
+
     // ── Generate + upload QR (PNG + SVG) ──
     const qrTargetUrl = `${APP_URL}/p/${plateId}`;
     let qrImageUrl: string | null = null;
     let qrSvgUrl: string | null = null;
 
     try {
-      const pngDataUrl: string = await QRCode.toDataURL(qrTargetUrl, { width: 400, margin: 4, errorCorrectionLevel: 'M' });
+      const pngDataUrl: string = await QRCode.toDataURL(qrTargetUrl, { width: 800, margin: 2, errorCorrectionLevel: 'H' });
       const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
       const pngBlob = new Blob([pngBytes], { type: 'image/png' });
       const { error: pngErr } = await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.png`, pngBlob, { contentType: 'image/png', upsert: true });
       if (!pngErr) qrImageUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.png`).data?.publicUrl || null;
 
-      const svgString: string = await QRCode.toString(qrTargetUrl, { type: 'svg', width: 400, margin: 4, errorCorrectionLevel: 'M' });
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+      const svgRaw: string = await QRCode.toString(qrTargetUrl, { type: 'svg', width: 400, margin: 2, errorCorrectionLevel: 'H' });
+      const svgStyled = injectCenterLogo(svgRaw);
+      const svgBlob = new Blob([svgStyled], { type: 'image/svg+xml' });
       const { error: svgErr } = await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.svg`, svgBlob, { contentType: 'image/svg+xml', upsert: true });
       if (!svgErr) qrSvgUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.svg`).data?.publicUrl || null;
 
