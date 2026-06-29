@@ -2,10 +2,12 @@
  * Smart Door — QR Generation Service
  * services/qr.js
  *
- * QR codes generate karta hai:
- * - PNG (display + print)
- * - SVG (manufacturing quality)
- * Supabase Storage bucket: qr-codes
+ * Premium branded QR codes generate karta hai:
+ * - Gold on black theme
+ * - Shield lock logo center mein
+ * - 3 corner finder boxes (no bottom-right)
+ * - "SMART DOOR" + "HOME PRIVACY. SMARTER LIVING." branding
+ * - Plaque-style rounded card for download/print
  *
  * Uses: qrcode library (CDN via ESM)
  * URL format: https://mysmartdoor.in/p/SD-ABX9K7
@@ -16,13 +18,17 @@ import { supabase } from './supabase.js';
 // ────────── CONFIG ──────────
 const QR_BASE_URL    = window.__SD_CONFIG__?.baseUrl || 'https://mysmartdoor.in';
 const QR_BUCKET      = 'qr-codes';
-const QR_SIZE_PX     = 400;      // Export resolution
-const QR_MARGIN      = 4;        // Quiet zone modules
-const QR_ERROR_LEVEL = 'M';      // Error correction: M = 15% recovery
+const QR_SIZE_PX     = 400;
+const QR_MARGIN      = 2;
+const QR_ERROR_LEVEL = 'H'; // H = 30% recovery — logo overlay ke liye zaroori
 
-// ────────── LOAD QR LIBRARY (qrcode.js via esm.sh) ──────────
+// Colors
+const GOLD   = '#D4AF37';
+const BLACK  = '#0B0B0B';
+const GOLD2  = '#C9972A';
+
+// ────────── LOAD QR LIBRARY ──────────
 let _QRCode = null;
-
 async function _loadQRLib() {
   if (_QRCode) return _QRCode;
   const mod = await import('https://esm.sh/qrcode@1.5.4');
@@ -31,114 +37,305 @@ async function _loadQRLib() {
 }
 
 // ────────── GET QR URL ──────────
-/**
- * QR mein encode hone wala URL return karta hai.
- * @param {string} plateId  - SD-ABX9K7
- */
 export function getQrUrl(plateId) {
   return `${QR_BASE_URL}/p/${plateId.toUpperCase()}`;
 }
 
-// ────────── GENERATE QR DATA URL (Canvas → PNG base64) ──────────
+// ────────── SHIELD LOCK SVG PATH ──────────
+function _shieldLockSvg(size) {
+  const s = size;
+  // Shield with lock — inline SVG string for canvas embedding
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 100 110">
+      <defs>
+        <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#D4AF37"/>
+          <stop offset="100%" style="stop-color:#C9972A"/>
+        </linearGradient>
+      </defs>
+      <path d="M50 2 L90 18 L90 50 C90 75 70 95 50 108 C30 95 10 75 10 50 L10 18 Z"
+            fill="url(#sg)" stroke="#0B0B0B" stroke-width="2"/>
+      <rect x="35" y="52" width="30" height="24" rx="4" fill="#0B0B0B"/>
+      <rect x="40" y="40" width="20" height="18" rx="10" fill="none" stroke="#0B0B0B" stroke-width="5"/>
+      <circle cx="50" cy="64" r="4" fill="${GOLD}"/>
+    </svg>`;
+}
+
+// ────────── GENERATE BRANDED QR — CANVAS ──────────
 /**
- * Browser mein canvas pe QR render karta hai, PNG data URL return karta hai.
+ * Canvas pe premium branded QR render karta hai.
  * @param {string} plateId
- * @returns {Promise<string>}  data:image/png;base64,...
+ * @param {string} [ownerName] - e.g. "SHARMA FAMILY" (optional)
+ * @returns {Promise<HTMLCanvasElement>}
  */
-export async function generateQrDataUrl(plateId) {
+export async function generateBrandedQrCanvas(plateId, ownerName = '') {
   const QRCode = await _loadQRLib();
   const url = getQrUrl(plateId);
 
-  const dataUrl = await QRCode.toDataURL(url, {
-    width:         QR_SIZE_PX,
-    margin:        QR_MARGIN,
-    errorCorrectionLevel: QR_ERROR_LEVEL,
-    color: {
-      dark:  '#000000',
-      light: '#FFFFFF',
-    },
+  // Step 1: Raw QR data matrix nikalo
+  const qrData = QRCode.create(url, { errorCorrectionLevel: QR_ERROR_LEVEL });
+  const modules = qrData.modules;
+  const count = modules.size;
+
+  // Canvas dimensions
+  const PLAQUE_W = 600;
+  const PLAQUE_H = ownerName ? 760 : 700;
+  const QR_AREA  = 380;
+  const MODULE_SIZE = QR_AREA / (count + QR_MARGIN * 2);
+  const OFFSET_X = (PLAQUE_W - QR_AREA) / 2;
+  const OFFSET_Y = ownerName ? 180 : 140;
+  const FINDER = 7; // finder pattern size in modules
+  const LOGO_SIZE = Math.floor(MODULE_SIZE * 9); // logo ~9 modules wide
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = PLAQUE_W;
+  canvas.height = PLAQUE_H;
+  const ctx = canvas.getContext('2d');
+
+  // ── Background: rounded plaque ──
+  const R = 36;
+  ctx.beginPath();
+  ctx.moveTo(R, 0);
+  ctx.lineTo(PLAQUE_W - R, 0);
+  ctx.quadraticCurveTo(PLAQUE_W, 0, PLAQUE_W, R);
+  ctx.lineTo(PLAQUE_W, PLAQUE_H - R);
+  ctx.quadraticCurveTo(PLAQUE_W, PLAQUE_H, PLAQUE_W - R, PLAQUE_H);
+  ctx.lineTo(R, PLAQUE_H);
+  ctx.quadraticCurveTo(0, PLAQUE_H, 0, PLAQUE_H - R);
+  ctx.lineTo(0, R);
+  ctx.quadraticCurveTo(0, 0, R, 0);
+  ctx.closePath();
+  ctx.fillStyle = BLACK;
+  ctx.fill();
+
+  // Gold border
+  ctx.strokeStyle = GOLD;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // ── Corner screws (gold dots) ──
+  const screws = [[28, 28], [PLAQUE_W - 28, 28], [28, PLAQUE_H - 28], [PLAQUE_W - 28, PLAQUE_H - 28]];
+  screws.forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = GOLD;
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Screw cross
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 4, y); ctx.lineTo(x + 4, y);
+    ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4);
+    ctx.stroke();
   });
 
-  return dataUrl;
+  // ── Owner name (if provided) ──
+  if (ownerName) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = GOLD;
+    ctx.font = 'bold 42px Georgia, serif';
+    ctx.letterSpacing = '4px';
+    ctx.fillText(ownerName.toUpperCase(), PLAQUE_W / 2, 90);
+
+    // Decorative line
+    ctx.strokeStyle = GOLD2;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(80, 108); ctx.lineTo(PLAQUE_W - 80, 108);
+    ctx.stroke();
+
+    // "SCAN TO CONNECT"
+    ctx.fillStyle = GOLD2;
+    ctx.font = '600 18px Arial, sans-serif';
+    ctx.letterSpacing = '3px';
+    ctx.fillText('SCAN TO CONNECT', PLAQUE_W / 2, 135);
+  } else {
+    // No owner name — just "SCAN TO CONNECT" at top
+    ctx.textAlign = 'center';
+    ctx.fillStyle = GOLD2;
+    ctx.font = '600 18px Arial, sans-serif';
+    ctx.letterSpacing = '3px';
+    ctx.fillText('SCAN TO CONNECT', PLAQUE_W / 2, 110);
+  }
+
+  // ── Draw QR modules (skip finder patterns + logo area) ──
+  const MARGIN_MOD = QR_MARGIN;
+  const FINDER_COORDS = [
+    { r: 0, c: 0 },         // top-left
+    { r: 0, c: count - FINDER }, // top-right
+    { r: count - FINDER, c: 0 }, // bottom-left
+    // bottom-right SKIP (count-FINDER, count-FINDER) — intentionally removed
+  ];
+
+  function isInFinder(row, col) {
+    return FINDER_COORDS.some(f =>
+      row >= f.r - 1 && row <= f.r + FINDER &&
+      col >= f.c - 1 && col <= f.c + FINDER
+    );
+  }
+
+  // Logo area center — skip modules under logo
+  const centerMod = Math.floor(count / 2);
+  const halfLogo = 5; // ~9 modules (logo ~9 wide)
+  function isInLogoArea(row, col) {
+    return row >= centerMod - halfLogo && row <= centerMod + halfLogo &&
+           col >= centerMod - halfLogo && col <= centerMod + halfLogo;
+  }
+
+  ctx.fillStyle = GOLD;
+  for (let r = 0; r < count; r++) {
+    for (let c = 0; c < count; c++) {
+      if (!modules.get(r, c)) continue;
+      if (isInFinder(r, c)) continue;
+      if (isInLogoArea(r, c)) continue;
+
+      const x = OFFSET_X + (c + MARGIN_MOD) * MODULE_SIZE;
+      const y = OFFSET_Y + (r + MARGIN_MOD) * MODULE_SIZE;
+      // Slightly rounded modules for premium look
+      const ms = MODULE_SIZE - 0.5;
+      const br = ms * 0.2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, ms, ms, br);
+      ctx.fill();
+    }
+  }
+
+  // ── Draw 3 Finder Patterns (custom gold style) ──
+  function drawFinderBox(startRow, startCol) {
+    const px = OFFSET_X + (startCol + MARGIN_MOD) * MODULE_SIZE;
+    const py = OFFSET_Y + (startRow + MARGIN_MOD) * MODULE_SIZE;
+    const sz = FINDER * MODULE_SIZE;
+    const br = sz * 0.15;
+
+    // Outer box
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.roundRect(px, py, sz, sz, br);
+    ctx.fill();
+
+    // Inner white area
+    const pad1 = MODULE_SIZE;
+    ctx.fillStyle = BLACK;
+    ctx.beginPath();
+    ctx.roundRect(px + pad1, py + pad1, sz - pad1 * 2, sz - pad1 * 2, br * 0.5);
+    ctx.fill();
+
+    // Center dot
+    const pad2 = MODULE_SIZE * 2;
+    ctx.fillStyle = GOLD;
+    ctx.beginPath();
+    ctx.roundRect(px + pad2, py + pad2, sz - pad2 * 2, sz - pad2 * 2, br * 0.3);
+    ctx.fill();
+  }
+
+  drawFinderBox(0, 0);              // top-left
+  drawFinderBox(0, count - FINDER); // top-right
+  drawFinderBox(count - FINDER, 0); // bottom-left
+  // bottom-right intentionally SKIPPED (unique design)
+
+  // ── Shield Lock Logo in center ──
+  const logoSvgStr = _shieldLockSvg(LOGO_SIZE);
+  const svgBlob = new Blob([logoSvgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const svgUrl  = URL.createObjectURL(svgBlob);
+
+  await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const logoX = OFFSET_X + (centerMod - halfLogo + MARGIN_MOD) * MODULE_SIZE + (LOGO_SIZE * 0.05);
+      const logoY = OFFSET_Y + (centerMod - halfLogo + MARGIN_MOD) * MODULE_SIZE + (LOGO_SIZE * 0.05);
+      const drawSize = LOGO_SIZE * 0.9;
+      // White background circle behind logo
+      ctx.beginPath();
+      ctx.arc(logoX + drawSize / 2, logoY + drawSize / 2, drawSize / 2 + 3, 0, Math.PI * 2);
+      ctx.fillStyle = BLACK;
+      ctx.fill();
+      ctx.drawImage(img, logoX, logoY, drawSize, drawSize);
+      URL.revokeObjectURL(svgUrl);
+      resolve();
+    };
+    img.onerror = reject;
+    img.src = svgUrl;
+  });
+
+  // ── Bottom branding ──
+  const brandY = OFFSET_Y + QR_AREA + 30;
+
+  // Separator line
+  ctx.strokeStyle = GOLD2;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(80, brandY); ctx.lineTo(PLAQUE_W - 80, brandY);
+  ctx.stroke();
+
+  // Shield icon + "SMART DOOR"
+  ctx.textAlign = 'center';
+  ctx.fillStyle = GOLD;
+  ctx.font = 'bold 28px Georgia, serif';
+  ctx.letterSpacing = '5px';
+  ctx.fillText('🛡 SMART DOOR', PLAQUE_W / 2, brandY + 42);
+
+  // Tagline
+  ctx.fillStyle = GOLD2;
+  ctx.font = '14px Arial, sans-serif';
+  ctx.letterSpacing = '2px';
+  ctx.fillText('HOME PRIVACY. SMARTER LIVING.', PLAQUE_W / 2, brandY + 68);
+
+  return canvas;
+}
+
+// ────────── GENERATE QR DATA URL (PNG) ──────────
+export async function generateQrDataUrl(plateId, ownerName = '') {
+  const canvas = await generateBrandedQrCanvas(plateId, ownerName);
+  return canvas.toDataURL('image/png');
 }
 
 // ────────── GENERATE QR SVG STRING ──────────
-/**
- * Manufacturing-quality SVG string generate karta hai.
- * @param {string} plateId
- * @returns {Promise<string>}  SVG markup
- */
-export async function generateQrSvg(plateId) {
-  const QRCode = await _loadQRLib();
-  const url = getQrUrl(plateId);
+// SVG: branded plaque as SVG (for download/print)
+export async function generateQrSvg(plateId, ownerName = '') {
+  // Canvas generate karo, fir PNG embed karo SVG mein (plaque wrapper with PNG inside)
+  const canvas = await generateBrandedQrCanvas(plateId, ownerName);
+  const pngData = canvas.toDataURL('image/png');
+  const W = canvas.width, H = canvas.height;
 
-  const svg = await QRCode.toString(url, {
-    type:   'svg',
-    margin: QR_MARGIN,
-    errorCorrectionLevel: QR_ERROR_LEVEL,
-    color: {
-      dark:  '#000000',
-      light: '#FFFFFF',
-    },
-  });
-
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <image href="${pngData}" x="0" y="0" width="${W}" height="${H}"/>
+</svg>`;
   return svg;
 }
 
 // ────────── UPLOAD QR TO SUPABASE STORAGE ──────────
-/**
- * QR PNG aur SVG dono Supabase Storage mein upload karta hai.
- * Bucket: qr-codes
- * Paths:  qr-codes/SD-ABX9K7.png
- *         qr-codes/SD-ABX9K7.svg
- *
- * @param {string} plateId
- * @returns {{ success, pngPath, svgPath, pngUrl, svgUrl }}
- */
-export async function uploadQrToStorage(plateId) {
+export async function uploadQrToStorage(plateId, ownerName = '') {
   try {
     const pid = plateId.toUpperCase();
 
-    // ── PNG ──
-    const pngDataUrl = await generateQrDataUrl(pid);
+    // PNG
+    const pngDataUrl = await generateQrDataUrl(pid, ownerName);
     const pngBlob    = await _dataUrlToBlob(pngDataUrl, 'image/png');
     const pngPath    = `${pid}.png`;
-
     const { error: pngError } = await supabase.storage
-      .from(QR_BUCKET)
-      .upload(pngPath, pngBlob, {
-        contentType: 'image/png',
-        upsert:      true,
-      });
-
+      .from(QR_BUCKET).upload(pngPath, pngBlob, { contentType: 'image/png', upsert: true });
     if (pngError) throw new Error(`PNG upload failed: ${pngError.message}`);
 
-    // ── SVG ──
-    const svgString = await generateQrSvg(pid);
+    // SVG
+    const svgString = await generateQrSvg(pid, ownerName);
     const svgBlob   = new Blob([svgString], { type: 'image/svg+xml' });
     const svgPath   = `${pid}.svg`;
-
     const { error: svgError } = await supabase.storage
-      .from(QR_BUCKET)
-      .upload(svgPath, svgBlob, {
-        contentType: 'image/svg+xml',
-        upsert:      true,
-      });
-
+      .from(QR_BUCKET).upload(svgPath, svgBlob, { contentType: 'image/svg+xml', upsert: true });
     if (svgError) throw new Error(`SVG upload failed: ${svgError.message}`);
 
-    // ── Public URLs ──
     const { data: pngUrlData } = supabase.storage.from(QR_BUCKET).getPublicUrl(pngPath);
     const { data: svgUrlData } = supabase.storage.from(QR_BUCKET).getPublicUrl(svgPath);
 
     return {
-      success: true,
-      pngPath,
-      svgPath,
+      success: true, pngPath, svgPath,
       pngUrl: pngUrlData.publicUrl,
       svgUrl: svgUrlData.publicUrl,
     };
-
   } catch (err) {
     console.error('[QR] uploadQrToStorage error:', err);
     return { success: false, error: err.message };
@@ -146,11 +343,6 @@ export async function uploadQrToStorage(plateId) {
 }
 
 // ────────── GET QR PUBLIC URL ──────────
-/**
- * Already uploaded QR ka public URL return karta hai.
- * @param {string} plateId
- * @param {'png'|'svg'} format
- */
 export function getQrStorageUrl(plateId, format = 'png') {
   const pid  = plateId.toUpperCase();
   const path = `${pid}.${format}`;
@@ -159,16 +351,9 @@ export function getQrStorageUrl(plateId, format = 'png') {
 }
 
 // ────────── RENDER QR IN DOM ELEMENT ──────────
-/**
- * Kisi bhi <img> ya <div> element mein QR render karo.
- * @param {string} plateId
- * @param {HTMLElement} container  - <img> or <div>
- */
-export async function renderQrInElement(plateId, container) {
+export async function renderQrInElement(plateId, container, ownerName = '') {
   if (!container) return;
-
-  const dataUrl = await generateQrDataUrl(plateId);
-
+  const dataUrl = await generateQrDataUrl(plateId, ownerName);
   if (container.tagName === 'IMG') {
     container.src = dataUrl;
     container.alt = `QR Code for ${plateId}`;
@@ -176,29 +361,17 @@ export async function renderQrInElement(plateId, container) {
     const img = document.createElement('img');
     img.src   = dataUrl;
     img.alt   = `QR Code for ${plateId}`;
-    img.style.cssText = 'width:100%;height:100%;object-fit:contain;';
+    img.style.cssText = 'width:100%;height:100%;object-fit:contain;border-radius:16px;';
     container.innerHTML = '';
     container.appendChild(img);
   }
 }
 
 // ────────── GENERATE + SAVE COMPLETE QR PACKAGE ──────────
-/**
- * Plate ke liye complete QR package:
- * 1. PNG + SVG generate karo
- * 2. Storage mein upload karo
- * 3. Manufacturing table update karo
- *
- * @param {string} plateId
- * @param {string} orderId
- * @returns {{ success, pngUrl, svgUrl }}
- */
-export async function generateAndSaveQrPackage(plateId, orderId) {
-  // Upload QR files
-  const uploadResult = await uploadQrToStorage(plateId);
+export async function generateAndSaveQrPackage(plateId, orderId, ownerName = '') {
+  const uploadResult = await uploadQrToStorage(plateId, ownerName);
   if (!uploadResult.success) return uploadResult;
 
-  // Manufacturing record update karo
   const { error } = await supabase
     .from('manufacturing')
     .update({
@@ -208,10 +381,7 @@ export async function generateAndSaveQrPackage(plateId, orderId) {
     })
     .eq('order_id', orderId);
 
-  if (error) {
-    console.error('[QR] Manufacturing update failed:', error.message);
-    // Non-fatal — QR uploaded, just metadata update fail hua
-  }
+  if (error) console.error('[QR] Manufacturing update failed:', error.message);
 
   return {
     success: true,
@@ -227,8 +397,6 @@ function _dataUrlToBlob(dataUrl, mimeType) {
   const byteString = atob(dataUrl.split(',')[1]);
   const buffer = new ArrayBuffer(byteString.length);
   const view   = new Uint8Array(buffer);
-  for (let i = 0; i < byteString.length; i++) {
-    view[i] = byteString.charCodeAt(i);
-  }
+  for (let i = 0; i < byteString.length; i++) view[i] = byteString.charCodeAt(i);
   return new Blob([buffer], { type: mimeType });
 }
