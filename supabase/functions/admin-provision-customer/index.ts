@@ -165,22 +165,28 @@ serve(async (req) => {
 
     // ── Center lock icon inject karo SVG mein ──
     function injectCenterLogo(svgString: string): string {
-      const size = 400, logoSize = 80, iconSize = 46;
-      const cx = size / 2, cy = size / 2;
-      const scale = iconSize / 24;
-      const tx = cx - (24 * scale) / 2;
-      const ty = cy - (24 * scale) / 2;
+      const whMatch = svgString.match(/width="([0-9.]+)"[^>]*height="([0-9.]+)"/);
+      const vbMatch = svgString.match(/viewBox="([0-9. ]+)"/);
+      let w = 400, h = 400;
+      if (whMatch) { w = parseFloat(whMatch[1]); h = parseFloat(whMatch[2]); }
+      else if (vbMatch) { const p = vbMatch[1].split(' '); w = parseFloat(p[2]); h = parseFloat(p[3]); }
+      const cx = w/2, cy = h/2;
+      const logoR = Math.min(w,h) * 0.11;
+      const iconScale = logoR * 1.1 / 12;
+      const tx = cx - 12*iconScale, ty = cy - 12*iconScale;
+      let svg = svgString;
+      if (!vbMatch) svg = svg.replace('<svg ', `<svg viewBox="0 0 ${w} ${h}" `);
       const overlay = `
-  <circle cx="${cx}" cy="${cy}" r="${logoSize / 2}" fill="white" />
-  <circle cx="${cx}" cy="${cy}" r="${logoSize / 2 - 2}" fill="white" stroke="#000" stroke-width="1.5" />
-  <g transform="translate(${tx}, ${ty}) scale(${scale})">
+  <circle cx="${cx}" cy="${cy}" r="${logoR+2}" fill="white"/>
+  <circle cx="${cx}" cy="${cy}" r="${logoR}" fill="white" stroke="#000" stroke-width="${logoR*0.06}"/>
+  <g transform="translate(${tx},${ty}) scale(${iconScale})">
     <path d="M12 2L3 6v6c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V6L12 2z" fill="#111"/>
     <rect x="9" y="11" width="6" height="5" rx="1" fill="white"/>
     <path d="M10 11V9a2 2 0 1 1 4 0v2" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round"/>
     <circle cx="12" cy="13.5" r="0.8" fill="#111"/>
     <rect x="11.6" y="13.5" width="0.8" height="1.2" rx="0.3" fill="#111"/>
   </g>`;
-      return svgString.replace('</svg>', overlay + '\n</svg>');
+      return svg.replace('</svg>', overlay + '\n</svg>');
     }
 
     // ── Generate + upload QR (PNG + SVG) ──
