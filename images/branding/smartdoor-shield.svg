@@ -1,1 +1,23 @@
-
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SmartDoor Official Shield-Lock Logo
+  Master brand asset — do not modify.
+  PNG source: smartdoor-shield.png (1254×1254)
+  Usage: Use this SVG everywhere a SmartDoor logo is needed.
+         The PNG fallback lives at /images/branding/smartdoor-shield.png
+-->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="256"
+     height="256"
+     viewBox="0 0 256 256">
+  <title>SmartDoor Shield Logo</title>
+  <desc>Official SmartDoor gold shield-lock brand mark</desc>
+  <image
+    href="smartdoor-shield.png"
+    x="0" y="0"
+    width="256" height="256"
+    preserveAspectRatio="xMidYMid meet"
+    image-rendering="high-quality"
+  />
+</svg>
