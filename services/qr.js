@@ -2,12 +2,13 @@
  * Smart Door — QR Generation Service
  * services/qr.js
  *
- * Premium branded QR codes generate karta hai:
- * - Gold on black theme
- * - Shield lock logo center mein
- * - 3 corner finder boxes (no bottom-right)
- * - "SMART DOOR" + "HOME PRIVACY. SMARTER LIVING." branding
- * - Plaque-style rounded card for download/print
+ * Print-ready branded QR codes:
+ * - Gold modules on black (#D4AF37 / #000000)
+ * - Official SmartDoor shield logo centered (18% of QR width)
+ * - 3 corner finder boxes (bottom-right omitted — SmartDoor signature)
+ * - Premium rounded modules + gold finder patterns
+ * - No text, no plaque, no borders — clean QR only
+ * - 1200×1200 px output for high-res print
  *
  * Uses: qrcode library (CDN via ESM)
  * URL format: https://mysmartdoor.in/p/SD-ABX9K7
@@ -71,105 +72,43 @@ async function _loadShieldLogo() {
  * @param {string} [ownerName] - e.g. "SHARMA FAMILY" (optional)
  * @returns {Promise<HTMLCanvasElement>}
  */
+/**
+ * Text-free, print-ready QR canvas.
+ * Sirf QR + official shield logo — koi text, border, screws, ya plaque nahi.
+ * Canvas = QR area only (tight margins), black background.
+ * High resolution: 1200×1200 px for crisp print output.
+ */
 export async function generateBrandedQrCanvas(plateId, ownerName = '') {
   const QRCode = await _loadQRLib();
   const url = getQrUrl(plateId);
 
-  // Step 1: Raw QR data matrix nikalo
+  // ── QR data matrix ──
   const qrData = QRCode.create(url, { errorCorrectionLevel: QR_ERROR_LEVEL });
   const modules = qrData.modules;
   const count = modules.size;
 
-  // Canvas dimensions
-  const PLAQUE_W = 600;
-  const PLAQUE_H = ownerName ? 760 : 700;
-  const QR_AREA  = 380;
-  const MODULE_SIZE = QR_AREA / (count + QR_MARGIN * 2);
-  const OFFSET_X = (PLAQUE_W - QR_AREA) / 2;
-  const OFFSET_Y = ownerName ? 180 : 140;
-  const FINDER = 7; // finder pattern size in modules
+  // ── Canvas: 1200×1200 high-res, no extra plaque padding ──
+  const SIZE    = 1200;
+  const MARGIN  = QR_MARGIN; // 2 modules quiet zone
+  const MOD_PX  = SIZE / (count + MARGIN * 2);
+  const OFFSET  = MARGIN * MOD_PX; // same offset on all 4 sides
 
   const canvas = document.createElement('canvas');
-  canvas.width  = PLAQUE_W;
-  canvas.height = PLAQUE_H;
+  canvas.width  = SIZE;
+  canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
 
-  // ── Background: rounded plaque ──
-  const R = 36;
-  ctx.beginPath();
-  ctx.moveTo(R, 0);
-  ctx.lineTo(PLAQUE_W - R, 0);
-  ctx.quadraticCurveTo(PLAQUE_W, 0, PLAQUE_W, R);
-  ctx.lineTo(PLAQUE_W, PLAQUE_H - R);
-  ctx.quadraticCurveTo(PLAQUE_W, PLAQUE_H, PLAQUE_W - R, PLAQUE_H);
-  ctx.lineTo(R, PLAQUE_H);
-  ctx.quadraticCurveTo(0, PLAQUE_H, 0, PLAQUE_H - R);
-  ctx.lineTo(0, R);
-  ctx.quadraticCurveTo(0, 0, R, 0);
-  ctx.closePath();
+  // ── Solid black background ──
   ctx.fillStyle = BLACK;
-  ctx.fill();
+  ctx.fillRect(0, 0, SIZE, SIZE);
 
-  // Gold border
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // ── Corner screws (gold dots) ──
-  const screws = [[28, 28], [PLAQUE_W - 28, 28], [28, PLAQUE_H - 28], [PLAQUE_W - 28, PLAQUE_H - 28]];
-  screws.forEach(([x, y]) => {
-    ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = GOLD;
-    ctx.fill();
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    // Screw cross
-    ctx.strokeStyle = '#8B6914';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x - 4, y); ctx.lineTo(x + 4, y);
-    ctx.moveTo(x, y - 4); ctx.lineTo(x, y + 4);
-    ctx.stroke();
-  });
-
-  // ── Owner name (if provided) ──
-  if (ownerName) {
-    ctx.textAlign = 'center';
-    ctx.fillStyle = GOLD;
-    ctx.font = 'bold 42px Georgia, serif';
-    ctx.letterSpacing = '4px';
-    ctx.fillText(ownerName.toUpperCase(), PLAQUE_W / 2, 90);
-
-    // Decorative line
-    ctx.strokeStyle = GOLD2;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(80, 108); ctx.lineTo(PLAQUE_W - 80, 108);
-    ctx.stroke();
-
-    // "SCAN TO CONNECT"
-    ctx.fillStyle = GOLD2;
-    ctx.font = '600 18px Arial, sans-serif';
-    ctx.letterSpacing = '3px';
-    ctx.fillText('SCAN TO CONNECT', PLAQUE_W / 2, 135);
-  } else {
-    // No owner name — just "SCAN TO CONNECT" at top
-    ctx.textAlign = 'center';
-    ctx.fillStyle = GOLD2;
-    ctx.font = '600 18px Arial, sans-serif';
-    ctx.letterSpacing = '3px';
-    ctx.fillText('SCAN TO CONNECT', PLAQUE_W / 2, 110);
-  }
-
-  // ── Draw QR modules (skip finder patterns + logo area) ──
-  const MARGIN_MOD = QR_MARGIN;
+  // ── Finder pattern coords ──
+  const FINDER = 7;
   const FINDER_COORDS = [
-    { r: 0, c: 0 },         // top-left
-    { r: 0, c: count - FINDER }, // top-right
-    { r: count - FINDER, c: 0 }, // bottom-left
-    // bottom-right SKIP (count-FINDER, count-FINDER) — intentionally removed
+    { r: 0,            c: 0            }, // top-left
+    { r: 0,            c: count - FINDER }, // top-right
+    { r: count - FINDER, c: 0          }, // bottom-left
+    // bottom-right intentionally omitted (SmartDoor design signature)
   ];
 
   function isInFinder(row, col) {
@@ -179,108 +118,84 @@ export async function generateBrandedQrCanvas(plateId, ownerName = '') {
     );
   }
 
-  // Logo area center — skip modules under logo (18% of QR area)
+  // ── Logo area — skip modules beneath (18% of QR width) ──
   const centerMod = Math.floor(count / 2);
-  const halfLogo = Math.ceil((count * 0.18) / 2); // matches 18% logo coverage
+  const halfLogo  = Math.ceil((count * 0.18) / 2);
   function isInLogoArea(row, col) {
     return row >= centerMod - halfLogo && row <= centerMod + halfLogo &&
            col >= centerMod - halfLogo && col <= centerMod + halfLogo;
   }
 
+  // ── Draw QR modules — gold, rounded ──
   ctx.fillStyle = GOLD;
   for (let r = 0; r < count; r++) {
     for (let c = 0; c < count; c++) {
       if (!modules.get(r, c)) continue;
-      if (isInFinder(r, c)) continue;
+      if (isInFinder(r, c))   continue;
       if (isInLogoArea(r, c)) continue;
 
-      const x = OFFSET_X + (c + MARGIN_MOD) * MODULE_SIZE;
-      const y = OFFSET_Y + (r + MARGIN_MOD) * MODULE_SIZE;
-      // Slightly rounded modules for premium look
-      const ms = MODULE_SIZE - 0.5;
-      const br = ms * 0.2;
+      const x  = OFFSET + c * MOD_PX;
+      const y  = OFFSET + r * MOD_PX;
+      const ms = MOD_PX - 0.8;
+      const br = ms * 0.22;
       ctx.beginPath();
       ctx.roundRect(x, y, ms, ms, br);
       ctx.fill();
     }
   }
 
-  // ── Draw 3 Finder Patterns (custom gold style) ──
+  // ── 3 Finder Patterns — premium gold style ──
   function drawFinderBox(startRow, startCol) {
-    const px = OFFSET_X + (startCol + MARGIN_MOD) * MODULE_SIZE;
-    const py = OFFSET_Y + (startRow + MARGIN_MOD) * MODULE_SIZE;
-    const sz = FINDER * MODULE_SIZE;
+    const px = OFFSET + startCol * MOD_PX;
+    const py = OFFSET + startRow * MOD_PX;
+    const sz = FINDER * MOD_PX;
     const br = sz * 0.15;
 
-    // Outer box
+    // Outer gold box
     ctx.fillStyle = GOLD;
     ctx.beginPath();
     ctx.roundRect(px, py, sz, sz, br);
     ctx.fill();
 
-    // Inner white area
-    const pad1 = MODULE_SIZE;
+    // Inner black area
+    const pad1 = MOD_PX;
     ctx.fillStyle = BLACK;
     ctx.beginPath();
     ctx.roundRect(px + pad1, py + pad1, sz - pad1 * 2, sz - pad1 * 2, br * 0.5);
     ctx.fill();
 
-    // Center dot
-    const pad2 = MODULE_SIZE * 2;
+    // Center gold dot
+    const pad2 = MOD_PX * 2;
     ctx.fillStyle = GOLD;
     ctx.beginPath();
     ctx.roundRect(px + pad2, py + pad2, sz - pad2 * 2, sz - pad2 * 2, br * 0.3);
     ctx.fill();
   }
 
-  drawFinderBox(0, 0);              // top-left
-  drawFinderBox(0, count - FINDER); // top-right
-  drawFinderBox(count - FINDER, 0); // bottom-left
-  // bottom-right intentionally SKIPPED (unique design)
+  drawFinderBox(0,            0           ); // top-left
+  drawFinderBox(0,            count - FINDER); // top-right
+  drawFinderBox(count - FINDER, 0          ); // bottom-left
 
-  // ── Official SmartDoor Shield Logo in center ──
-  // Always loads /images/branding/smartdoor-shield.png — never drawn or generated inline.
-  // Logo size = 18% of QR area for optimal coverage without harming scan reliability.
-  const LOGO_DRAW_SIZE = Math.round(QR_AREA * 0.18); // 18% of QR area
-  const logoX = OFFSET_X + (QR_AREA - LOGO_DRAW_SIZE) / 2;
-  const logoY = OFFSET_Y + (QR_AREA - LOGO_DRAW_SIZE) / 2;
+  // ── Official SmartDoor Shield Logo — centered, 18% of QR width ──
+  // Always loaded from /images/branding/smartdoor-shield.png.
+  // Never drawn inline. Never generated with CSS.
+  const QR_PX       = count * MOD_PX;                  // pixel width of QR grid
+  const LOGO_SIZE   = Math.round(QR_PX * 0.18);        // 18% of QR width
+  const logoX       = OFFSET + (QR_PX - LOGO_SIZE) / 2;
+  const logoY       = OFFSET + (QR_PX - LOGO_SIZE) / 2;
 
   const shieldImg = await _loadShieldLogo();
 
-  // Black circular backing — isolates logo from QR modules beneath
-  const logoCx = logoX + LOGO_DRAW_SIZE / 2;
-  const logoCy = logoY + LOGO_DRAW_SIZE / 2;
-  const backingR = LOGO_DRAW_SIZE / 2 + 4;
+  // Black circular backing — clean separation from QR modules
+  const logoCx = logoX + LOGO_SIZE / 2;
+  const logoCy = logoY + LOGO_SIZE / 2;
   ctx.beginPath();
-  ctx.arc(logoCx, logoCy, backingR, 0, Math.PI * 2);
+  ctx.arc(logoCx, logoCy, LOGO_SIZE / 2 + 6, 0, Math.PI * 2);
   ctx.fillStyle = BLACK;
   ctx.fill();
 
-  // Draw official logo — perfectly centered, square aspect ratio preserved
-  ctx.drawImage(shieldImg, logoX, logoY, LOGO_DRAW_SIZE, LOGO_DRAW_SIZE);
-
-  // ── Bottom branding ──
-  const brandY = OFFSET_Y + QR_AREA + 30;
-
-  // Separator line
-  ctx.strokeStyle = GOLD2;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(80, brandY); ctx.lineTo(PLAQUE_W - 80, brandY);
-  ctx.stroke();
-
-  // Shield icon + "SMART DOOR"
-  ctx.textAlign = 'center';
-  ctx.fillStyle = GOLD;
-  ctx.font = 'bold 28px Georgia, serif';
-  ctx.letterSpacing = '5px';
-  ctx.fillText('🛡 SMART DOOR', PLAQUE_W / 2, brandY + 42);
-
-  // Tagline
-  ctx.fillStyle = GOLD2;
-  ctx.font = '14px Arial, sans-serif';
-  ctx.letterSpacing = '2px';
-  ctx.fillText('HOME PRIVACY. SMARTER LIVING.', PLAQUE_W / 2, brandY + 68);
+  // Draw official logo — pixel-perfect center, square
+  ctx.drawImage(shieldImg, logoX, logoY, LOGO_SIZE, LOGO_SIZE);
 
   return canvas;
 }
