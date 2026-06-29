@@ -16,37 +16,45 @@ const QR_BUCKET            = 'qr-codes';
 
 // ── Inject center lock icon into QR SVG ──
 function injectCenterLogo(svgString: string): string {
-  const size = 400;
-  const logoSize = 80;         // white circle diameter
-  const iconSize = 46;         // lock icon size
-  const cx = size / 2;
-  const cy = size / 2;
+  // Parse actual width/height from SVG tag
+  const whMatch = svgString.match(/width="([0-9.]+)"[^>]*height="([0-9.]+)"/);
+  const vbMatch = svgString.match(/viewBox="([0-9. ]+)"/);
 
-  // Shield + lock SVG path (centered at 0,0, scaled to iconSize)
-  // Viewbox of icon is 0 0 24 24 → scale = iconSize/24
-  const scale = iconSize / 24;
-  const tx = cx - (24 * scale) / 2;
-  const ty = cy - (24 * scale) / 2;
+  let w = 400, h = 400;
+  if (whMatch) {
+    w = parseFloat(whMatch[1]);
+    h = parseFloat(whMatch[2]);
+  } else if (vbMatch) {
+    const parts = vbMatch[1].split(' ');
+    w = parseFloat(parts[2]);
+    h = parseFloat(parts[3]);
+  }
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const logoR = Math.min(w, h) * 0.11;   // ~11% of size = white circle radius
+  const iconScale = logoR * 1.1 / 12;     // scale 24x24 icon to fit
+  const tx = cx - 12 * iconScale;
+  const ty = cy - 12 * iconScale;
+
+  // Ensure SVG has viewBox so overlay scales correctly
+  let svg = svgString;
+  if (!vbMatch) {
+    svg = svg.replace('<svg ', `<svg viewBox="0 0 ${w} ${h}" `);
+  }
 
   const overlay = `
-  <!-- Center logo overlay -->
-  <circle cx="${cx}" cy="${cy}" r="${logoSize / 2}" fill="white" />
-  <circle cx="${cx}" cy="${cy}" r="${logoSize / 2 - 2}" fill="white" stroke="#000" stroke-width="1.5" />
-  <g transform="translate(${tx}, ${ty}) scale(${scale})">
-    <!-- Shield -->
-    <path d="M12 2L3 6v6c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V6L12 2z"
-          fill="#111" stroke="none"/>
-    <!-- Lock body -->
+  <circle cx="${cx}" cy="${cy}" r="${logoR + 2}" fill="white"/>
+  <circle cx="${cx}" cy="${cy}" r="${logoR}" fill="white" stroke="#000" stroke-width="${logoR * 0.06}"/>
+  <g transform="translate(${tx},${ty}) scale(${iconScale})">
+    <path d="M12 2L3 6v6c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V6L12 2z" fill="#111"/>
     <rect x="9" y="11" width="6" height="5" rx="1" fill="white"/>
-    <!-- Lock shackle -->
     <path d="M10 11V9a2 2 0 1 1 4 0v2" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-    <!-- Keyhole -->
     <circle cx="12" cy="13.5" r="0.8" fill="#111"/>
     <rect x="11.6" y="13.5" width="0.8" height="1.2" rx="0.3" fill="#111"/>
   </g>`;
 
-  // Insert before closing </svg>
-  return svgString.replace('</svg>', overlay + '\n</svg>');
+  return svg.replace('</svg>', overlay + '\n</svg>');
 }
 
 serve(async (req) => {
