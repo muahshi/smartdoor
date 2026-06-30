@@ -277,6 +277,7 @@
       margin-top: -6px;
     }
     .msg-meta { font-size: 0.6rem; color: rgba(255,255,255,0.2); margin-top: 2px; text-align: center; }
+    .seen-tick { margin-left: 4px; color: rgba(255,255,255,0.25); transition: color 0.3s; }
 
     .intent-badge {
       display: inline-flex; align-items: center; gap: 6px;
@@ -602,20 +603,35 @@
         return;
       }
 
-      // Fetch owner name + security rules in parallel
+      // Fetch owner name + profile + security rules in parallel
       const [ownerRes, rulesRes] = await Promise.all([
         supabase.rpc('get_owner_display_for_plate', { p_plate_id: plate.plate_id }),
         supabase
           .from('security_rules')
-          .select('night_mode_on, night_mode_start, night_mode_end, allow_sos, allow_voice, allow_calls, call_forwarding, current_status, custom_message')
+          .select('night_mode_on, night_mode_start, night_mode_end, allow_sos, allow_voice, allow_calls, call_forwarding, current_status, custom_message, residence_name, family_name, welcome_message, owner_display_name, ai_name, greeting_style, preferred_language, visitor_greeting, auto_reply_enabled, emergency_behaviour')
           .eq('owner_id', plate.owner_id)
           .maybeSingle(),
       ]);
 
+      const ownerRow = Array.isArray(ownerRes.data) ? ownerRes.data[0] : ownerRes.data;
+
       state = {
         success: true,
         plate: { id: plate.id, plateId: plate.plate_id, productType: plate.product_type },
-        owner: { id: plate.owner_id, name: (Array.isArray(ownerRes.data) ? ownerRes.data[0]?.full_name : ownerRes.data?.full_name) || 'Resident' },
+        owner: {
+          id: plate.owner_id,
+          name: ownerRow?.full_name || 'Resident',
+          profile: {
+            residenceName:     ownerRow?.residence_name || null,
+            familyName:        ownerRow?.family_name || null,
+            welcomeMessage:    ownerRow?.welcome_message || null,
+            ownerDisplayName:  ownerRow?.owner_display_name || ownerRow?.full_name || 'Resident',
+            aiName:            ownerRow?.ai_name || 'Priya',
+            greetingStyle:     ownerRow?.greeting_style || 'warm',
+            preferredLanguage: ownerRow?.preferred_language || 'hinglish',
+            visitorGreeting:   ownerRow?.visitor_greeting || null,
+          },
+        },
         securityRules: rulesRes.data || {
           night_mode_on: false, allow_sos: true, allow_voice: true,
           allow_calls: true, call_forwarding: true,
@@ -662,13 +678,27 @@
     const rules = s.securityRules || {};
 
     const statusMap = {
-      available: { cls:'status-available', text: 'Available — Will respond shortly' },
-      busy:      { cls:'status-busy',      text: 'Busy — Please leave a message' },
-      sleeping:  { cls:'status-dnd',       text: 'Sleeping — Only SOS accepted' },
-      away:      { cls:'status-busy',      text: 'Away — Voice note recommended' },
+      available:     { cls:'status-available', text: 'Available — Will respond shortly' },
+      busy:          { cls:'status-busy',      text: 'Busy — Please leave a message' },
+      meeting:       { cls:'status-busy',      text: 'In a meeting — Please leave a message' },
+      sleeping:      { cls:'status-dnd',       text: 'Sleeping — Only SOS accepted' },
+      baby:          { cls:'status-dnd',       text: 'Baby sleeping — Please keep it quiet' }, // legacy dashboard key
+      away:          { cls:'status-busy',      text: 'Away — Voice note recommended' },
+      out_of_town:   { cls:'status-busy',      text: 'Out of town — Voice note recommended' },
+      out:           { cls:'status-busy',      text: 'Out of town — Voice note recommended' }, // legacy dashboard key
+      leave_at_gate: { cls:'status-busy',      text: 'Please leave parcel at the gate' },
+      parcel:        { cls:'status-busy',      text: 'Please leave parcel at the gate' }, // legacy dashboard key
+      vacation:      { cls:'status-busy',      text: 'On vacation — Will respond when back' },
+      driving:       { cls:'status-busy',      text: 'Driving — Please leave a message' },
+      offline:       { cls:'status-dnd',       text: 'Currently offline — Leave a message' },
     };
     const st = statusMap[rules.current_status] || statusMap.available;
     const statusText = rules.custom_message || st.text;
+
+    const profile = s.owner.profile || {};
+    const headerWelcomeLabel = profile.residenceName ? '🏡 Welcome' : 'Welcome to';
+    const headerMainName = profile.residenceName || profile.familyName || s.owner.name;
+    const headerSubLine  = profile.welcomeMessage || 'You are a valued visitor.';
 
     shell.innerHTML = `
       <!-- Header -->
@@ -680,9 +710,9 @@
             <div class="sd-logo-tagline">Home Privacy. Smarter Living.</div>
           </div>
         </div>
-        <div class="welcome-label">Welcome to</div>
-        <div class="owner-name" id="owner-name-el">${_esc(s.owner.name)}</div>
-        <div class="owner-sub">You are a valued visitor.</div>
+        <div class="welcome-label">${_esc(headerWelcomeLabel)}</div>
+        <div class="owner-name" id="owner-name-el">${_esc(headerMainName)}</div>
+        <div class="owner-sub">${_esc(headerSubLine)}</div>
         <div id="status-badge-wrap">
           <div class="status-badge ${st.cls}">
             <span class="status-dot"></span>
@@ -764,7 +794,7 @@
         <div class="ai-header">
           <div class="ai-avatar">🤖</div>
           <div class="ai-header-text">
-            <div class="ai-name">Priya — AI Receptionist</div>
+            <div class="ai-name" id="ai-receptionist-name">${_esc(s.owner.profile?.aiName || 'Priya')} — AI Receptionist</div>
             <div class="ai-status-text">Online · Powered by GROQ AI</div>
           </div>
           <button class="voice-toggle active" id="voice-toggle-btn" onclick="toggleVoice()">🔊 Voice On</button>
@@ -802,10 +832,19 @@
   function updateStatusBadge() {
     const rules = state?.securityRules || {};
     const map = {
-      available: { cls:'status-available', text:'Available — Will respond shortly' },
-      busy:      { cls:'status-busy',      text:'Busy — Please leave a message' },
-      sleeping:  { cls:'status-dnd',       text:'Sleeping — Only SOS accepted' },
-      away:      { cls:'status-busy',      text:'Away — Voice note recommended' },
+      available:     { cls:'status-available', text:'Available — Will respond shortly' },
+      busy:          { cls:'status-busy',      text:'Busy — Please leave a message' },
+      meeting:       { cls:'status-busy',      text:'In a meeting — Please leave a message' },
+      sleeping:      { cls:'status-dnd',       text:'Sleeping — Only SOS accepted' },
+      baby:          { cls:'status-dnd',       text:'Baby sleeping — Please keep it quiet' },
+      away:          { cls:'status-busy',      text:'Away — Voice note recommended' },
+      out_of_town:   { cls:'status-busy',      text:'Out of town — Voice note recommended' },
+      out:           { cls:'status-busy',      text:'Out of town — Voice note recommended' },
+      leave_at_gate: { cls:'status-busy',      text:'Please leave parcel at the gate' },
+      parcel:        { cls:'status-busy',      text:'Please leave parcel at the gate' },
+      vacation:      { cls:'status-busy',      text:'On vacation — Will respond when back' },
+      driving:       { cls:'status-busy',      text:'Driving — Please leave a message' },
+      offline:       { cls:'status-dnd',       text:'Currently offline — Leave a message' },
     };
     const st = map[rules.current_status] || map.available;
     const text = rules.custom_message || st.text;
@@ -838,16 +877,101 @@
       </div>`;
   }
 
-  // ── AI Chat Receptionist ──
-  function initAIChat(s) {
-    const ownerFirst = (s.owner.name || 'the resident').split(' ')[0];
-    // Hinglish greeting (Roman script — readable + speakable)
-    const hinglishGreeting = `Namaste! 🙏 Main Priya hoon, ${_esc(ownerFirst)} ji ki taraf se aapka swagat karta hoon. Aap mujhse Hindi, Hinglish, ya English mein baat kar sakte hain — main samjhunga! Kaise madad kar sakta hoon?`;
-    const englishSubtitle  = `Welcome! I'm Priya, AI receptionist for ${_esc(s.owner.name)}. You can speak Hindi, Hinglish, or English — I understand all three!`;
+  // ── Visitor fingerprint (for "returning visitor" memory, privacy-safe) ──
+  function _getVisitorFingerprint() {
+    try {
+      let fp = localStorage.getItem('sd_visitor_fp');
+      if (!fp) {
+        fp = 'v_' + Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2,'0')).join('');
+        localStorage.setItem('sd_visitor_fp', fp);
+      }
+      return fp;
+    } catch (_) {
+      return 'v_anon_' + Date.now();
+    }
+  }
 
-    // Dual-bubble greeting: Hinglish first, English subtitle below
+  // ── Greeting variation pools (never repeats the same sentence) ──
+  const GREETING_POOLS = {
+    warm: {
+      hinglish: [
+        (ai, owner) => `Namaste! 🙏 Main ${ai} hoon, ${owner} ji ki taraf se aapka swagat karta hoon. Aap mujhse Hindi, Hinglish, ya English mein baat kar sakte hain — main samjhunga! Kaise madad kar sakta hoon?`,
+        (ai, owner) => `Namaste ji! 😊 Main ${ai}, ${owner} ke ghar ki AI receptionist hoon. Batayein, aap kis silsile mein aaye hain?`,
+        (ai, owner) => `Swagat hai! Main ${ai} hoon — ${owner} ji ki taraf se aapki madad karne ke liye yahan hoon. Kripya batayein, kaise help kar sakti hoon?`,
+      ],
+      english: [
+        (ai, owner) => `Welcome! I'm ${ai}, AI receptionist for ${owner}. You can speak Hindi, Hinglish, or English — I understand all three!`,
+        (ai, owner) => `Hello there! I'm ${ai}, here on behalf of ${owner}. How can I help you today?`,
+        (ai, owner) => `Hi! ${ai} here, representing ${owner}'s home. What brings you by today?`,
+      ],
+    },
+    formal: {
+      hinglish: [
+        (ai, owner) => `Namaskar. Main ${ai} hoon, ${owner} ji ki authorized AI receptionist. Kripya apna parichay aur aane ka karan batayein.`,
+        (ai, owner) => `Namaste. ${ai} bol rahi hoon, ${owner} ke nivas se. Kripya apni visit ka uddeshya saanjha karein.`,
+      ],
+      english: [
+        (ai, owner) => `Greetings. I am ${ai}, the authorized AI receptionist for ${owner}'s residence. Please state the purpose of your visit.`,
+        (ai, owner) => `Good day. This is ${ai} on behalf of ${owner}. May I know the reason for your visit?`,
+      ],
+    },
+    brief: {
+      hinglish: [
+        (ai, owner) => `Hi! Main ${ai}. ${owner} ji ke liye. Aapka purpose?`,
+        (ai, owner) => `Namaste! ${ai} yahan. Kaise help karoon?`,
+      ],
+      english: [
+        (ai, owner) => `Hi, I'm ${ai} for ${owner}. Purpose of visit?`,
+        (ai, owner) => `Hello, ${ai} here. How can I help?`,
+      ],
+    },
+  };
+
+  function _pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // ── AI Chat Receptionist ──
+  async function initAIChat(s) {
+    const profile = s.owner.profile || {};
+    const aiName = profile.aiName || 'Priya';
+    const ownerFirst = (profile.familyName || s.owner.name || 'the resident').split(' ')[0];
+    const style = GREETING_POOLS[profile.greetingStyle] ? profile.greetingStyle : 'warm';
+
+    // Check visitor memory — returning visitor recognition
+    let memoryNote = null;
+    try {
+      const fp = _getVisitorFingerprint();
+      const { data: memData } = await supabase.rpc('remember_visitor', {
+        p_owner_id: s.owner.id, p_plate_id: s.plate.plateId, p_fingerprint: fp, p_intent: null,
+      });
+      const mem = Array.isArray(memData) ? memData[0] : memData;
+      if (mem?.is_returning) {
+        if (mem.visit_count > 3 && mem.visitor_label) {
+          memoryNote = `Welcome back! 👋 Aap pehle bhi (${mem.visitor_label}) aa chuke hain — Aapko pehchaan liya gaya hai.`;
+        } else {
+          memoryNote = `Welcome back! 👋 Aap dobara aaye hain — accha laga!`;
+        }
+      }
+    } catch (e) { console.warn('[visitor] memory check failed', e); }
+
+    // Use owner's custom visitor greeting if set, otherwise generate varied greeting
+    let hinglishGreeting, englishSubtitle;
+    if (profile.visitorGreeting) {
+      hinglishGreeting = _esc(profile.visitorGreeting);
+      englishSubtitle = `I'm ${_esc(aiName)}, AI receptionist for ${_esc(ownerFirst)}. You can speak Hindi, Hinglish, or English!`;
+    } else {
+      const hinglishFn = _pickRandom(GREETING_POOLS[style].hinglish);
+      const englishFn  = _pickRandom(GREETING_POOLS[style].english);
+      hinglishGreeting = hinglishFn(_esc(aiName), _esc(ownerFirst));
+      englishSubtitle  = englishFn(_esc(aiName), _esc(ownerFirst));
+    }
+
+    // Status-aware addendum — tells visitor what to expect right away
+    const statusAddendum = _statusAwareNote(s.securityRules?.current_status, s.securityRules?.custom_message);
+
+    if (memoryNote) appendAIMsg(memoryNote, 'ai-subtitle');
     appendAIMsg(hinglishGreeting, 'ai');
     appendAIMsg(englishSubtitle, 'ai-subtitle');
+    if (statusAddendum) appendAIMsg(statusAddendum, 'ai-subtitle');
 
     // Auto-speak the greeting — works after any user gesture on the page.
     // Voice toggle button is shown so user can enable for subsequent replies.
@@ -888,7 +1012,31 @@
     });
   }
 
+  // ── Owner-status-aware note shown immediately on chat load ──
+  function _statusAwareNote(status, customMessage) {
+    if (customMessage) return null; // owner already has a custom message shown in the header badge
+    const notes = {
+      busy:          'Owner is currently busy. Would you like to leave a message?',
+      meeting:       'Owner is in a meeting right now. Please leave a message and they\'ll respond soon.',
+      sleeping:      'Owner is resting. Only emergencies will notify immediately — otherwise please leave a voice or text message.',
+      baby:          'A baby is sleeping at home. Only emergencies will notify immediately — otherwise please leave a quiet message.',
+      away:          'Owner is away from home. A voice note works best — they\'ll hear it as soon as possible.',
+      out_of_town:   'Owner is out of town. Please leave a message — they\'ll get back to you.',
+      out:           'Owner is out of town. Please leave a message — they\'ll get back to you.',
+      leave_at_gate: 'Please leave the parcel safely at the entrance. Thank you!',
+      parcel:        'Please leave the parcel safely at the entrance. Thank you!',
+      vacation:      'Owner is on vacation right now. Messages will be answered once they\'re back.',
+      driving:       'Owner is driving right now. Please leave a message — they\'ll call back shortly.',
+      offline:       'Owner is currently offline. Please leave a message for a prompt response.',
+    };
+    return notes[status] || null;
+  }
+
   let _aiSending = false; // double-submit guard
+  // Per-session conversation history — keeps Priya context-aware and stops
+  // her from repeating the same sentence within a conversation.
+  let _aiConversationHistory = [];
+
   async function handleAISend(s) {
     if (_aiSending) return;
     const input = document.getElementById('ai-input');
@@ -900,13 +1048,19 @@
     if (sendBtn) sendBtn.disabled = true;
 
     appendAIMsg(text, 'user');
+    _aiConversationHistory.push({ role: 'user', content: text });
 
-    // Thinking indicator
+    // Thinking indicator (natural delay — feels less robotic, more human)
     const thinkId = 'think-' + Date.now();
     appendThinking(thinkId);
+    const thinkingDelay = 450 + Math.random() * 550; // 450–1000ms
+    await new Promise(r => setTimeout(r, thinkingDelay));
 
     // Detect visitor language for adaptive AI response
     const inputLang = detectLang(text);
+    const profile = s.owner.profile || {};
+    const aiName = profile.aiName || 'Priya';
+    const ownerLabel = profile.familyName || profile.residenceName || s.owner.name || 'the resident';
 
     // Call Groq proxy
     let intentData = null;
@@ -914,17 +1068,21 @@
       const supabaseUrl = window.__SD_CONFIG__?.supabaseUrl || '';
       const anonKey = window.__SD_CONFIG__?.supabaseAnon || '';
       if (supabaseUrl && anonKey) {
+        const systemPrompt = `You are ${aiName}, AI receptionist for Smart Door, deployed at the residence of "${ownerLabel}" in India. OWNER STATUS: "${(s.securityRules?.current_status || 'available').toUpperCase()}" — ${s.securityRules?.custom_message || 'No custom message'}. GREETING STYLE: ${profile.greetingStyle || 'warm'}. PREFERRED LANGUAGE: ${profile.preferredLanguage || 'hinglish'}. LANGUAGE RULES: Visitor language detected: ${inputLang === 'hi-IN' ? 'Hindi/Hinglish' : 'English'}. NEVER repeat a sentence you've already used in this conversation — vary your phrasing naturally each time, like a real receptionist would. Based on owner status, guide visitors appropriately: BUSY/MEETING/DRIVING → suggest leaving a message; SLEEPING/OFFLINE → only emergencies get immediate attention, otherwise suggest a message; AVAILABLE → offer to notify owner immediately; OUT_OF_TOWN/AWAY/VACATION → guide to leave a voice/text message; LEAVE_AT_GATE → instruct delivery/courier visitors to leave parcel at gate. Always reply with THREE fields: "response" (English 1-2 sentences), "hinglish_response" (Hinglish Roman script — warmly blend Hindi+English), "hindi_tts" (pure Devanagari for TTS). Respond ONLY with valid JSON, no markdown: {"intent":"Courier|Amazon|Flipkart|Food Delivery|Friend|Guest|Family|Electrician|Plumber|Milkman|Gas Cylinder|Maintenance|Maid|Emergency|Salesperson|Unknown Visitor","priority":"Low|Normal|High|Critical","action":"Blocked|Notify Owner|Ring Bell + Notify|Bypass All Rules|Leave Message","color":"#hex","emoji":"emoji","response":"English","hinglish_response":"Hinglish Roman","hindi_tts":"Devanagari","confidence":0.9,"suggest_action":"bell|text|voice|call|none"}`;
+
         const res = await fetch(`${supabaseUrl}/functions/v1/groq-proxy`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
           body: JSON.stringify({
             model: 'llama3-70b-8192',
             max_tokens: 400,
-            temperature: 0.3,
-            messages: [{
-              role: 'system',
-              content: `You are Priya, AI receptionist for Smart Door, deployed across India at residential and commercial gates. OWNER STATUS: "${(s.securityRules?.current_status || 'available').toUpperCase()}" — ${s.securityRules?.custom_message || 'No custom message'}. LANGUAGE RULES: Visitor language detected: ${inputLang === 'hi-IN' ? 'Hindi/Hinglish' : 'English'}. Based on owner status, guide visitors appropriately: if BUSY/SLEEPING → suggest voice note or text message; if AVAILABLE → offer to notify owner; if OUT_OF_TOWN/AWAY → guide to leave message; if MEETING → ask to wait or leave message. Always reply with THREE fields: "response" (English 1-2 sentences), "hinglish_response" (Hinglish Roman script — warmly blend Hindi+English), "hindi_tts" (pure Devanagari for TTS). Respond ONLY with valid JSON, no markdown: {"intent":"Delivery|Emergency / SOS|Spam / Promotional|Known Guest / Family|Maintenance|Courier|Food Delivery|Gas Cylinder|Electrician|Plumber|General Visitor","priority":"Low|Normal|High|Critical","action":"Blocked|Notify Owner|Ring Bell + Notify|Bypass All Rules|Leave Message","color":"#hex","emoji":"emoji","response":"English","hinglish_response":"Hinglish Roman","hindi_tts":"Devanagari","confidence":0.9,"suggest_action":"bell|text|voice|call|none"}`
-            }, { role: 'user', content: text }],
+            temperature: 0.6, // higher temp → more varied phrasing, avoids repeating
+            messages: [
+              { role: 'system', content: systemPrompt },
+              // Send recent conversation history (last 6 turns) so AI has context
+              // and naturally avoids repeating itself.
+              ..._aiConversationHistory.slice(-6),
+            ],
           }),
         });
         const data = await res.json();
@@ -952,6 +1110,7 @@
     if (englishReply && englishReply !== hinglishReply) {
       appendAIMsg(englishReply, 'ai-subtitle');
     }
+    _aiConversationHistory.push({ role: 'assistant', content: hinglishReply });
 
     // TTS — always auto-speak after response (needs prior user gesture)
     const ttsText = intentData.hindi_tts || intentData.hindi_response || toHindi(intentData.response, intentData.intent);
@@ -959,10 +1118,30 @@
     // Honour voiceEnabled for repeat/explicit speaks
     if (voiceEnabled && ttsText) speak(ttsText, 'hi-IN');
 
+    // Persist detected intent — visitor_logs + visitor_memory (returning-visitor recognition)
+    if (s.owner.id && s.plate.plateId) {
+      try {
+        await supabase.from('visitor_logs').insert({
+          owner_id: s.owner.id, plate_id: s.plate.plateId,
+          event_type: 'ai_conversation', user_agent: navigator.userAgent,
+          ai_intent: intentData.intent || null,
+          ai_confidence: intentData.confidence || null,
+          ai_priority: intentData.priority || null,
+        });
+      } catch (_) {}
+      try {
+        const fp = _getVisitorFingerprint();
+        await supabase.rpc('remember_visitor', {
+          p_owner_id: s.owner.id, p_plate_id: s.plate.plateId,
+          p_fingerprint: fp, p_intent: intentData.intent || null,
+        });
+      } catch (_) {}
+    }
+
     // Auto-actions based on AI intent
     if (intentData.action === 'Blocked') {
       showToast('🚫 Visitor intent blocked by AI', 'error');
-    } else if (intentData.priority === 'Critical' || intentData.intent === 'Emergency / SOS') {
+    } else if (intentData.priority === 'Critical' || intentData.intent === 'Emergency') {
       showToast('🚨 Emergency detected — alerting all contacts', 'error');
       // Auto-trigger SOS for critical intents detected by AI
       if (s.owner.id && s.plate.plateId) {
@@ -977,6 +1156,9 @@
         _logVisitorEvent(s.owner.id, s.plate.plateId, 'bell_ring').catch(() => {});
         showToast('🔔 Bell auto-rung — owner notified by AI', 'info');
       }
+    } else if (intentData.suggest_action === 'call') {
+      // AI suggests calling — surface the call button visually
+      document.getElementById('btn-call')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else if (intentData.suggest_action === 'text' || intentData.suggest_action === 'voice') {
       // AI suggests leaving a message — open text panel
       const panel = document.getElementById('text-msg-body');
@@ -988,7 +1170,8 @@
       }
     }
 
-    // Log the message
+    // Log the conversational message as a low-priority record (keeps existing
+    // message_logs flow intact for the dashboard's communication timeline)
     if (s.owner.id && s.plate.plateId) {
       sendTextMessage({
         ownerId: s.owner.id, plateId: s.plate.plateId, content: text,
@@ -1010,13 +1193,21 @@
     div.className = `msg-row ${role}`;
     div.id = id;
     const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const seenTick = role === 'user' ? '<span class="seen-tick" id="' + id + '-seen">✓</span>' : '';
     div.innerHTML = `
       <div class="msg-bubble" style="${color ? `border-color:${color}40;` : ''}">
         ${_esc(text)}
-        <div class="msg-meta">${timeStr}</div>
+        <div class="msg-meta">${timeStr} ${seenTick}</div>
       </div>`;
     wrap.appendChild(div);
     wrap.scrollTop = wrap.scrollHeight;
+    // Simulate "seen" — double-tick after AI starts responding
+    if (role === 'user') {
+      setTimeout(() => {
+        const tick = document.getElementById(id + '-seen');
+        if (tick) { tick.textContent = '✓✓'; tick.style.color = '#00A2E8'; }
+      }, 600);
+    }
     return id;
   }
 
@@ -1065,30 +1256,84 @@
   function mockClassify(text) {
     const t = text.toLowerCase();
     if (['emergency','sos','help','fire','accident','urgent'].some(k=>t.includes(k)))
-      return { intent:'Emergency / SOS', priority:'Critical', action:'Bypass All Rules', color:'#EF4444', emoji:'🚨',
+      return { intent:'Emergency', priority:'Critical', action:'Bypass All Rules', color:'#EF4444', emoji:'🚨',
         response:'Emergency detected! Alerting all family members immediately. Please stay calm.',
         hinglish_response:'🚨 Emergency detect hua! Sabhi family members ko turant alert kar diya gaya hai. Shant rahein, madad aa rahi hai!',
         hindi_tts:'आपातकालीन स्थिति का पता चला है। सभी परिवार के सदस्यों को तुरंत सूचित किया जा रहा है। शांत रहें।',
         confidence:0.97 };
-    if (['deliver','parcel','amazon','courier','flipkart','food','swiggy','zomato','box'].some(k=>t.includes(k)))
-      return { intent:'Delivery', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'📦',
+    if (['amazon'].some(k=>t.includes(k)))
+      return { intent:'Amazon', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'📦',
+        response:'Please leave the Amazon parcel at the gate. Owner has been notified.',
+        hinglish_response:'📦 Amazon ka parcel gate ke paas chhod dein ji. Owner ko notify kar diya gaya hai!',
+        hindi_tts:'कृपया अमेज़न पार्सल गेट के पास छोड़ दें। मालिक को सूचित कर दिया गया है।',
+        confidence:0.92 };
+    if (['flipkart'].some(k=>t.includes(k)))
+      return { intent:'Flipkart', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'📦',
+        response:'Please leave the Flipkart parcel at the gate. Owner has been notified.',
+        hinglish_response:'📦 Flipkart ka parcel gate ke paas chhod dein. Owner ko bata diya gaya hai!',
+        hindi_tts:'कृपया फ्लिपकार्ट पार्सल गेट के पास छोड़ दें। मालिक को सूचित कर दिया गया है।',
+        confidence:0.92 };
+    if (['swiggy','zomato','food','delivery boy','khana'].some(k=>t.includes(k)))
+      return { intent:'Food Delivery', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'🍔',
+        response:'Food delivery noted. Owner has been notified — please wait a moment.',
+        hinglish_response:'🍔 Food delivery aayi hai, owner ko bata diya gaya hai. Thodi der rukiye!',
+        hindi_tts:'खाने की डिलीवरी आई है। मालिक को सूचित कर दिया गया है।',
+        confidence:0.9 };
+    if (['courier','parcel','box','dtdc','bluedart','speed post'].some(k=>t.includes(k)))
+      return { intent:'Courier', priority:'Normal', action:'Notify Owner', color:'#F59E0B', emoji:'📦',
         response:'Please leave the parcel at the gate. Owner has been notified.',
         hinglish_response:'📦 Parcel gate ke paas chhod dein ji. Owner ko notify kar diya gaya hai. Shukriya!',
         hindi_tts:'कृपया पार्सल गेट के पास छोड़ दें। मालिक को सूचित कर दिया गया है।',
         confidence:0.91 };
-    if (['sell','loan','insurance','offer','discount','promotion','leaflet'].some(k=>t.includes(k)))
-      return { intent:'Spam / Promotional', priority:'Low', action:'Blocked', color:'#EF4444', emoji:'🚫',
-        response:'We do not accept promotional requests. Thank you.',
+    if (['sell','loan','insurance','offer','discount','promotion','leaflet','scheme'].some(k=>t.includes(k)))
+      return { intent:'Salesperson', priority:'Low', action:'Blocked', color:'#EF4444', emoji:'🚫',
+        response:'We do not accept promotional or sales visits. Thank you.',
         hinglish_response:'🚫 Maafi chahenge, hum promotional ya sales requests accept nahi karte. Shukriya aane ka!',
         hindi_tts:'माफी चाहते हैं, हम प्रचार संबंधी अनुरोध स्वीकार नहीं करते।',
         confidence:0.93 };
-    if (['family','friend','relative','guest','visit','know','neighbour'].some(k=>t.includes(k)))
-      return { intent:'Known Guest / Family', priority:'High', action:'Ring Bell + Notify', color:'#22C55E', emoji:'👨‍👩‍👧',
+    if (['electrician','wiring','switch','fuse','mcb'].some(k=>t.includes(k)))
+      return { intent:'Electrician', priority:'Normal', action:'Notify Owner', color:'#3B82F6', emoji:'🔌',
+        response:'Electrician noted — owner has been notified.',
+        hinglish_response:'🔌 Electrician ji, owner ko aapke baare mein bata diya gaya hai. Thodi der rukiye!',
+        hindi_tts:'इलेक्ट्रीशियन की सूचना मालिक को दे दी गई है।',
+        confidence:0.88 };
+    if (['plumber','pipe','leak','tap','nal'].some(k=>t.includes(k)))
+      return { intent:'Plumber', priority:'Normal', action:'Notify Owner', color:'#3B82F6', emoji:'🔧',
+        response:'Plumber noted — owner has been notified.',
+        hinglish_response:'🔧 Plumber ji, owner ko bata diya gaya hai. Thodi der pratiksha karein!',
+        hindi_tts:'प्लंबर की सूचना मालिक को दे दी गई है।',
+        confidence:0.88 };
+    if (['milk','doodh','milkman'].some(k=>t.includes(k)))
+      return { intent:'Milkman', priority:'Low', action:'Notify Owner', color:'#94A3B8', emoji:'🥛',
+        response:'Milk delivery noted — owner has been notified.',
+        hinglish_response:'🥛 Doodh wale bhaiya, owner ko bata diya gaya hai!',
+        hindi_tts:'दूध की डिलीवरी की सूचना मालिक को दे दी गई है।',
+        confidence:0.85 };
+    if (['gas','cylinder','lpg'].some(k=>t.includes(k)))
+      return { intent:'Gas Cylinder', priority:'Normal', action:'Notify Owner', color:'#F97316', emoji:'🔥',
+        response:'Gas cylinder delivery noted — owner has been notified.',
+        hinglish_response:'🔥 Gas cylinder ji, owner ko bata diya gaya hai. Thodi der rukiye!',
+        hindi_tts:'गैस सिलेंडर की सूचना मालिक को दे दी गई है।',
+        confidence:0.89 };
+    if (['maintenance','repair','society','watchman','guard duty'].some(k=>t.includes(k)))
+      return { intent:'Maintenance', priority:'Normal', action:'Notify Owner', color:'#3B82F6', emoji:'🛠️',
+        response:'Maintenance visit noted — owner has been notified.',
+        hinglish_response:'🛠️ Maintenance ke liye owner ko bata diya gaya hai. Thodi der rukiye!',
+        hindi_tts:'रखरखाव विज़िट की सूचना मालिक को दे दी गई है।',
+        confidence:0.86 };
+    if (['maid','servant','cleaning','jhadu','bai'].some(k=>t.includes(k)))
+      return { intent:'Maid', priority:'Normal', action:'Ring Bell + Notify', color:'#22C55E', emoji:'🧹',
+        response:'Welcome! Owner has been notified of your arrival.',
+        hinglish_response:'🧹 Swagat hai! Owner ko aapke aane ki soochana de di gayi hai.',
+        hindi_tts:'आपका स्वागत है! मालिक को सूचित कर दिया गया है।',
+        confidence:0.87 };
+    if (['family','friend','relative','guest','visit','know','neighbour','dost'].some(k=>t.includes(k)))
+      return { intent:'Friend', priority:'High', action:'Ring Bell + Notify', color:'#22C55E', emoji:'👨‍👩‍👧',
         response:'Welcome! The owner has been notified of your arrival.',
         hinglish_response:'🙏 Swagat hai aapka! Owner ko aapke aane ki soochana de di gayi hai. Thodi der mein aa jaayenge!',
         hindi_tts:'आपका स्वागत है! मालिक को आपके आने की सूचना दे दी गई है।',
         confidence:0.88 };
-    return { intent:'General Visitor', priority:'Normal', action:'Notify Owner', color:'#00A2E8', emoji:'👋',
+    return { intent:'Unknown Visitor', priority:'Normal', action:'Notify Owner', color:'#00A2E8', emoji:'👋',
       response:'Thank you for visiting! The owner has been notified of your arrival.',
       hinglish_response:'👋 Shukriya aane ka! Owner ko aapke baare mein inform kar diya gaya hai. Thodi der pratiksha karein ya bell bajayein.',
       hindi_tts:'आने का शुक्रिया! मालिक को सूचित कर दिया गया है। कृपया प्रतीक्षा करें।',

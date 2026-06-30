@@ -293,6 +293,24 @@
       border-color: rgba(0,162,232,0.25);
     }
 
+    /* ── Owner & AI Settings form fields ── */
+    .settings-field-group { margin-bottom: 10px; }
+    .settings-label {
+      display: block; font-size: 0.72rem; color: rgba(255,255,255,0.45);
+      margin-bottom: 5px; font-weight: 600;
+    }
+    .settings-input {
+      width: 100%; padding: 9px 11px; border-radius: 9px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      color: #E2ECF4; font-size: 0.82rem; font-family: 'Inter', sans-serif;
+      outline: none; resize: none; transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .settings-input:focus { border-color: rgba(0,162,232,0.45); }
+    .settings-input::placeholder { color: rgba(226,236,244,0.3); }
+    select.settings-input { cursor: pointer; }
+    select.settings-input option { background: #0E1B2A; color: #E2ECF4; }
+
     /* ── Status Option tiles ── */
     .status-option {
       display: flex;
@@ -693,6 +711,83 @@
         <button id="use-ai-message-btn" class="btn-primary" style="width:100%;justify-content:center;margin-top:8px;font-size:0.82rem;padding:10px;display:none;">USE THIS MESSAGE</button>
       </div>
 
+      <!-- Owner & AI Receptionist Settings -->
+      <div class="dash-card" style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span style="font-size:1.1rem;">🏡</span>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Owner & AI Settings</div>
+        </div>
+
+        <div class="settings-field-group">
+          <label class="settings-label">Residence Name</label>
+          <input type="text" id="set-residence-name" class="settings-input" placeholder="e.g. Sharma Residence" maxlength="60" />
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Family Name</label>
+          <input type="text" id="set-family-name" class="settings-input" placeholder="e.g. The Sharma Family" maxlength="60" />
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Owner Display Name</label>
+          <input type="text" id="set-owner-display-name" class="settings-input" placeholder="e.g. Rahul Sharma" maxlength="60" />
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Welcome Message</label>
+          <textarea id="set-welcome-message" class="settings-input" rows="2" maxlength="200" placeholder="We're happy to assist you today."></textarea>
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Visitor Greeting (optional override)</label>
+          <textarea id="set-visitor-greeting" class="settings-input" rows="2" maxlength="200" placeholder="How may we help you today?"></textarea>
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">AI Receptionist Name</label>
+          <input type="text" id="set-ai-name" class="settings-input" placeholder="Priya" maxlength="30" />
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Greeting Style</label>
+          <select id="set-greeting-style" class="settings-input">
+            <option value="warm">Warm & Friendly</option>
+            <option value="formal">Formal & Professional</option>
+            <option value="brief">Brief & Direct</option>
+          </select>
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Preferred Language</label>
+          <select id="set-preferred-language" class="settings-input">
+            <option value="hinglish">Hinglish (Hindi + English)</option>
+            <option value="hindi">Hindi</option>
+            <option value="english">English</option>
+          </select>
+        </div>
+        <div class="settings-field-group" style="display:flex;align-items:center;justify-content:space-between;">
+          <label class="settings-label" style="margin:0;">Auto Reply Enabled</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="set-auto-reply" checked />
+            <div class="toggle-thumb"></div>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <div class="settings-field-group" style="flex:1;">
+            <label class="settings-label">Business Hours Start</label>
+            <input type="time" id="set-hours-start" class="settings-input" />
+          </div>
+          <div class="settings-field-group" style="flex:1;">
+            <label class="settings-label">Business Hours End</label>
+            <input type="time" id="set-hours-end" class="settings-input" />
+          </div>
+        </div>
+        <div class="settings-field-group">
+          <label class="settings-label">Emergency Behaviour</label>
+          <select id="set-emergency-behaviour" class="settings-input">
+            <option value="notify_all">Notify Owner + All Family</option>
+            <option value="notify_owner_only">Notify Owner Only</option>
+            <option value="silent_log">Log Only (No Push)</option>
+          </select>
+        </div>
+
+        <button id="save-owner-settings-btn" class="btn-primary" style="width:100%;justify-content:center;margin-top:10px;font-size:0.82rem;padding:10px;">💾 Save Settings</button>
+        <div id="owner-settings-status" style="margin-top:8px;font-size:0.72rem;color:rgba(34,197,94,0.8);display:none;">✅ Saved successfully</div>
+      </div>
+
       <!-- Family Routing -->
       <div class="dash-card" style="margin-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -867,6 +962,78 @@
             <div style="flex:1;font-size:0.8rem;font-weight:600;color:#fff;">Leave at Gate</div>
             <div class="check-icon" style="opacity:0;width:14px;height:14px;border-radius:50%;background:#00A2E8;display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#fff;">✓</div>
           </div>
+        </div>
+
+        <!-- Owner & AI Receptionist Settings (desktop) -->
+        <div class="dash-section-title">Owner & AI Settings</div>
+        <div class="dash-card" style="margin-bottom:16px;">
+          <div class="settings-field-group">
+            <label class="settings-label">Residence Name</label>
+            <input type="text" id="set-residence-name-d" class="settings-input" placeholder="e.g. Sharma Residence" maxlength="60" />
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Family Name</label>
+            <input type="text" id="set-family-name-d" class="settings-input" placeholder="e.g. The Sharma Family" maxlength="60" />
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Owner Display Name</label>
+            <input type="text" id="set-owner-display-name-d" class="settings-input" placeholder="e.g. Rahul Sharma" maxlength="60" />
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Welcome Message</label>
+            <textarea id="set-welcome-message-d" class="settings-input" rows="2" maxlength="200" placeholder="We're happy to assist you today."></textarea>
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Visitor Greeting (optional)</label>
+            <textarea id="set-visitor-greeting-d" class="settings-input" rows="2" maxlength="200" placeholder="How may we help you today?"></textarea>
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">AI Receptionist Name</label>
+            <input type="text" id="set-ai-name-d" class="settings-input" placeholder="Priya" maxlength="30" />
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Greeting Style</label>
+            <select id="set-greeting-style-d" class="settings-input">
+              <option value="warm">Warm & Friendly</option>
+              <option value="formal">Formal & Professional</option>
+              <option value="brief">Brief & Direct</option>
+            </select>
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Preferred Language</label>
+            <select id="set-preferred-language-d" class="settings-input">
+              <option value="hinglish">Hinglish (Hindi + English)</option>
+              <option value="hindi">Hindi</option>
+              <option value="english">English</option>
+            </select>
+          </div>
+          <div class="settings-field-group" style="display:flex;align-items:center;justify-content:space-between;">
+            <label class="settings-label" style="margin:0;">Auto Reply Enabled</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="set-auto-reply-d" checked />
+              <div class="toggle-thumb"></div>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div class="settings-field-group" style="flex:1;">
+              <label class="settings-label">Hours Start</label>
+              <input type="time" id="set-hours-start-d" class="settings-input" />
+            </div>
+            <div class="settings-field-group" style="flex:1;">
+              <label class="settings-label">Hours End</label>
+              <input type="time" id="set-hours-end-d" class="settings-input" />
+            </div>
+          </div>
+          <div class="settings-field-group">
+            <label class="settings-label">Emergency Behaviour</label>
+            <select id="set-emergency-behaviour-d" class="settings-input">
+              <option value="notify_all">Notify Owner + All Family</option>
+              <option value="notify_owner_only">Notify Owner Only</option>
+              <option value="silent_log">Log Only (No Push)</option>
+            </select>
+          </div>
+          <button id="save-owner-settings-btn-d" class="btn-primary" style="width:100%;justify-content:center;margin-top:10px;font-size:0.82rem;padding:10px;">💾 Save Settings</button>
+          <div id="owner-settings-status-d" style="margin-top:8px;font-size:0.72rem;color:rgba(34,197,94,0.8);display:none;">✅ Saved successfully</div>
         </div>
 
         <!-- Family Routing -->
