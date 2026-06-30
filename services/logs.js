@@ -343,13 +343,15 @@ export function subscribeToSOS(ownerId, callback) {
 // ────────── FORMAT LOG FOR DISPLAY ──────────
 export function formatLogForDisplay(log) {
   const typeMap = {
-    qr_scan:       { label: 'QR Code Scanned',        color: '#00A2E8', icon: '📲' },
-    bell_ring:     { label: 'Digital Bell Rung',       color: '#F59E0B', icon: '🔔' },
-    voice_message: { label: 'Voice Message Left',      color: '#22C55E', icon: '🎤' },
-    call_attempt:  { label: 'Masked Call Routed',      color: '#00A2E8', icon: '📞' },
-    spam_blocked:  { label: 'Spam Blocked by AI',      color: '#EF4444', icon: '🚫' },
-    sos:           { label: '🚨 SOS Emergency Alert',  color: '#EF4444', icon: '🚨' },
-    ai_intent:     { label: `AI: ${log.ai_intent || 'Intent Detected'}`, color: '#9333EA', icon: '🤖' },
+    qr_scan:        { label: 'QR Code Scanned',        color: '#00A2E8', icon: '📲' },
+    bell_ring:      { label: 'Digital Bell Rung',       color: '#F59E0B', icon: '🔔' },
+    voice_message:  { label: 'Voice Message Left',      color: '#22C55E', icon: '🎤' },
+    call_attempt:   { label: 'Masked Call Routed',      color: '#00A2E8', icon: '📞' },
+    spam_blocked:   { label: 'Spam Blocked by AI',      color: '#EF4444', icon: '🚫' },
+    sos:            { label: '🚨 SOS Emergency Alert',  color: '#EF4444', icon: '🚨' },
+    sos_triggered:  { label: '🚨 SOS Emergency Alert',  color: '#EF4444', icon: '🚨' },
+    ai_intent:      { label: `AI: ${log.ai_intent || 'Intent Detected'}`, color: '#9333EA', icon: '🤖' },
+    ai_conversation:{ label: `AI Chat: ${log.ai_intent || 'Visitor message'}`, color: '#9333EA', icon: '🤖' },
   };
 
   const meta = typeMap[log.event_type] || { label: log.event_type, color: '#00A2E8', icon: '📋' };
@@ -361,6 +363,8 @@ export function formatLogForDisplay(log) {
     type: log.event_type,
     color: meta.color,
     icon: meta.icon,
+    intent: log.ai_intent || null,
+    priority: log.ai_priority || null,
     raw: log,
   };
 }
