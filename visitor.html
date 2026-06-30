@@ -17,7 +17,7 @@
 
     body {
       min-height: 100dvh;
-      background: #060d1a;
+      background: #03080a;
       color: #e2ecf4;
       font-family: 'Inter', sans-serif;
       display: flex;
@@ -27,36 +27,22 @@
       position: relative;
     }
 
-    /* ── Animated background ── */
+    /* ── Cinematic background — real photo ── */
     .bg-layer {
-      position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url('/images/visitor-background.webp');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      /* No stretching. No repeating. No white edges. */
     }
-    .bg-grid {
+    /* Dark luxury overlay — keeps cards readable on any photo */
+    .bg-layer::after {
+      content: '';
       position: absolute; inset: 0;
-      background-image:
-        linear-gradient(rgba(0,162,232,0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,162,232,0.035) 1px, transparent 1px);
-      background-size: 44px 44px;
+      background: rgba(3, 8, 18, 0.72);
     }
-    .bg-glow-top {
-      position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
-      width: 700px; height: 400px;
-      background: radial-gradient(ellipse, rgba(0,162,232,0.13) 0%, transparent 70%);
-      animation: bgPulse 6s ease-in-out infinite;
-    }
-    .bg-glow-bottom {
-      position: absolute; bottom: -80px; right: -100px;
-      width: 500px; height: 380px;
-      background: radial-gradient(ellipse, rgba(200,160,40,0.07) 0%, transparent 70%);
-    }
-    .bg-scanline {
-      position: absolute; inset: 0;
-      background: repeating-linear-gradient(
-        0deg, transparent, transparent 2px, rgba(0,162,232,0.012) 2px, rgba(0,162,232,0.012) 4px
-      );
-      pointer-events: none;
-    }
-    @keyframes bgPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
 
     /* ── Shell ── */
     .shell {
@@ -394,6 +380,59 @@
     .pending-stage { font-size: 0.75rem; color: rgba(0,162,232,0.6); padding: 6px 14px; border: 1px solid rgba(0,162,232,0.2); border-radius: 10px; }
 
     /* ── Toast ── */
+    /* ── Text message panel ── */
+    .text-msg-panel {
+      margin: 0 16px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+    .text-msg-toggle {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 16px;
+      cursor: pointer; background: none; border: none;
+      color: #e2ecf4; width: 100%; text-align: left;
+    }
+    .text-msg-toggle .tmg-icon { font-size: 1.2rem; }
+    .text-msg-toggle .tmg-label { font-weight: 600; font-size: 0.92rem; flex: 1; }
+    .text-msg-toggle .tmg-arrow { font-size: 0.9rem; color: rgba(255,255,255,0.25); transition: transform 0.2s; }
+    .text-msg-toggle.open .tmg-arrow { transform: rotate(90deg); }
+    .text-msg-body {
+      display: none; padding: 0 14px 14px;
+      flex-direction: column; gap: 8px;
+    }
+    .text-msg-body.open { display: flex; }
+    .text-msg-body textarea {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 10px 12px;
+      color: #e2ecf4; font-family: 'Inter', sans-serif;
+      font-size: 0.88rem; resize: none; outline: none;
+      min-height: 72px; line-height: 1.5;
+    }
+    .text-msg-body textarea::placeholder { color: rgba(226,236,244,0.35); }
+    .text-msg-body textarea:focus { border-color: rgba(0,162,232,0.35); }
+    .text-msg-send {
+      align-self: flex-end;
+      background: linear-gradient(135deg,#00A2E8,#0066cc);
+      border: none; border-radius: 9px;
+      padding: 8px 18px; color: #fff; font-weight: 600; font-size: 0.84rem;
+      cursor: pointer; transition: opacity 0.2s;
+    }
+    .text-msg-send:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Bell ring animation on dashboard — keyframe for btn */
+    @keyframes bellShake {
+      0%,100% { transform: rotate(0); }
+      20% { transform: rotate(-15deg); }
+      40% { transform: rotate(15deg); }
+      60% { transform: rotate(-10deg); }
+      80% { transform: rotate(10deg); }
+    }
+    .bell-ringing { animation: bellShake 0.6s ease-in-out; }
+
     .toast {
       position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
       padding: 10px 20px; border-radius: 12px;
@@ -408,12 +447,7 @@
   </style>
 </head>
 <body>
-<div class="bg-layer">
-  <div class="bg-grid"></div>
-  <div class="bg-glow-top"></div>
-  <div class="bg-glow-bottom"></div>
-  <div class="bg-scanline"></div>
-</div>
+<div class="bg-layer"></div>
 
 <script src="config/env.generated.js?v=2"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
@@ -710,6 +744,19 @@
         </button>
       </div>
 
+      <!-- Text Message Panel (collapsible) -->
+      <div class="text-msg-panel" id="text-msg-panel">
+        <button class="text-msg-toggle" id="text-msg-toggle">
+          <span class="tmg-icon">💬</span>
+          <span class="tmg-label">Leave a Text Message</span>
+          <span class="tmg-arrow">›</span>
+        </button>
+        <div class="text-msg-body" id="text-msg-body">
+          <textarea id="text-msg-input" placeholder="Type your message for the owner… (e.g. Parcel chhod ke gaya hoon gate pe)" maxlength="500" rows="3"></textarea>
+          <button class="text-msg-send" id="text-msg-send">Send Message →</button>
+        </div>
+      </div>
+
       <hr class="section-divider" />
 
       <!-- AI Chat Receptionist -->
@@ -876,7 +923,7 @@
             temperature: 0.3,
             messages: [{
               role: 'system',
-              content: `You are Priya, AI receptionist for Smart Door, used across India. LANGUAGE RULES: Visitor language detected: ${inputLang === 'hi-IN' ? 'Hindi/Hinglish' : 'English'}. Always reply with THREE fields: "response" (English 1-2 sentences), "hinglish_response" (Hinglish Roman script — warmly blend Hindi+English, e.g. "Aapka parcel gate pe chhod dein, owner ko notify kar diya. Shukriya!"), "hindi_tts" (pure Devanagari for TTS). Respond ONLY with valid JSON, no markdown: {"intent":"Delivery|Emergency / SOS|Spam / Promotional|Known Guest / Family|General Visitor","priority":"Low|Normal|High|Critical","action":"Blocked|Notify Owner|Ring Bell + Notify|Bypass All Rules","color":"#hex","emoji":"emoji","response":"English","hinglish_response":"Hinglish Roman","hindi_tts":"Devanagari","confidence":0.9}`
+              content: `You are Priya, AI receptionist for Smart Door, deployed across India at residential and commercial gates. OWNER STATUS: "${(s.securityRules?.current_status || 'available').toUpperCase()}" — ${s.securityRules?.custom_message || 'No custom message'}. LANGUAGE RULES: Visitor language detected: ${inputLang === 'hi-IN' ? 'Hindi/Hinglish' : 'English'}. Based on owner status, guide visitors appropriately: if BUSY/SLEEPING → suggest voice note or text message; if AVAILABLE → offer to notify owner; if OUT_OF_TOWN/AWAY → guide to leave message; if MEETING → ask to wait or leave message. Always reply with THREE fields: "response" (English 1-2 sentences), "hinglish_response" (Hinglish Roman script — warmly blend Hindi+English), "hindi_tts" (pure Devanagari for TTS). Respond ONLY with valid JSON, no markdown: {"intent":"Delivery|Emergency / SOS|Spam / Promotional|Known Guest / Family|Maintenance|Courier|Food Delivery|Gas Cylinder|Electrician|Plumber|General Visitor","priority":"Low|Normal|High|Critical","action":"Blocked|Notify Owner|Ring Bell + Notify|Bypass All Rules|Leave Message","color":"#hex","emoji":"emoji","response":"English","hinglish_response":"Hinglish Roman","hindi_tts":"Devanagari","confidence":0.9,"suggest_action":"bell|text|voice|call|none"}`
             }, { role: 'user', content: text }],
           }),
         });
@@ -912,11 +959,33 @@
     // Honour voiceEnabled for repeat/explicit speaks
     if (voiceEnabled && ttsText) speak(ttsText, 'hi-IN');
 
-    // Auto-actions
+    // Auto-actions based on AI intent
     if (intentData.action === 'Blocked') {
       showToast('🚫 Visitor intent blocked by AI', 'error');
-    } else if (intentData.priority === 'Critical') {
+    } else if (intentData.priority === 'Critical' || intentData.intent === 'Emergency / SOS') {
       showToast('🚨 Emergency detected — alerting all contacts', 'error');
+      // Auto-trigger SOS for critical intents detected by AI
+      if (s.owner.id && s.plate.plateId) {
+        getFamilyMembersForSos(s.plate.plateId).then(({ members }) => {
+          triggerEmergency({ ownerId: s.owner.id, plateId: s.plate.plateId, familyMembers: members }).catch(() => {});
+        });
+      }
+    } else if (intentData.suggest_action === 'bell' || intentData.action === 'Ring Bell + Notify') {
+      // AI suggests ring bell — auto-ring
+      if (s.owner.id && s.plate.plateId) {
+        notifyBellRing(s.owner.id, s.plate.plateId).catch(() => {});
+        _logVisitorEvent(s.owner.id, s.plate.plateId, 'bell_ring').catch(() => {});
+        showToast('🔔 Bell auto-rung — owner notified by AI', 'info');
+      }
+    } else if (intentData.suggest_action === 'text' || intentData.suggest_action === 'voice') {
+      // AI suggests leaving a message — open text panel
+      const panel = document.getElementById('text-msg-body');
+      const toggle = document.getElementById('text-msg-toggle');
+      if (panel && !panel.classList.contains('open')) {
+        panel.classList.add('open');
+        toggle?.classList.add('open');
+        panel.querySelector('textarea')?.focus();
+      }
     }
 
     // Log the message
@@ -1031,7 +1100,7 @@
     const ownerId = s.owner.id;
     const plateId = s.plate.plateId;
 
-    // CALL
+    // CALL — masked calling with visitor log
     const btnCall = document.getElementById('btn-call');
     let cachedPhone = null;
     btnCall?.addEventListener('click', async () => {
@@ -1046,6 +1115,7 @@
       }
       btnCall.disabled = true;
       document.getElementById('call-sub').textContent = 'Connecting…';
+      _logVisitorEvent(ownerId, plateId, 'call_attempt');
       const r = await initiateMaskedCall({ plateId, ownerId, visitorPhone: vPhone });
       if (r.success) {
         document.getElementById('call-sub').textContent = 'Connected — your number is hidden';
@@ -1058,11 +1128,19 @@
       btnCall.disabled = !s.access?.allowCall;
     });
 
-    // BELL
+    // BELL — with shake animation + full logging
     const btnBell = document.getElementById('btn-bell');
     btnBell?.addEventListener('click', async () => {
+      if (btnBell.disabled) return;
       btnBell.disabled = true;
-      await Promise.allSettled([notifyBellRing(ownerId, plateId), _logVisitorEvent(ownerId, plateId, 'bell_ring')]);
+      const bellIcon = btnBell.querySelector('.action-icon');
+      bellIcon?.classList.add('bell-ringing');
+      setTimeout(() => bellIcon?.classList.remove('bell-ringing'), 700);
+      document.getElementById('bell-sub').textContent = 'Ringing…';
+      await Promise.allSettled([
+        notifyBellRing(ownerId, plateId),
+        _logVisitorEvent(ownerId, plateId, 'bell_ring'),
+      ]);
       document.getElementById('bell-sub').textContent = 'Bell rung! Owner notified.';
       showToast('🔔 Bell rung — owner notified', 'success');
       if (voiceEnabled) speak('Darwazi ghanti baja di gayi hai. Maalik ko soochana mil gayi hai.', 'hi-IN');
@@ -1117,6 +1195,7 @@
       sosTimer = setTimeout(async () => {
         btnSos.classList.remove('holding');
         btnSos.disabled = true;
+        _logVisitorEvent(ownerId, plateId, 'sos_triggered');
         const { members } = await getFamilyMembersForSos(plateId);
         const r = await triggerEmergency({ ownerId, plateId, familyMembers: members });
         if (r.success) {
@@ -1132,6 +1211,42 @@
     btnSos?.addEventListener('mousedown', startHold);
     btnSos?.addEventListener('touchstart', startHold, { passive: true });
     ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev => btnSos?.addEventListener(ev, cancelHold));
+
+    // TEXT MESSAGE PANEL — collapsible, connected to Supabase
+    const textToggle = document.getElementById('text-msg-toggle');
+    const textBody   = document.getElementById('text-msg-body');
+    const textInput  = document.getElementById('text-msg-input');
+    const textSendBtn = document.getElementById('text-msg-send');
+
+    textToggle?.addEventListener('click', () => {
+      const open = textBody.classList.toggle('open');
+      textToggle.classList.toggle('open', open);
+      if (open) setTimeout(() => textInput?.focus(), 50);
+    });
+
+    const doSendText = async () => {
+      const content = textInput?.value?.trim();
+      if (!content) { showToast('Message khaali nahi ho sakta', 'error'); return; }
+      textSendBtn.disabled = true;
+      textSendBtn.textContent = 'Sending…';
+      const r = await sendTextMessage({ ownerId, plateId, content, messageType: 'text' });
+      if (r.success) {
+        textInput.value = '';
+        textBody.classList.remove('open');
+        textToggle?.classList.remove('open');
+        showToast('💬 Message sent to owner', 'success');
+        if (voiceEnabled) speak('Aapka sandesh maalik ko bheja gaya hai.', 'hi-IN');
+      } else {
+        showToast(r.error || 'Message send failed', 'error');
+      }
+      textSendBtn.disabled = false;
+      textSendBtn.textContent = 'Send Message →';
+    };
+
+    textSendBtn?.addEventListener('click', doSendText);
+    textInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendText(); }
+    });
   }
 
   async function _logVisitorEvent(ownerId, plateId, eventType) {

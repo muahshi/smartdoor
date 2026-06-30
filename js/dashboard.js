@@ -21,6 +21,7 @@ import { getOnboardingProgress, markOnboardingStep } from '../services/customerS
 import { getOrderSummary, subscribeToOrderTracking } from '../services/orders.js';
 import { getCommunicationLogs, subscribeToCommunicationLogs } from '../services/communication.js';
 import { getVoiceNoteUrl } from '../services/voiceNotes.js';
+import { supabase } from '../services/supabase.js';
 
 const DashboardModule = (() => {
   // ────────── STATE ──────────
@@ -95,6 +96,9 @@ const DashboardModule = (() => {
     setupFamilyMemberActions();
     setupSecurityTimeline();
     updateSubscriptionDays();
+
+    // Initial unread badge load
+    _refreshUnreadBadge(state.owner.id);
 
     // Setup checklist — new owner onboarding guidance
     await _loadAndRenderSetupChecklist();
@@ -267,6 +271,8 @@ const DashboardModule = (() => {
           document.body.style.background = 'rgba(239,68,68,0.1)';
           setTimeout(() => { document.body.style.background = ''; }, 2000);
         }
+        // Update unread badge
+        _refreshUnreadBadge(ownerId);
       }
     });
 
@@ -290,6 +296,29 @@ const DashboardModule = (() => {
   function _logToToastType(eventType) {
     const map = { sos: 'danger', spam_blocked: 'danger', bell_ring: 'warning', voice_message: 'success' };
     return map[eventType] || 'info';
+  }
+
+  // ── Unread badge — fetches count and renders badge on any element with
+  //    data-unread-badge attribute (e.g. Messages nav item)
+  async function _refreshUnreadBadge(ownerId) {
+    try {
+      const { data, error } = await supabase.rpc('get_unread_counts', { p_owner_id: ownerId });
+      if (error || !data) return;
+      const total = data.total || 0;
+      // Update any badge elements
+      document.querySelectorAll('[data-unread-badge]').forEach(el => {
+        el.textContent = total > 0 ? (total > 99 ? '99+' : String(total)) : '';
+        el.style.display = total > 0 ? 'inline-flex' : 'none';
+      });
+      // Update page title if there are unread messages
+      if (total > 0) {
+        document.title = `(${total}) Smart Door — Dashboard`;
+      } else {
+        document.title = 'Smart Door — Dashboard';
+      }
+    } catch (err) {
+      console.warn('[Dashboard] _refreshUnreadBadge error:', err);
+    }
   }
 
   function _updateOwnerNameUI() {
