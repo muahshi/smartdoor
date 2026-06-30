@@ -691,6 +691,7 @@
       vacation:      { cls:'status-busy',      text: 'On vacation — Will respond when back' },
       driving:       { cls:'status-busy',      text: 'Driving — Please leave a message' },
       offline:       { cls:'status-dnd',       text: 'Currently offline — Leave a message' },
+      custom:        { cls:'status-busy',      text: 'Please see message below' },
     };
     const st = statusMap[rules.current_status] || statusMap.available;
     const statusText = rules.custom_message || st.text;
@@ -845,6 +846,7 @@
       vacation:      { cls:'status-busy',      text:'On vacation — Will respond when back' },
       driving:       { cls:'status-busy',      text:'Driving — Please leave a message' },
       offline:       { cls:'status-dnd',       text:'Currently offline — Leave a message' },
+      custom:        { cls:'status-busy',      text:'Please see message below' },
     };
     const st = map[rules.current_status] || map.available;
     const text = rules.custom_message || st.text;
@@ -1074,7 +1076,11 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
           body: JSON.stringify({
-            model: 'llama3-70b-8192',
+            // FIX (stabilization audit): llama3-70b-8192 was decommissioned by
+            // Groq — every call to groq-proxy was failing and silently falling
+            // back to mockClassify() below, so the AI receptionist never
+            // actually used Groq despite the "Powered by GROQ AI" badge.
+            model: 'llama-3.3-70b-versatile',
             max_tokens: 400,
             temperature: 0.6, // higher temp → more varied phrasing, avoids repeating
             messages: [
