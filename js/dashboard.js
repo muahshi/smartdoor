@@ -27,6 +27,7 @@ const DashboardModule = (() => {
   // ────────── STATE ──────────
   const state = {
     owner: null,
+    securityRules: {},
     callForwarding: true,
     currentStatus: 'available',
     nightModeStart: '22:00',
@@ -91,6 +92,7 @@ const DashboardModule = (() => {
     renderHeatmap('qr-heatmap-desktop');
     setupToggle();
     setupStatusManager();
+    setupOwnerSettings();
     setupNightMode();
     setupAIStatusCustomizer();
     setupFamilyMemberActions();
@@ -191,6 +193,7 @@ const DashboardModule = (() => {
     // Security rules
     if (rulesResult.status === 'fulfilled' && rulesResult.value.success) {
       const r = rulesResult.value.rules;
+      state.securityRules   = r;
       state.callForwarding  = r.call_forwarding;
       state.currentStatus   = r.current_status;
       state.nightModeStart  = r.night_mode_start || '22:00';
@@ -692,6 +695,80 @@ const DashboardModule = (() => {
         }
       });
     });
+  }
+
+  // ────────── OWNER & AI RECEPTIONIST SETTINGS ──────────
+  // Handles both mobile (#set-*) and desktop (#set-*-d) form variants.
+  function setupOwnerSettings() {
+    const FIELD_MAP = [
+      ['residence-name',      'residence_name'],
+      ['family-name',         'family_name'],
+      ['owner-display-name',  'owner_display_name'],
+      ['welcome-message',     'welcome_message'],
+      ['visitor-greeting',    'visitor_greeting'],
+      ['ai-name',             'ai_name'],
+      ['greeting-style',      'greeting_style'],
+      ['preferred-language',  'preferred_language'],
+      ['hours-start',         'business_hours_start'],
+      ['hours-end',           'business_hours_end'],
+      ['emergency-behaviour', 'emergency_behaviour'],
+    ];
+
+    function populateForm(suffix) {
+      const rules = state.securityRules || {};
+      FIELD_MAP.forEach(([domId, col]) => {
+        const el = document.getElementById(`set-${domId}${suffix}`);
+        if (el && rules[col] != null) el.value = rules[col];
+      });
+      const autoReplyEl = document.getElementById(`set-auto-reply${suffix}`);
+      if (autoReplyEl) autoReplyEl.checked = rules.auto_reply_enabled !== false;
+    }
+
+    function readForm(suffix) {
+      const updates = {};
+      FIELD_MAP.forEach(([domId, col]) => {
+        const el = document.getElementById(`set-${domId}${suffix}`);
+        if (el) updates[col] = el.value.trim() || null;
+      });
+      const autoReplyEl = document.getElementById(`set-auto-reply${suffix}`);
+      if (autoReplyEl) updates.auto_reply_enabled = autoReplyEl.checked;
+      return updates;
+    }
+
+    async function saveSettings(suffix, statusElId) {
+      if (!state.owner) return;
+      const updates = readForm(suffix);
+      const btn = document.getElementById(`save-owner-settings-btn${suffix}`);
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+      const res = await updateSecurityRules(state.owner.id, updates);
+
+      if (btn) { btn.disabled = false; btn.textContent = '💾 Save Settings'; }
+
+      if (res.success) {
+        state.securityRules = { ...state.securityRules, ...res.rules };
+        // Keep both mobile + desktop forms in sync
+        populateForm('');
+        populateForm('-d');
+        showToast('🏡 Owner & AI settings saved', 'success');
+        addLog('Owner profile / AI settings updated', 'status', '#00A2E8');
+
+        const statusEl = document.getElementById(statusElId);
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+        }
+      } else {
+        showToast(res.error || 'Failed to save settings', 'error');
+      }
+    }
+
+    // Populate on load
+    populateForm('');
+    populateForm('-d');
+
+    document.getElementById('save-owner-settings-btn')?.addEventListener('click', () => saveSettings('', 'owner-settings-status'));
+    document.getElementById('save-owner-settings-btn-d')?.addEventListener('click', () => saveSettings('-d', 'owner-settings-status-d'));
   }
 
   // ────────── NIGHT MODE ──────────
