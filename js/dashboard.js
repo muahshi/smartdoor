@@ -15,6 +15,7 @@
 
 import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from '../services/auth.js';
 import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from '../services/logs.js';
+import { subscribeToNotifications } from '../services/notifications.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
@@ -234,6 +235,33 @@ const DashboardModule = (() => {
     updateSubscriptionDays();
   }
 
+  // ────────── SOUND ALERTS (Flow 3: Bell Sound / Flow 6: SOS Sound Alert) ──────────
+  // FIX (stabilization audit): no audio was ever played for bell rings or SOS —
+  // the only Audio() in this file was for voice-note playback. Web Audio API
+  // beep generator avoids needing a new static asset file.
+  let _audioCtx = null;
+  function _beep({ freq = 880, durationMs = 180, volume = 0.18, count = 1, gapMs = 120 } = {}) {
+    try {
+      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => {
+          const osc = _audioCtx.createOscillator();
+          const gain = _audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.value = volume;
+          osc.connect(gain).connect(_audioCtx.destination);
+          osc.start();
+          gain.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime + durationMs / 1000);
+          osc.stop(_audioCtx.currentTime + durationMs / 1000);
+        }, i * gapMs);
+      }
+    } catch (_) { /* autoplay policy / unsupported browser — fail silent */ }
+  }
+  function playBellSound()  { _beep({ freq: 880, count: 2, gapMs: 200, durationMs: 220 }); }
+  function playSosSound()   { _beep({ freq: 1200, count: 4, gapMs: 160, durationMs: 140, volume: 0.22 }); }
+
   // ────────── REALTIME SETUP ──────────
   function _setupRealtime() {
     const ownerId = state.owner.id;
@@ -246,14 +274,31 @@ const DashboardModule = (() => {
       renderVisitorLogs();
       showToast(`${formatted.icon} ${formatted.event}`, _logToToastType(newLog.event_type));
       _bumpStat(newLog.event_type);
+      if (newLog.event_type === 'bell_ring') playBellSound();
     });
 
     // SOS alert → special notification
     const unsubSOS = subscribeToSOS(ownerId, () => {
       showToast('🚨 SOS EMERGENCY ALERT!', 'danger');
+      playSosSound();
       // Flash the dashboard
       document.body.style.background = 'rgba(239,68,68,0.1)';
       setTimeout(() => { document.body.style.background = ''; }, 2000);
+    });
+
+    // FIX (stabilization audit): services/notifications.js' dispatch()/
+    // createNotification() writes to the `notifications` table for every
+    // lifecycle event (order created, shipped, delivered, activated,
+    // subscription expiry, etc.) but NOTHING in the app ever read that table
+    // — getNotifications/subscribeToNotifications/markNotificationRead had
+    // zero callers anywhere in the codebase. Those notifications were
+    // silently write-only. Wire the realtime channel in so owners actually
+    // see them. Bell/call/voice/SOS already surface via visitor_logs /
+    // message_logs / call_logs above, so only surface 'status_change' here
+    // (order + subscription lifecycle) to avoid duplicate toasts.
+    const unsubNotifications = subscribeToNotifications(ownerId, (notif) => {
+      if (notif.type !== 'status_change') return;
+      showToast(`${notif.title}${notif.body ? ' — ' + notif.body : ''}`, notif.priority === 'high' ? 'warning' : 'info');
     });
 
     // Communication engine: call history + voice notes + messages + emergency alerts
@@ -271,6 +316,7 @@ const DashboardModule = (() => {
         if (!isEmergency) _bumpStat('voice_message');
         showToast(`${formatted.icon} ${formatted.event}`, isEmergency ? 'danger' : 'success');
         if (isEmergency) {
+          playSosSound();
           document.body.style.background = 'rgba(239,68,68,0.1)';
           setTimeout(() => { document.body.style.background = ''; }, 2000);
         }
@@ -279,7 +325,7 @@ const DashboardModule = (() => {
       }
     });
 
-    state._realtimeUnsubs = [unsubLogs, unsubSOS, unsubComms];
+    state._realtimeUnsubs = [unsubLogs, unsubSOS, unsubComms, unsubNotifications];
   }
 
   function _bumpStat(eventType) {
