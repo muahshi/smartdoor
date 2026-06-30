@@ -330,7 +330,13 @@ export function subscribeToSOS(ownerId, callback) {
         filter: `owner_id=eq.${ownerId}`,
       },
       (payload) => {
-        if (payload.new.event_type === 'sos') {
+        // FIX (stabilization audit): visitor.html logs SOS as 'sos_triggered'
+        // (see bindActions → _logVisitorEvent(ownerId, plateId, 'sos_triggered')).
+        // This handler was checking for 'sos', which never matched, so the
+        // dashboard's dedicated SOS flash/toast never fired — SOS silently
+        // fell back to the generic log toast only. Accept both values so any
+        // future caller using the shorter 'sos' string still works too.
+        if (payload.new.event_type === 'sos_triggered' || payload.new.event_type === 'sos') {
           callback(payload.new);
         }
       }
