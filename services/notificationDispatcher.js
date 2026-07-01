@@ -110,7 +110,15 @@ const EVENT_CONFIG = {
  * @param {object} row      the DB row that triggered this (must have .id)
  * @param {string} ownerId
  */
-async function _dispatchOne(type, row, ownerId) {
+// ────────── SHOW ONE NOTIFICATION (never reused, never suppressed) ──────────
+/**
+ * Call this from whatever realtime callback already owns the subscription
+ * for the row's table — do NOT open a second channel just to call this.
+ * @param {'bell_ring'|'qr_scan'|'voice'|'text'|'sos'} type
+ * @param {object} row      the DB row that triggered this (must have .id)
+ * @param {string} ownerId
+ */
+export async function notifyEvent(type, row, ownerId) {
   const id = row?.id;
   if (!id) return; // can't guarantee uniqueness without a stable id — refuse rather than risk a collision
   if (_dispatchedIds.has(id)) return; // exact same DB row already notified (e.g. catch-up overlap) — not a duplicate event
@@ -223,14 +231,14 @@ async function _runCatchUp(ownerId) {
     if (logsRes.status === 'fulfilled' && !logsRes.value.error) {
       for (const row of logsRes.value.data || []) {
         const type = row.event_type === 'sos_triggered' ? 'sos' : row.event_type;
-        await _dispatchOne(type, row, ownerId);
+        await notifyEvent(type, row, ownerId);
       }
     }
     if (msgRes.status === 'fulfilled' && !msgRes.value.error) {
       for (const row of msgRes.value.data || []) {
         const type = row.message_type === 'emergency' ? 'sos' : row.message_type; // voice | text | sos
         if (!EVENT_CONFIG[type]) continue;
-        await _dispatchOne(type, row, ownerId);
+        await notifyEvent(type, row, ownerId);
       }
     }
   } catch (err) {
@@ -238,52 +246,27 @@ async function _runCatchUp(ownerId) {
   }
 }
 
-// ────────── INIT — ONE subscription set, ONE dispatch path ──────────
+// ────────── INIT — permission + click tracking + catch-up ONLY ──────────
+// IMPORTANT: this function intentionally does NOT open its own realtime
+// channels for visitor_logs/message_logs anymore. Earlier versions of this
+// file opened a second, dedicated channel per table — but dashboard.js
+// already had channels open on those exact tables (`logs:${ownerId}`,
+// `message_logs:${ownerId}`, etc.) for the UI feed. That meant a single
+// dashboard session was opening 7 concurrent realtime channels instead of
+// ~5, and the later-created channels (these two) were the ones that
+// intermittently failed to complete their join handshake — which is
+// consistent with what was reported: bell (on the FIRST channel created)
+// worked, everything wired through the SECOND channel (messages) did not.
+// Fix: this file no longer opens channels at all. Callers must call
+// notifyEvent() directly from their existing subscription callback.
 /**
  * @param {string} ownerId
- * @param {object} [handlers]
- * @param {(type: 'bell_ring'|'qr_scan'|'voice'|'text'|'sos', row: object) => void} [handlers.onEvent]
- *        Called once per dispatched event, after the notification attempt,
- *        so callers can layer in-tab sound/vibration/UI updates (kept
- *        separate from this file on purpose — this file owns OS
- *        notifications only, not audio/UI, so it doesn't fight with
- *        existing dashboard sound code).
- * @returns {() => void} unsubscribe
+ * @returns {() => void} cleanup — removes the visibility/focus listeners
  */
-export function initNotificationDispatcher(ownerId, handlers = {}) {
+export function initNotificationDispatcher(ownerId) {
   ensureNotificationPermission();
   _wireClickTracking();
   _lastCatchUpAt = Date.now();
-
-  const visitorLogsChannel = supabase
-    .channel(`notif-dispatch-logs:${ownerId}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'visitor_logs', filter: `owner_id=eq.${ownerId}` },
-      async (payload) => {
-        const row = payload.new;
-        if (!['bell_ring', 'qr_scan', 'sos_triggered'].includes(row.event_type)) return;
-        const type = row.event_type === 'sos_triggered' ? 'sos' : row.event_type;
-        await _dispatchOne(type, row, ownerId);
-        handlers.onEvent?.(type, row);
-      }
-    )
-    .subscribe();
-
-  const messageLogsChannel = supabase
-    .channel(`notif-dispatch-messages:${ownerId}`)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'message_logs', filter: `owner_id=eq.${ownerId}` },
-      async (payload) => {
-        const row = payload.new;
-        const type = row.message_type === 'emergency' ? 'sos' : row.message_type; // voice | text | sos
-        if (!EVENT_CONFIG[type]) return;
-        await _dispatchOne(type, row, ownerId);
-        handlers.onEvent?.(type, row);
-      }
-    )
-    .subscribe();
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
@@ -294,8 +277,6 @@ export function initNotificationDispatcher(ownerId, handlers = {}) {
   window.addEventListener('focus', onVisibilityChange);
 
   return () => {
-    supabase.removeChannel(visitorLogsChannel);
-    supabase.removeChannel(messageLogsChannel);
     document.removeEventListener('visibilitychange', onVisibilityChange);
     window.removeEventListener('focus', onVisibilityChange);
   };
@@ -303,6 +284,7 @@ export function initNotificationDispatcher(ownerId, handlers = {}) {
 
 export default {
   initNotificationDispatcher,
+  notifyEvent,
   ensureNotificationPermission,
   getDispatchLog,
   clearDispatchLog,
