@@ -31,12 +31,48 @@ export class VoiceRecorder {
       throw new Error('Microphone access is not supported on this device/browser.');
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // FIX (notification pipeline audit): every failure path here — mic
+    // truly denied, no mic hardware present, mic already in use by another
+    // app/tab, insecure (non-HTTPS) context, or a MediaRecorder construction
+    // failure — was being swallowed by callers into one generic "Microphone
+    // denied" message. That's wrong most of the time: an owner testing on a
+    // laptop with no mic, or a visitor whose mic is busy in another tab,
+    // would be told "denied" when permission was never actually asked. Map
+    // the real DOMException.name to an accurate, distinct message so only
+    // an actual NotAllowedError says "denied".
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const messages = {
+        NotAllowedError: 'Microphone permission was denied. Please allow microphone access and try again.',
+        PermissionDeniedError: 'Microphone permission was denied. Please allow microphone access and try again.',
+        NotFoundError: 'No microphone was found on this device.',
+        DevicesNotFoundError: 'No microphone was found on this device.',
+        NotReadableError: 'Microphone is already in use by another app or tab. Close it and try again.',
+        TrackStartError: 'Microphone is already in use by another app or tab. Close it and try again.',
+        OverconstrainedError: 'Microphone does not support the required settings.',
+        SecurityError: 'Microphone access requires a secure (HTTPS) connection.',
+        AbortError: 'Microphone access was interrupted. Please try again.',
+      };
+      const friendly = messages[err.name] || `Could not access the microphone (${err.name || err.message || 'unknown error'}).`;
+      const typedErr = new Error(friendly);
+      typedErr.name = err.name;
+      typedErr.wasPermissionDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+      throw typedErr;
+    }
+
     const mimeType = MediaRecorder.isTypeSupported('audio/webm')
       ? 'audio/webm'
       : (MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '');
 
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    let recorder;
+    try {
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    } catch (err) {
+      stream.getTracks().forEach((t) => t.stop());
+      throw new Error('This browser cannot record audio in a supported format.');
+    }
     const chunks = [];
     let seconds = 0;
     let tickInterval = null;

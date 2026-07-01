@@ -228,12 +228,19 @@ function _formatCallLog(c) {
 
 function _formatMessageLog(m) {
   const isEmergency = m.message_type === 'emergency';
+  const isVoice = m.message_type === 'voice';
+  // FIX (notification pipeline audit): every non-emergency message used to
+  // be labeled 'voice_message' here regardless of whether it was actually a
+  // voice note or a plain text message. Downstream code (dashboard.js stat
+  // bump) trusted this label, so a visitor sending a text message silently
+  // inflated the "Voice Messages" counter. Label accurately; callers should
+  // key off `m.message_type` (on `raw`) for anything that must be exact.
   return {
     time: new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-    event: isEmergency ? '🚨 Emergency Message' : (m.message_type === 'voice' ? '🎤 Voice Message' : '💬 Text Message'),
-    type: isEmergency ? 'sos' : 'voice_message',
+    event: isEmergency ? '🚨 Emergency Message' : (isVoice ? '🎤 Voice Message' : '💬 Text Message'),
+    type: isEmergency ? 'sos' : (isVoice ? 'voice_message' : 'text_message'),
     color: isEmergency ? '#EF4444' : '#22C55E',
-    icon: isEmergency ? '🚨' : '💬',
+    icon: isEmergency ? '🚨' : (isVoice ? '🎤' : '💬'),
     raw: m,
   };
 }
