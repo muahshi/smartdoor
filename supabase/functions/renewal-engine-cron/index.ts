@@ -114,8 +114,8 @@ serve(async (req) => {
                 ownerName:    owner.full_name || 'Valued Customer',
                 daysLeft:     Math.max(0, daysLeft),
                 expiryDate:   expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-                renewalPrice: `₹${sub.renewal_price ?? 0}`,
-                renewalLink:  'https://mysmartdoor.in/app#renew',
+                renewalPrice: `₹${sub.renewal_price || 999}`,
+                renewalLink:  'https://smartdoor.in/app#renew',
               },
             },
           });
@@ -129,7 +129,7 @@ serve(async (req) => {
               templateVars: {
                 name:     owner.full_name || 'Customer',
                 daysLeft: Math.max(0, daysLeft),
-                link:     'https://mysmartdoor.in/app#renew',
+                link:     'https://smartdoor.in/app#renew',
               },
             },
           });
