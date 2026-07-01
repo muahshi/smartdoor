@@ -14,9 +14,9 @@
  */
 
 import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from '../services/auth.js';
-import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from '../services/logs.js';
+import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, formatLogForDisplay } from '../services/logs.js';
 import { subscribeToNotifications } from '../services/notifications.js';
-import { initNotificationDispatcher, ensureNotificationPermission } from '../services/notificationDispatcher.js';
+import { initNotificationDispatcher, notifyEvent, ensureNotificationPermission } from '../services/notificationDispatcher.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
@@ -340,12 +340,17 @@ const DashboardModule = (() => {
   function _setupRealtime() {
     const ownerId = state.owner.id;
 
-    // New visitor log → prepend to list + update stats counter
-    // NOTE: sound/vibrate/OS-notification for bell_ring used to be fired
-    // directly from here. That's moved to the centralized dispatcher's
-    // onEvent callback below so there's exactly ONE path from "DB row
-    // inserted" to "owner hears/sees something", instead of two competing
-    // ones that could race or double-fire.
+    // New visitor log → prepend to list + update stats counter + notify.
+    // FIX (channel-bloat bug): this used to be TWO separate subscriptions to
+    // the same visitor_logs table (this one for the UI feed, plus
+    // subscribeToSOS() below for SOS-only, PLUS a third dedicated channel
+    // this file's dispatcher used to open just to call showNotification()).
+    // A single dashboard session was opening 3 channels against one table.
+    // That's very likely why message notifications specifically were
+    // silently failing — the extra channels were the last ones created and
+    // the most likely to lose the join race. Now there is exactly ONE
+    // subscription to visitor_logs, and it drives UI + sound + OS
+    // notification together, in order, for every row.
     const unsubLogs = subscribeToLogs(ownerId, (newLog) => {
       const formatted = formatLogForDisplay(newLog);
       state.visitorLogs.unshift(formatted);
@@ -353,31 +358,24 @@ const DashboardModule = (() => {
       renderVisitorLogs();
       showToast(`${formatted.icon} ${formatted.event}`, _logToToastType(newLog.event_type));
       _bumpStat(newLog.event_type);
+
+      if (newLog.event_type === 'bell_ring') {
+        notifyEvent('bell_ring', newLog, ownerId);
+        playBellSound();
+      } else if (newLog.event_type === 'qr_scan') {
+        notifyEvent('qr_scan', newLog, ownerId);
+        playScanSound();
+      } else if (newLog.event_type === 'sos_triggered' || newLog.event_type === 'sos') {
+        notifyEvent('sos', newLog, ownerId);
+        playSosSound();
+        document.body.style.background = 'rgba(239,68,68,0.1)';
+        setTimeout(() => { document.body.style.background = ''; }, 2000);
+      }
     });
 
-    // SOS alert → special toast + screen flash (UI only — sound/vibrate/
-    // notification now come from the centralized dispatcher's onEvent).
-    const unsubSOS = subscribeToSOS(ownerId, () => {
-      showToast('🚨 SOS EMERGENCY ALERT!', 'danger');
-      // Flash the dashboard
-      document.body.style.background = 'rgba(239,68,68,0.1)';
-      setTimeout(() => { document.body.style.background = ''; }, 2000);
-    });
-
-    // ────────── CENTRALIZED NOTIFICATION DISPATCHER ──────────
-    // Single subscription set that owns every OS-level showNotification()
-    // call (unique tag per event, delivery-logged). onEvent below is where
-    // the existing in-tab sound/vibrate functions get triggered — kept
-    // separate from the dispatcher itself so this file's existing,
-    // already-tested Web Audio chimes don't need to be duplicated there.
-    const unsubDispatcher = initNotificationDispatcher(ownerId, {
-      onEvent: (type) => {
-        if (type === 'bell_ring') playBellSound();
-        else if (type === 'qr_scan') playScanSound();
-        else if (type === 'voice' || type === 'text') playMessageSound();
-        else if (type === 'sos') playSosSound();
-      },
-    });
+    // Permission request + click-tracking + visibility-regain catch-up.
+    // Opens NO realtime channels of its own (see services/notificationDispatcher.js).
+    const unsubDispatcher = initNotificationDispatcher(ownerId);
 
     // FIX (stabilization audit): services/notifications.js' dispatch()/
     // createNotification() writes to the `notifications` table for every
@@ -405,25 +403,33 @@ const DashboardModule = (() => {
         if (formatted.raw.call_status === 'completed') _bumpStat('call_attempt');
         showToast(`${formatted.icon} ${formatted.event}`, formatted.raw.call_status === 'completed' ? 'success' : 'info');
       } else if (kind === 'message') {
-        const isEmergency = formatted.raw.message_type === 'emergency';
+        const rawType = formatted.raw.message_type; // 'voice' | 'text' | 'emergency'
+        const isEmergency = rawType === 'emergency';
         // FIX (notification pipeline audit): this used to bump 'voice_message'
         // for ANY non-emergency message, including plain text messages —
         // inflating the "Voice Messages" stat card every time a visitor sent
         // a text instead of a voice note. Only count actual voice notes.
-        if (formatted.raw.message_type === 'voice') _bumpStat('voice_message');
+        if (rawType === 'voice') _bumpStat('voice_message');
         showToast(`${formatted.icon} ${formatted.event}`, isEmergency ? 'danger' : 'success');
+
+        // Notification + sound, driven straight off this ONE existing
+        // channel — no second channel opened just for this.
+        const notifType = isEmergency ? 'sos' : rawType; // 'sos' | 'voice' | 'text'
+        notifyEvent(notifType, formatted.raw, ownerId);
         if (isEmergency) {
-          // Sound/vibrate/notification for emergency now comes from the
-          // centralized dispatcher's onEvent — this stays UI-only (flash).
+          playSosSound();
           document.body.style.background = 'rgba(239,68,68,0.1)';
           setTimeout(() => { document.body.style.background = ''; }, 2000);
+        } else {
+          playMessageSound();
         }
+
         // Update unread badge
         _refreshUnreadBadge(ownerId);
       }
     });
 
-    state._realtimeUnsubs = [unsubLogs, unsubSOS, unsubComms, unsubNotifications, unsubDispatcher];
+    state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
   }
 
   function _bumpStat(eventType) {
