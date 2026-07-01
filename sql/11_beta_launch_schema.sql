@@ -69,8 +69,10 @@ CREATE TABLE IF NOT EXISTS customer_onboarding (
 
 -- RLS
 ALTER TABLE customer_onboarding ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "onboarding_owner_read" ON customer_onboarding;
 CREATE POLICY "onboarding_owner_read" ON customer_onboarding
   FOR SELECT USING (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "onboarding_admin_all" ON customer_onboarding;
 CREATE POLICY "onboarding_admin_all" ON customer_onboarding
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -94,6 +96,7 @@ CREATE TABLE IF NOT EXISTS customer_health (
 );
 
 ALTER TABLE customer_health ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "health_admin_all" ON customer_health;
 CREATE POLICY "health_admin_all" ON customer_health
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -118,6 +121,7 @@ CREATE TABLE IF NOT EXISTS renewal_notifications (
 );
 
 ALTER TABLE renewal_notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "renewal_notif_admin" ON renewal_notifications;
 CREATE POLICY "renewal_notif_admin" ON renewal_notifications
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -149,8 +153,10 @@ CREATE TABLE IF NOT EXISTS nps_responses (
 );
 
 ALTER TABLE nps_responses ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "nps_owner_insert" ON nps_responses;
 CREATE POLICY "nps_owner_insert" ON nps_responses
   FOR INSERT WITH CHECK (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "nps_admin_all" ON nps_responses;
 CREATE POLICY "nps_admin_all" ON nps_responses
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -174,8 +180,10 @@ CREATE TABLE IF NOT EXISTS referrals (
 );
 
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "referral_owner_read" ON referrals;
 CREATE POLICY "referral_owner_read" ON referrals
   FOR SELECT USING (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "referral_admin_all" ON referrals;
 CREATE POLICY "referral_admin_all" ON referrals
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -213,6 +221,7 @@ CREATE TABLE IF NOT EXISTS shipments (
 );
 
 ALTER TABLE shipments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shipment_admin_all" ON shipments;
 CREATE POLICY "shipment_admin_all" ON shipments
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -252,6 +261,7 @@ CREATE TABLE IF NOT EXISTS beta_users (
 );
 
 ALTER TABLE beta_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "beta_users_admin" ON beta_users;
 CREATE POLICY "beta_users_admin" ON beta_users
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -276,10 +286,13 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 );
 
 ALTER TABLE bug_reports ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "bug_owner_insert" ON bug_reports;
 CREATE POLICY "bug_owner_insert" ON bug_reports
   FOR INSERT WITH CHECK (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "bug_owner_read" ON bug_reports;
 CREATE POLICY "bug_owner_read" ON bug_reports
   FOR SELECT USING (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "bug_admin_all" ON bug_reports;
 CREATE POLICY "bug_admin_all" ON bug_reports
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -303,10 +316,13 @@ CREATE TABLE IF NOT EXISTS feature_requests (
 );
 
 ALTER TABLE feature_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "feat_owner_insert" ON feature_requests;
 CREATE POLICY "feat_owner_insert" ON feature_requests
   FOR INSERT WITH CHECK (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "feat_owner_read" ON feature_requests;
 CREATE POLICY "feat_owner_read" ON feature_requests
   FOR SELECT USING (TRUE);   -- Anyone can read feature requests
+DROP POLICY IF EXISTS "feat_admin_all" ON feature_requests;
 CREATE POLICY "feat_admin_all" ON feature_requests
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -327,8 +343,10 @@ CREATE TABLE IF NOT EXISTS feedback_logs (
 );
 
 ALTER TABLE feedback_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "feedback_owner_insert" ON feedback_logs;
 CREATE POLICY "feedback_owner_insert" ON feedback_logs
   FOR INSERT WITH CHECK (auth.uid() = owner_id);
+DROP POLICY IF EXISTS "feedback_admin_all" ON feedback_logs;
 CREATE POLICY "feedback_admin_all" ON feedback_logs
   FOR ALL USING (
     EXISTS (SELECT 1 FROM admin_users WHERE id::text = auth.uid()::text)
@@ -368,11 +386,24 @@ ON CONFLICT (key) DO NOTHING;
 -- ────────── REALTIME ──────────
 
 -- Enable realtime on tables the admin ops dashboard needs live
-ALTER PUBLICATION supabase_realtime ADD TABLE customer_onboarding;
-ALTER PUBLICATION supabase_realtime ADD TABLE customer_health;
-ALTER PUBLICATION supabase_realtime ADD TABLE shipments;
-ALTER PUBLICATION supabase_realtime ADD TABLE bug_reports;
-ALTER PUBLICATION supabase_realtime ADD TABLE feature_requests;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'customer_onboarding') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE customer_onboarding;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'customer_health') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE customer_health;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'shipments') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE shipments;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'bug_reports') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE bug_reports;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'feature_requests') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE feature_requests;
+  END IF;
+END $$;
 
 -- ────────── DONE ──────────
 -- Run 12_beta_launch_rls.sql next if you need granular per-field RLS.
