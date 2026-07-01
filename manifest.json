@@ -1,26 +1,36 @@
 {
-  "name": "Smart Door - Home Privacy System",
+  "name": "Smart Door — Home Privacy System",
   "short_name": "SmartDoor",
-  "description": "India's 1st Smart Nameplate System. Protect your privacy. Secure your home.",
+  "description": "India's 1st Smart Nameplate. Protect your privacy. Secure your home.",
   "start_url": "/app.html",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#081321",
+  "background_color": "#060d1a",
   "theme_color": "#00A2E8",
   "orientation": "portrait-primary",
+  "lang": "en-IN",
+  "categories": ["security", "utilities", "lifestyle"],
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%23081321'/><path d='M96 20 L160 60 L160 110 Q160 150 96 172 Q32 150 32 110 L32 60 Z' fill='%230078D7'/><path d='M96 30 L150 65 L150 108 Q150 142 96 162 Q42 142 42 108 L42 65 Z' fill='%2300A2E8'/><circle cx='96' cy='90' r='18' fill='%23081321'/><rect x='91' y='108' width='10' height='20' rx='3' fill='%23081321'/></svg>",
+      "src": "/images/favicon-192x192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%23081321'/><path d='M256 50 L430 150 L430 290 Q430 400 256 460 Q82 400 82 290 L82 150 Z' fill='%230078D7'/><path d='M256 70 L410 160 L410 285 Q410 385 256 442 Q102 385 102 285 L102 160 Z' fill='%2300A2E8'/><circle cx='256' cy='230' r='48' fill='%23081321'/><rect x='240' y='278' width='32' height='58' rx='8' fill='%23081321'/></svg>",
+      "src": "/images/favicon-512x512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["security", "utilities", "lifestyle"],
-  "screenshots": [],
-  "related_applications": [],
+  "shortcuts": [
+    {
+      "name": "Open Dashboard",
+      "short_name": "Dashboard",
+      "url": "/app.html",
+      "icons": [{ "src": "/images/favicon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
   "prefer_related_applications": false
 }
