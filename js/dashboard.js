@@ -16,6 +16,7 @@
 import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from '../services/auth.js';
 import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, subscribeToSOS, formatLogForDisplay } from '../services/logs.js';
 import { subscribeToNotifications } from '../services/notifications.js';
+import { initNotificationDispatcher, ensureNotificationPermission } from '../services/notificationDispatcher.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
@@ -241,9 +242,21 @@ const DashboardModule = (() => {
   // ── PREMIUM DOORBELL SOUND — louder two-tone digital chime ────────────────
   let _audioCtx = null;
 
-  function _getAudioCtx() {
+  // FIX (notification pipeline audit): resume() is async but was previously
+  // called fire-and-forget, then `ctx.currentTime` was read immediately
+  // after on a context that was often still suspended (frozen clock). Every
+  // _tone() call scheduled its start/stop times off that frozen value, so by
+  // the time the context actually resumed, the scheduled times were already
+  // in the past — on repeat doorbell presses (2nd/3rd/4th) this is exactly
+  // the "no sound" symptom: the browser auto-suspends an idle AudioContext
+  // between presses, so only the very first press (context freshly created
+  // and already running) reliably played. Now we await resume() before any
+  // scheduling happens.
+  async function _getAudioCtx() {
     _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    if (_audioCtx.state === 'suspended') {
+      try { await _audioCtx.resume(); } catch (_) {}
+    }
     return _audioCtx;
   }
 
@@ -261,22 +274,27 @@ const DashboardModule = (() => {
     osc.stop(startTime + duration);
   }
 
-  function playBellSound() {
+  // NOTE: OS-level showNotification() for doorbell/QR/voice/text/SOS is now
+  // owned exclusively by services/notificationDispatcher.js (one dispatch
+  // path, unique tag per event, delivery log). The functions below are
+  // in-tab audio/vibration feedback ONLY — they no longer also fire a
+  // notification themselves, which used to cause two separate code paths
+  // fighting over the same fixed 'smartdoor-doorbell' tag.
+  async function playBellSound() {
     try {
-      const ctx = _getAudioCtx();
+      const ctx = await _getAudioCtx();
       const now = ctx.currentTime;
       _tone({ freq: 1046, startTime: now,        duration: 0.9, volume: 0.65, ctx });
       _tone({ freq: 784,  startTime: now + 0.05, duration: 0.8, volume: 0.45, ctx });
       _tone({ freq: 880,  startTime: now + 0.55, duration: 0.9, volume: 0.6,  ctx });
       _tone({ freq: 659,  startTime: now + 0.60, duration: 0.8, volume: 0.4,  ctx });
       if ('vibrate' in navigator) navigator.vibrate([300, 100, 300]);
-      _triggerDoorbellNotification();
     } catch (_) {}
   }
 
-  function playSosSound() {
+  async function playSosSound() {
     try {
-      const ctx = _getAudioCtx();
+      const ctx = await _getAudioCtx();
       const now = ctx.currentTime;
       for (let i = 0; i < 4; i++) {
         _tone({ freq: 1200 + (i % 2) * 200, startTime: now + i * 0.2, duration: 0.18, volume: 0.8, type: 'square', ctx });
@@ -285,34 +303,33 @@ const DashboardModule = (() => {
     } catch (_) {}
   }
 
-  async function _triggerDoorbellNotification() {
-    if (Notification.permission !== 'granted') return;
+  // FIX (notification pipeline audit): qr_scan, voice, and text events
+  // previously had ZERO audible/haptic feedback — only a silent in-page
+  // toast, which is invisible unless the dashboard tab is open and in
+  // focus. Each now gets a short, distinct chime + vibrate so they're
+  // noticeable even if the owner isn't staring at the screen.
+  async function playScanSound() {
     try {
-      const reg = await navigator.serviceWorker?.ready;
-      if (reg) {
-        reg.showNotification('🔔 Smart Door — Doorbell!', {
-          body: 'Someone is at your door. Tap to open dashboard.',
-          icon: '/images/favicon-192x192.png',
-          badge: '/images/favicon-192x192.png',
-          vibrate: [300, 100, 300],
-          requireInteraction: true,
-          renotify: true,
-          tag: 'smartdoor-doorbell',
-          data: { url: '/app.html' },
-          actions: [
-            { action: 'open',    title: '📲 Open Dashboard' },
-            { action: 'dismiss', title: '✕ Dismiss' },
-          ],
-        });
-      }
+      const ctx = await _getAudioCtx();
+      const now = ctx.currentTime;
+      _tone({ freq: 660, startTime: now, duration: 0.18, volume: 0.35, ctx });
+      if ('vibrate' in navigator) navigator.vibrate([120]);
+    } catch (_) {}
+  }
+
+  async function playMessageSound() {
+    try {
+      const ctx = await _getAudioCtx();
+      const now = ctx.currentTime;
+      _tone({ freq: 523, startTime: now,        duration: 0.16, volume: 0.4, ctx });
+      _tone({ freq: 659, startTime: now + 0.12, duration: 0.2,  volume: 0.4, ctx });
+      if ('vibrate' in navigator) navigator.vibrate([150, 60, 150]);
     } catch (_) {}
   }
 
   function _initNotifications() {
-    if (document.visibilityState === 'visible' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
-      }
+    if (document.visibilityState === 'visible') {
+      ensureNotificationPermission().catch(() => {});
     }
     navigator.serviceWorker?.ready.then(reg => {
       reg.active?.postMessage({ type: 'CLEAR_BADGE' });
@@ -324,6 +341,11 @@ const DashboardModule = (() => {
     const ownerId = state.owner.id;
 
     // New visitor log → prepend to list + update stats counter
+    // NOTE: sound/vibrate/OS-notification for bell_ring used to be fired
+    // directly from here. That's moved to the centralized dispatcher's
+    // onEvent callback below so there's exactly ONE path from "DB row
+    // inserted" to "owner hears/sees something", instead of two competing
+    // ones that could race or double-fire.
     const unsubLogs = subscribeToLogs(ownerId, (newLog) => {
       const formatted = formatLogForDisplay(newLog);
       state.visitorLogs.unshift(formatted);
@@ -331,16 +353,30 @@ const DashboardModule = (() => {
       renderVisitorLogs();
       showToast(`${formatted.icon} ${formatted.event}`, _logToToastType(newLog.event_type));
       _bumpStat(newLog.event_type);
-      if (newLog.event_type === 'bell_ring') playBellSound();
     });
 
-    // SOS alert → special notification
+    // SOS alert → special toast + screen flash (UI only — sound/vibrate/
+    // notification now come from the centralized dispatcher's onEvent).
     const unsubSOS = subscribeToSOS(ownerId, () => {
       showToast('🚨 SOS EMERGENCY ALERT!', 'danger');
-      playSosSound();
       // Flash the dashboard
       document.body.style.background = 'rgba(239,68,68,0.1)';
       setTimeout(() => { document.body.style.background = ''; }, 2000);
+    });
+
+    // ────────── CENTRALIZED NOTIFICATION DISPATCHER ──────────
+    // Single subscription set that owns every OS-level showNotification()
+    // call (unique tag per event, delivery-logged). onEvent below is where
+    // the existing in-tab sound/vibrate functions get triggered — kept
+    // separate from the dispatcher itself so this file's existing,
+    // already-tested Web Audio chimes don't need to be duplicated there.
+    const unsubDispatcher = initNotificationDispatcher(ownerId, {
+      onEvent: (type) => {
+        if (type === 'bell_ring') playBellSound();
+        else if (type === 'qr_scan') playScanSound();
+        else if (type === 'voice' || type === 'text') playMessageSound();
+        else if (type === 'sos') playSosSound();
+      },
     });
 
     // FIX (stabilization audit): services/notifications.js' dispatch()/
@@ -370,10 +406,15 @@ const DashboardModule = (() => {
         showToast(`${formatted.icon} ${formatted.event}`, formatted.raw.call_status === 'completed' ? 'success' : 'info');
       } else if (kind === 'message') {
         const isEmergency = formatted.raw.message_type === 'emergency';
-        if (!isEmergency) _bumpStat('voice_message');
+        // FIX (notification pipeline audit): this used to bump 'voice_message'
+        // for ANY non-emergency message, including plain text messages —
+        // inflating the "Voice Messages" stat card every time a visitor sent
+        // a text instead of a voice note. Only count actual voice notes.
+        if (formatted.raw.message_type === 'voice') _bumpStat('voice_message');
         showToast(`${formatted.icon} ${formatted.event}`, isEmergency ? 'danger' : 'success');
         if (isEmergency) {
-          playSosSound();
+          // Sound/vibrate/notification for emergency now comes from the
+          // centralized dispatcher's onEvent — this stays UI-only (flash).
           document.body.style.background = 'rgba(239,68,68,0.1)';
           setTimeout(() => { document.body.style.background = ''; }, 2000);
         }
@@ -382,7 +423,7 @@ const DashboardModule = (() => {
       }
     });
 
-    state._realtimeUnsubs = [unsubLogs, unsubSOS, unsubComms, unsubNotifications];
+    state._realtimeUnsubs = [unsubLogs, unsubSOS, unsubComms, unsubNotifications, unsubDispatcher];
   }
 
   function _bumpStat(eventType) {
