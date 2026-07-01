@@ -33,7 +33,7 @@ const WIZARD_STEPS = [
   {
     id: 'family',
     title: 'Add Family Members',
-    subtitle: 'Add names and photos of family so your AI knows who\'s home.',
+    subtitle: 'Add names and photos of family so your AI knows who's home.',
     icon: '👨‍👩‍👧‍👦',
     cta: 'Go to Family Setup',
     skip: true,
