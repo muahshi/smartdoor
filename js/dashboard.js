@@ -82,6 +82,9 @@ const DashboardModule = (() => {
     // Setup realtime
     _setupRealtime();
 
+    // Request notification permission & clear badge
+    _initNotifications();
+
     // Render everything
     renderStats();
     renderFamilyMembers();
@@ -235,32 +238,86 @@ const DashboardModule = (() => {
     updateSubscriptionDays();
   }
 
-  // ────────── SOUND ALERTS (Flow 3: Bell Sound / Flow 6: SOS Sound Alert) ──────────
-  // FIX (stabilization audit): no audio was ever played for bell rings or SOS —
-  // the only Audio() in this file was for voice-note playback. Web Audio API
-  // beep generator avoids needing a new static asset file.
+  // ── PREMIUM DOORBELL SOUND — louder two-tone digital chime ────────────────
   let _audioCtx = null;
-  function _beep({ freq = 880, durationMs = 180, volume = 0.18, count = 1, gapMs = 120 } = {}) {
-    try {
-      _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (_audioCtx.state === 'suspended') _audioCtx.resume();
-      for (let i = 0; i < count; i++) {
-        setTimeout(() => {
-          const osc = _audioCtx.createOscillator();
-          const gain = _audioCtx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.value = volume;
-          osc.connect(gain).connect(_audioCtx.destination);
-          osc.start();
-          gain.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime + durationMs / 1000);
-          osc.stop(_audioCtx.currentTime + durationMs / 1000);
-        }, i * gapMs);
-      }
-    } catch (_) { /* autoplay policy / unsupported browser — fail silent */ }
+
+  function _getAudioCtx() {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    return _audioCtx;
   }
-  function playBellSound()  { _beep({ freq: 880, count: 2, gapMs: 200, durationMs: 220 }); }
-  function playSosSound()   { _beep({ freq: 1200, count: 4, gapMs: 160, durationMs: 140, volume: 0.22 }); }
+
+  function _tone({ freq, startTime, duration, volume = 0.6, type = 'sine', ctx }) {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(volume, startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  }
+
+  function playBellSound() {
+    try {
+      const ctx = _getAudioCtx();
+      const now = ctx.currentTime;
+      _tone({ freq: 1046, startTime: now,        duration: 0.9, volume: 0.65, ctx });
+      _tone({ freq: 784,  startTime: now + 0.05, duration: 0.8, volume: 0.45, ctx });
+      _tone({ freq: 880,  startTime: now + 0.55, duration: 0.9, volume: 0.6,  ctx });
+      _tone({ freq: 659,  startTime: now + 0.60, duration: 0.8, volume: 0.4,  ctx });
+      if ('vibrate' in navigator) navigator.vibrate([300, 100, 300]);
+      _triggerDoorbellNotification();
+    } catch (_) {}
+  }
+
+  function playSosSound() {
+    try {
+      const ctx = _getAudioCtx();
+      const now = ctx.currentTime;
+      for (let i = 0; i < 4; i++) {
+        _tone({ freq: 1200 + (i % 2) * 200, startTime: now + i * 0.2, duration: 0.18, volume: 0.8, type: 'square', ctx });
+      }
+      if ('vibrate' in navigator) navigator.vibrate([400, 100, 400, 100, 400]);
+    } catch (_) {}
+  }
+
+  async function _triggerDoorbellNotification() {
+    if (Notification.permission !== 'granted') return;
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      if (reg) {
+        reg.showNotification('🔔 Smart Door — Doorbell!', {
+          body: 'Someone is at your door. Tap to open dashboard.',
+          icon: '/images/favicon-192x192.png',
+          badge: '/images/favicon-192x192.png',
+          vibrate: [300, 100, 300],
+          requireInteraction: true,
+          renotify: true,
+          tag: 'smartdoor-doorbell',
+          data: { url: '/app.html' },
+          actions: [
+            { action: 'open',    title: '📲 Open Dashboard' },
+            { action: 'dismiss', title: '✕ Dismiss' },
+          ],
+        });
+      }
+    } catch (_) {}
+  }
+
+  function _initNotifications() {
+    if (document.visibilityState === 'visible' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+    navigator.serviceWorker?.ready.then(reg => {
+      reg.active?.postMessage({ type: 'CLEAR_BADGE' });
+    }).catch(() => {});
+  }
 
   // ────────── REALTIME SETUP ──────────
   function _setupRealtime() {
@@ -747,6 +804,7 @@ const DashboardModule = (() => {
   // Handles both mobile (#set-*) and desktop (#set-*-d) form variants.
   function setupOwnerSettings() {
     const FIELD_MAP = [
+      ['visitor-welcome-title', 'visitor_welcome_title'],
       ['residence-name',      'residence_name'],
       ['family-name',         'family_name'],
       ['owner-display-name',  'owner_display_name'],
