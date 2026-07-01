@@ -1459,7 +1459,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       document.getElementById('bell-sub').textContent = 'Bell rung! Owner notified.';
       showToast('🔔 Bell rung — owner notified', 'success');
       if (voiceEnabled) speak('Darwazi ghanti baja di gayi hai. Maalik ko soochana mil gayi hai.', 'hi-IN');
-      setTimeout(() => { document.getElementById('bell-sub').textContent = 'Alert the family'; btnBell.disabled = false; }, 4000);
+      setTimeout(() => { document.getElementById('bell-sub').textContent = 'Alert the family'; btnBell.disabled = false; }, 900);
     });
 
     // UNIFIED MESSAGE PANEL — choose Text or Voice after tapping "LEAVE A MESSAGE"
@@ -1516,7 +1516,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           if (icon) icon.textContent = '⏺️';
           if (label) label.textContent = 'Recording… tap to stop & send';
           if (voiceEnabled) speak('Recording shuru ho gayi hai. Apna sandesh chhod dein.', 'hi-IN');
-        } catch (err) { showToast(err.message || 'Microphone denied', 'error'); }
+        } catch (err) { showToast(err.message || 'Could not access the microphone.', 'error'); }
         return;
       }
       const { blob, durationSecs, mimeType } = await recorder.stop();

@@ -1,7 +1,7 @@
 // Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
-const CACHE_NAME = 'smartdoor-v5';
+const CACHE_NAME = 'smartdoor-v6'; // bumped: notification pipeline fix (unique tags, push broadcast)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -102,16 +102,28 @@ self.addEventListener('push', (event) => {
 
   const title = data.title || (isSOS ? '🚨 SOS EMERGENCY!' : '🔔 Smart Door Alert');
 
+  // FIX (notification pipeline audit): this used to tag every doorbell-type
+  // push ('bell_ring', 'visitor_scan', 'sos') with the SAME fixed string
+  // ('smartdoor-doorbell'), so two different real events (e.g. a bell ring
+  // followed by a QR scan) shared one tag. renotify:true is supposed to
+  // still re-alert on a repeat with the same tag, but relying on that
+  // per-OS/per-browser behavior is fragile — the safe, spec-guaranteed way
+  // to "never reuse previous notification" is to make the tag unique per
+  // event. Prefer an id the caller supplied (data.id — e.g. the DB row
+  // uuid); fall back to a timestamp+random suffix so it's still unique even
+  // if no id was sent.
+  const eventId = data.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   const options = {
     body:      data.body || 'Someone is at your door!',
     icon:      '/images/favicon-192x192.png',
     badge:     '/images/favicon-192x192.png',
     vibrate,
-    tag:       isDoorbell ? 'smartdoor-doorbell' : `smartdoor-${type}`,
-    renotify:  true,             // ring again even if same tag
+    tag:       `smartdoor-${type}-${eventId}`, // unique per event — never collides, never gets silently merged
+    renotify:  true,             // belt-and-braces, kept even though tag is already unique
     requireInteraction: isDoorbell, // keeps notification on screen until acted on
     silent:    false,
-    data:      { url: data.url || '/app.html', type, timestamp: Date.now() },
+    data:      { id: eventId, url: data.url || '/app.html', type, timestamp: Date.now() },
     actions: isSOS
       ? [
           { action: 'open',    title: '🚨 Open App' },
@@ -127,10 +139,23 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
       await incrementBadge();
-      await self.registration.showNotification(title, options);
+      try {
+        await self.registration.showNotification(title, options);
+        await _broadcast({ type: 'push_delivered', notifData: options.data });
+      } catch (err) {
+        await _broadcast({ type: 'push_failed', notifData: options.data, error: String(err) });
+      }
     })()
   );
 });
+
+// Tell any open/foreground clients what happened, so the page-level
+// notification dispatch log (services/notificationDispatcher.js) can record
+// push-originated deliveries too, not just page-triggered ones.
+async function _broadcast(message) {
+  const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  clientList.forEach((c) => c.postMessage(message));
+}
 
 // ── Notification click ──
 self.addEventListener('notificationclick', (event) => {
