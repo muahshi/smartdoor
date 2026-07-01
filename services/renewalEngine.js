@@ -115,8 +115,8 @@ async function _dispatchRenewalNotification(sub, window, daysLeft) {
     plan:         sub.plan,
     daysLeft:     Math.max(0, daysLeft),
     expiryDate:   new Date(sub.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-    renewalPrice: `₹${sub.renewal_price ?? 0}`,
-    renewalLink:  `https://mysmartdoor.in/app#renew`,
+    renewalPrice: `₹${sub.renewal_price || 999}`,
+    renewalLink:  `https://smartdoor.in/app#renew`,
     windowLabel:  window.label,
   };
 
