@@ -2,30 +2,24 @@
  * Smart Door — Environment Configuration
  * config/environment.js
  *
- * Phase 10 — Production Launch
+ * Phase 9 — Beta Launch Operations
  *
  * Production / Staging / Development environment separation.
  *
  * Usage:
  *   import { ENV, getConfig, isProduction } from '../config/environment.js';
  *
- * IMPORTANT (Phase 10 fix): Smart Door has no bundler, so import.meta.env
- * and process.env never resolve in the browser — they were silently always
- * undefined, meaning production builds were running on 'development'
- * config defaults. The real source of truth is now window.__SD_CONFIG__,
- * which is generated at Vercel build time by scripts/build-env.js from the
- * project's Environment Variables (see config/env.generated.js, loaded via
- * <script src="config/env.generated.js"> before this module in every HTML
- * entry point). Set VITE_APP_ENV per-environment in Vercel dashboard:
- *   Production  → VITE_APP_ENV=production
- *   Preview     → VITE_APP_ENV=staging
- *   Dev/local   → VITE_APP_ENV=development  (or unset)
+ * Set VITE_APP_ENV in Vercel dashboard per deployment:
+ *   Production  branch → VITE_APP_ENV=production
+ *   Staging     branch → VITE_APP_ENV=staging
+ *   Dev/local          → VITE_APP_ENV=development  (or unset)
  */
 
 // ────────── DETECT ENVIRONMENT ──────────
 
 const RAW_ENV = (
-  (typeof window !== 'undefined' && window.__SD_CONFIG__?.env) ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_ENV) ||
+  (typeof process !== 'undefined' && process.env?.VITE_APP_ENV) ||
   'development'
 ).toLowerCase();
 
@@ -37,22 +31,17 @@ export const isProduction  = ENV === 'production';
 export const isStaging     = ENV === 'staging';
 export const isDevelopment = ENV === 'development';
 
-// Single source of truth: window.__SD_CONFIG__ (written by scripts/build-env.js
-// at Vercel build time — see config/env.generated.js)
-const _SD = (typeof window !== 'undefined' && window.__SD_CONFIG__) || {};
-
-
 // ────────── PER-ENVIRONMENT CONFIG ──────────
 
 const CONFIGS = {
   production: {
     env:              'production',
     label:            '🟢 Production',
-    appUrl:           _SD.appUrl || 'https://mysmartdoor.in',
-    supabaseUrl:      _SD.supabaseUrl    || '',
-    supabaseAnonKey:  _SD.supabaseAnon   || '',
-    razorpayKeyId:    _SD.razorpayKeyId  || '',
-    groqApiKey:       _SD.groqApiKey     || '',
+    appUrl:           'https://smartdoor.in',
+    supabaseUrl:      import.meta?.env?.VITE_SUPABASE_URL        || '',
+    supabaseAnonKey:  import.meta?.env?.VITE_SUPABASE_ANON_KEY   || '',
+    razorpayKeyId:    import.meta?.env?.VITE_RAZORPAY_KEY_ID     || '',
+    groqApiKey:       import.meta?.env?.VITE_GROQ_API_KEY        || '',
     debugMode:        false,
     logLevel:         'error',
     sentryEnabled:    true,
@@ -72,11 +61,11 @@ const CONFIGS = {
   staging: {
     env:              'staging',
     label:            '🟡 Staging',
-    appUrl:           _SD.appUrl || 'https://staging.mysmartdoor.in',
-    supabaseUrl:      _SD.supabaseUrl    || '',
-    supabaseAnonKey:  _SD.supabaseAnon   || '',
-    razorpayKeyId:    _SD.razorpayKeyId  || '',
-    groqApiKey:       _SD.groqApiKey     || '',
+    appUrl:           'https://staging.smartdoor.in',
+    supabaseUrl:      import.meta?.env?.VITE_SUPABASE_URL        || '',
+    supabaseAnonKey:  import.meta?.env?.VITE_SUPABASE_ANON_KEY   || '',
+    razorpayKeyId:    import.meta?.env?.VITE_RAZORPAY_KEY_ID     || '',
+    groqApiKey:       import.meta?.env?.VITE_GROQ_API_KEY        || '',
     debugMode:        true,
     logLevel:         'warn',
     sentryEnabled:    true,
@@ -97,10 +86,10 @@ const CONFIGS = {
     env:              'development',
     label:            '🔵 Development',
     appUrl:           'http://localhost:5173',
-    supabaseUrl:      _SD.supabaseUrl    || '',
-    supabaseAnonKey:  _SD.supabaseAnon   || '',
-    razorpayKeyId:    _SD.razorpayKeyId  || '',
-    groqApiKey:       _SD.groqApiKey     || '',
+    supabaseUrl:      import.meta?.env?.VITE_SUPABASE_URL        || '',
+    supabaseAnonKey:  import.meta?.env?.VITE_SUPABASE_ANON_KEY   || '',
+    razorpayKeyId:    import.meta?.env?.VITE_RAZORPAY_KEY_ID     || '',
+    groqApiKey:       import.meta?.env?.VITE_GROQ_API_KEY        || '',
     debugMode:        true,
     logLevel:         'debug',
     sentryEnabled:    false,
