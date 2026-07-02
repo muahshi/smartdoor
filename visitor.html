@@ -482,6 +482,7 @@
   import { VoiceRecorder, uploadVoiceNote } from './services/voiceNotes.js';
   import { subscribeToStatusChanges } from './services/plates.js';
   import { isNightModeActive } from './services/security.js';
+  import { getOrCreateConversation, sendMessage as sendConvMessage, sendVoiceMessage as sendConvVoiceMessage, getConversationMessages, subscribeToConversation, sendTypingSignal } from './services/messaging.js';
 
   const shell = document.getElementById('shell');
 
@@ -493,26 +494,43 @@
   const slugFromPath  = (window.location.pathname.match(/\/p\/([A-Z0-9-]+)/i) || [])[1] || '';
   const plateSlug = (slugFromQuery || slugFromPath).trim().toUpperCase();
 
-  // ── TTS: Hindi female voice AI receptionist ──
+  // ── TTS: AI receptionist voice — owner picks male or female (default female) ──
   let voiceEnabled = true; // Default ON — auto-speak after user's first interaction (browser gesture)
   let speechSynth = window.speechSynthesis;
   let hindiVoice = null;
+  let aiVoiceGender = 'female'; // set from owner.profile.aiVoiceGender once state loads
 
   function initVoice() {
     if (!speechSynth) return;
     const tryFind = () => {
       const voices = speechSynth.getVoices();
-      // Priority: Hindi female > Hindi > any Indian English female > Google Hindi
+      const wantMale = aiVoiceGender === 'male';
+      const genderWord = wantMale ? 'male' : 'female';
+      // Priority: Hindi voice matching gender > Hindi (any) > Indian English
+      // matching gender > Indian English (any) > Google Hindi.
+      // Most platforms only expose one or two hi-IN voices, so "matching
+      // gender" filters by name hint; if none found we still fall back to
+      // whatever Hindi voice IS available rather than silence.
       hindiVoice =
-        voices.find(v => v.lang === 'hi-IN' && v.name.toLowerCase().includes('female')) ||
+        voices.find(v => v.lang === 'hi-IN' && v.name.toLowerCase().includes(genderWord)) ||
+        (wantMale
+          ? voices.find(v => v.lang === 'hi-IN' && !v.name.toLowerCase().includes('female'))
+          : null) ||
         voices.find(v => v.lang === 'hi-IN') ||
         voices.find(v => v.lang.startsWith('hi')) ||
-        voices.find(v => v.lang === 'en-IN' && v.name.toLowerCase().includes('female')) ||
+        voices.find(v => v.lang === 'en-IN' && v.name.toLowerCase().includes(genderWord)) ||
         voices.find(v => v.lang === 'en-IN') ||
         null;
     };
     tryFind();
     speechSynth.onvoiceschanged = tryFind;
+  }
+
+  // Call this once owner.profile.aiVoiceGender is known (after state loads),
+  // and again if it ever changes mid-session.
+  function setAIVoiceGender(gender) {
+    aiVoiceGender = gender === 'male' ? 'male' : 'female';
+    initVoice();
   }
 
   function speak(text, lang = 'hi-IN') {
@@ -521,7 +539,7 @@
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = lang;
     utt.rate = 0.92;
-    utt.pitch = 1.05;
+    utt.pitch = aiVoiceGender === 'male' ? 0.88 : 1.05;
     utt.volume = 1;
     if (hindiVoice) utt.voice = hindiVoice;
     speechSynth.speak(utt);
@@ -537,7 +555,7 @@
       const utt = new SpeechSynthesisUtterance(text);
       utt.lang = lang;
       utt.rate = 0.90;
-      utt.pitch = 1.05;
+      utt.pitch = aiVoiceGender === 'male' ? 0.88 : 1.05;
       utt.volume = 1;
       if (hindiVoice) utt.voice = hindiVoice;
       speechSynth.speak(utt);
@@ -572,6 +590,33 @@
 
   let state = null;
   let unsubscribeStatus = null;
+
+  // ── UNIFIED CONVERSATION (Phase 4) ──
+  // One thread ties together: AI chat turns, "Leave a Message" text, and
+  // voice notes — so the owner's Inbox shows everything from this visitor
+  // session in one place, even though (per the "do not redesign" rule in
+  // the Phase 4 spec) the visitor page keeps its existing two widgets
+  // (Leave a Message panel + AI Chat) visually separate.
+  let conversationId = null;
+  let _convReady = null;
+  function ensureConversation(ownerId, plateId) {
+    if (_convReady) return _convReady;
+    _convReady = getOrCreateConversation({ ownerId, plateId }).then((r) => {
+      if (r.success) {
+        conversationId = r.conversationId;
+        // Live owner replies — show up in the AI chat feed if the visitor
+        // is still on the page (realtime, no polling/refresh).
+        subscribeToConversation(conversationId, (msg) => {
+          if (msg.sender_type !== 'owner') return;
+          appendAIMsg(msg.message_type === 'voice' ? '🎤 Owner sent a voice reply' : msg.text, 'ai', '#00A2E8');
+          if (voiceEnabled && msg.message_type === 'text' && msg.text) speak(msg.text, detectLang(msg.text));
+          showToast('💬 Owner replied', 'success');
+        });
+      }
+      return r;
+    });
+    return _convReady;
+  }
 
   // Wait for __SD_CONFIG__ to be available before init
   // env.generated.js loads via <script src> before this module,
@@ -641,6 +686,7 @@
             welcomeMessage:    ownerRow?.welcome_message || null,
             ownerDisplayName:  ownerRow?.owner_display_name || ownerRow?.full_name || 'Resident',
             aiName:            ownerRow?.ai_name || 'Priya',
+            aiVoiceGender:     ownerRow?.ai_voice_gender || 'female',
             greetingStyle:     ownerRow?.greeting_style || 'warm',
             preferredLanguage: ownerRow?.preferred_language || 'hinglish',
             visitorGreeting:      ownerRow?.visitor_greeting || null,
@@ -654,6 +700,8 @@
         },
         access: { allowCall: true, allowVoice: true, allowSos: true, allowText: true },
       };
+
+      setAIVoiceGender(state.owner.profile.aiVoiceGender);
 
       // Log scan async — never block render
       try {
@@ -1247,6 +1295,16 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         ownerId: s.owner.id, plateId: s.plate.plateId, content: text,
         messageType: intentData.priority === 'Critical' ? 'emergency' : 'text',
       }).catch(() => {});
+
+      // Mirror this AI-chat turn into the unified conversation (Phase 4
+      // Inbox) — visitor's message, then the AI's reply, both tagged with
+      // the detected intent so the owner Inbox can filter/tag by it.
+      ensureConversation(s.owner.id, s.plate.plateId).then((cr) => {
+        if (!cr.success) return;
+        const meta = { intent: intentData.intent, priority: intentData.priority, confidence: intentData.confidence };
+        sendConvMessage({ conversationId: cr.conversationId, ownerId: s.owner.id, plateId: s.plate.plateId, senderType: 'visitor', text, metadata: meta }).catch(() => {});
+        sendConvMessage({ conversationId: cr.conversationId, ownerId: s.owner.id, plateId: s.plate.plateId, senderType: 'ai', senderName: (s.owner.profile?.aiName || 'Priya'), text: hinglishReply, aiGenerated: true, metadata: meta }).catch(() => {});
+      });
     }
 
     // Release double-submit guard
@@ -1525,6 +1583,18 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       btnVoice.classList.remove('recording');
       if (label) label.textContent = 'Uploading…';
       const r = await uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mimeType });
+      // Mirror into the unified conversation (Phase 4 Inbox) — reuses the
+      // same uploaded storage path, no second upload.
+      if (r.success && r.voiceNote?.storagePath) {
+        ensureConversation(ownerId, plateId).then((cr) => {
+          if (cr.success) {
+            sendConvVoiceMessage({
+              conversationId: cr.conversationId, ownerId, plateId, senderType: 'visitor',
+              durationSecs, existingStoragePath: r.voiceNote.storagePath,
+            }).catch(() => {});
+          }
+        });
+      }
       if (r.success) {
         if (icon) icon.textContent = '✅';
         if (label) label.textContent = 'Voice note sent!';
@@ -1576,6 +1646,11 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       textSendBtn.disabled = true;
       textSendBtn.textContent = 'Sending…';
       const r = await sendTextMessage({ ownerId, plateId, content, messageType: 'text' });
+      // Mirror into the unified conversation (Phase 4 Inbox) — best-effort,
+      // never blocks the existing send flow above.
+      ensureConversation(ownerId, plateId).then((cr) => {
+        if (cr.success) sendConvMessage({ conversationId: cr.conversationId, ownerId, plateId, senderType: 'visitor', text: content }).catch(() => {});
+      });
       if (r.success) {
         textInput.value = '';
         msgPanel?.classList.remove('open');
