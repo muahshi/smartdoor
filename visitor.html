@@ -703,13 +703,25 @@
 
       setAIVoiceGender(state.owner.profile.aiVoiceGender);
 
-      // Log scan async — never block render
-      try {
+      // Log scan async — never block render.
+      // Also opens/reuses the unified conversation right away (Phase 4b) so
+      // a QR scan is the FIRST thing in the timeline, before any bell/
+      // message/AI-chat turn — and the scan itself gets a conversation_id
+      // so its OS notification can deep-link into the exact thread.
+      ensureConversation(plate.owner_id, plate.plate_id).then((cr) => {
+        const convId = cr.success ? cr.conversationId : null;
         supabase.from('visitor_logs').insert({
           owner_id: plate.owner_id, plate_id: plate.plate_id,
           event_type: 'qr_scan', user_agent: navigator.userAgent,
-        });
-      } catch (_) {}
+          conversation_id: convId,
+        }).then(() => {});
+        if (convId) {
+          sendConvMessage({
+            conversationId: convId, ownerId: plate.owner_id, plateId: plate.plate_id,
+            senderType: 'system', text: '📲 Visitor opened the Smart Door page (QR scan)',
+          }).catch(() => {});
+        }
+      });
 
       renderVisitorExperience(state);
 
@@ -1574,7 +1586,24 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           if (icon) icon.textContent = '⏺️';
           if (label) label.textContent = 'Recording… tap to stop & send';
           if (voiceEnabled) speak('Recording shuru ho gayi hai. Apna sandesh chhod dein.', 'hi-IN');
-        } catch (err) { showToast(err.message || 'Could not access the microphone.', 'error'); }
+        } catch (err) {
+          // FIX: a plain "Microphone permission was denied" red banner is a
+          // dead end for a first-time visitor — they don't know this app,
+          // don't want to dig into Chrome's site-permission settings at
+          // someone's front door, and Text is right there as a fully
+          // equivalent option. So: only the true "denied" case gets a soft,
+          // actionable message + auto-switch to Text; every other mic error
+          // (no hardware, busy, insecure context) still shows its precise
+          // message from services/voiceNotes.js, since those aren't
+          // permission problems the visitor can route around by retrying.
+          if (err.wasPermissionDenied) {
+            showToast('🎤 Mic access isn\'t available here — switched to Text so you can still send your message', 'info');
+            setMsgMode('text');
+            setTimeout(() => textInput?.focus(), 100);
+          } else {
+            showToast(err.message || 'Could not access the microphone.', 'error');
+          }
+        }
         return;
       }
       const { blob, durationSecs, mimeType } = await recorder.stop();
@@ -1582,18 +1611,16 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       voiceBar.classList.remove('show');
       btnVoice.classList.remove('recording');
       if (label) label.textContent = 'Uploading…';
-      const r = await uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mimeType });
+      const cr = await ensureConversation(ownerId, plateId);
+      const convId = cr.success ? cr.conversationId : null;
+      const r = await uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mimeType, conversationId: convId });
       // Mirror into the unified conversation (Phase 4 Inbox) — reuses the
       // same uploaded storage path, no second upload.
-      if (r.success && r.voiceNote?.storagePath) {
-        ensureConversation(ownerId, plateId).then((cr) => {
-          if (cr.success) {
-            sendConvVoiceMessage({
-              conversationId: cr.conversationId, ownerId, plateId, senderType: 'visitor',
-              durationSecs, existingStoragePath: r.voiceNote.storagePath,
-            }).catch(() => {});
-          }
-        });
+      if (r.success && r.voiceNote?.storagePath && convId) {
+        sendConvVoiceMessage({
+          conversationId: convId, ownerId, plateId, senderType: 'visitor',
+          durationSecs, existingStoragePath: r.voiceNote.storagePath,
+        }).catch(() => {});
       }
       if (r.success) {
         if (icon) icon.textContent = '✅';
@@ -1622,7 +1649,8 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         btnSos.disabled = true;
         _logVisitorEvent(ownerId, plateId, 'sos_triggered');
         const { members } = await getFamilyMembersForSos(plateId);
-        const r = await triggerEmergency({ ownerId, plateId, familyMembers: members });
+        const cr = await ensureConversation(ownerId, plateId);
+        const r = await triggerEmergency({ ownerId, plateId, familyMembers: members, conversationId: cr.success ? cr.conversationId : null });
         if (r.success) {
           showToast('🚨 Emergency alert sent — help coming', 'success');
           if (voiceEnabled) speak('Aapaat sandesh bheja ja raha hai. Madad aa rahi hai!', 'hi-IN');
@@ -1645,12 +1673,12 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       if (!content) { showToast('Message khaali nahi ho sakta', 'error'); return; }
       textSendBtn.disabled = true;
       textSendBtn.textContent = 'Sending…';
-      const r = await sendTextMessage({ ownerId, plateId, content, messageType: 'text' });
+      const cr = await ensureConversation(ownerId, plateId);
+      const convId = cr.success ? cr.conversationId : null;
+      const r = await sendTextMessage({ ownerId, plateId, content, messageType: 'text', conversationId: convId });
       // Mirror into the unified conversation (Phase 4 Inbox) — best-effort,
       // never blocks the existing send flow above.
-      ensureConversation(ownerId, plateId).then((cr) => {
-        if (cr.success) sendConvMessage({ conversationId: cr.conversationId, ownerId, plateId, senderType: 'visitor', text: content }).catch(() => {});
-      });
+      if (convId) sendConvMessage({ conversationId: convId, ownerId, plateId, senderType: 'visitor', text: content }).catch(() => {});
       if (r.success) {
         textInput.value = '';
         msgPanel?.classList.remove('open');
@@ -1672,7 +1700,32 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
   async function _logVisitorEvent(ownerId, plateId, eventType) {
     try {
       const { supabase } = await import('./services/supabase.js');
-      await supabase.from('visitor_logs').insert({ owner_id: ownerId, plate_id: plateId, event_type: eventType });
+      // Phase 4b: attach this event to the same unified conversation as
+      // every other interaction from this visitor, and mirror it in as a
+      // system message so doorbell/SOS show up in the owner's Inbox
+      // timeline alongside text/voice/AI turns (Req 10), and so the OS
+      // notification for this row can deep-link to the exact thread (Req 6).
+      const cr = await ensureConversation(ownerId, plateId);
+      const convId = cr.success ? cr.conversationId : null;
+
+      await supabase.from('visitor_logs').insert({
+        owner_id: ownerId, plate_id: plateId, event_type: eventType,
+        conversation_id: convId,
+      });
+
+      if (convId) {
+        const SYSTEM_LABELS = {
+          bell_ring: '🔔 Visitor rang the doorbell',
+          sos_triggered: '🚨 SOS Emergency triggered — respond immediately',
+        };
+        const text = SYSTEM_LABELS[eventType];
+        if (text) {
+          sendConvMessage({
+            conversationId: convId, ownerId, plateId, senderType: 'system', text,
+            metadata: { event: eventType, priority: eventType === 'sos_triggered' ? 'critical' : 'high' },
+          }).catch(() => {});
+        }
+      }
     } catch {}
   }
 

@@ -123,7 +123,7 @@ self.addEventListener('push', (event) => {
     renotify:  true,             // belt-and-braces, kept even though tag is already unique
     requireInteraction: isDoorbell, // keeps notification on screen until acted on
     silent:    false,
-    data:      { id: eventId, url: data.url || '/app.html', type, timestamp: Date.now() },
+    data:      { id: eventId, url: data.url || '/app.html', type, conversationId: data.conversationId || null, timestamp: Date.now() },
     actions: isSOS
       ? [
           { action: 'open',    title: '🚨 Open App' },
