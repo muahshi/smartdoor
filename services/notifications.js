@@ -26,8 +26,15 @@ const CHANNELS = {
     return { channel: 'in_app', status: 'sent' };
   },
   push: async (_notification) => {
-    // TODO: integrate Web Push / FCM. Architecture placeholder only.
-    return { channel: 'push', status: 'not_configured' };
+    // Background push (Web Push VAPID + FCM) is dispatched server-side by a
+    // Postgres trigger the instant createNotification() above inserts the
+    // row (see sql/33_push_notifications.sql -> supabase/functions/
+    // send-push). Doing it there instead of here means push still fires
+    // even if the tab closes the millisecond after this call returns —
+    // exactly the "works when app is closed" guarantee this channel needs.
+    // Nothing to do client-side; this just records that delivery was
+    // delegated rather than skipped.
+    return { channel: 'push', status: 'delegated_to_db_trigger' };
   },
   sms: async (_notification) => {
     // TODO: integrate Exotel/Twilio SMS API via an Edge Function.
@@ -140,7 +147,7 @@ export async function notifyBellRing(ownerId, plateId) {
     body: 'A visitor rang the digital bell.',
     payload: { plateId },
     priority: 'normal',
-    channels: ['in_app'],
+    channels: ['in_app', 'push'],
   });
 }
 
@@ -152,7 +159,7 @@ export async function notifyVoiceNote(ownerId, plateId, voiceNoteId, durationSec
     body: `${durationSecs}s message waiting`,
     payload: { plateId, voiceNoteId },
     priority: 'normal',
-    channels: ['in_app'],
+    channels: ['in_app', 'push'],
   });
 }
 
@@ -164,7 +171,7 @@ export async function notifyCallRequest(ownerId, plateId, callId) {
     body: 'A visitor is requesting a secure call.',
     payload: { plateId, callId },
     priority: 'high',
-    channels: ['in_app'],
+    channels: ['in_app', 'push'],
   });
 }
 
@@ -179,7 +186,7 @@ export async function notifyNewConversationMessage(ownerId, plateId, conversatio
     body: preview || 'A visitor sent a new message.',
     payload: { plateId, conversationId },
     priority: 'normal',
-    channels: ['in_app'],
+    channels: ['in_app', 'push'],
   });
 }
 
@@ -214,7 +221,7 @@ export async function triggerEmergencyBroadcast(ownerId, plateId, familyMembers 
     body: 'A visitor pressed the SOS button at your door.',
     payload: { plateId, bypassDND: true, bypassNightMode: true },
     priority: 'critical',
-    channels: ['in_app'],
+    channels: ['in_app', 'push'],
   });
 
   // Fan out to every active family member, highest priority first, but
@@ -232,7 +239,7 @@ export async function triggerEmergencyBroadcast(ownerId, plateId, familyMembers 
         body: 'SOS triggered — please respond immediately.',
         payload: { plateId, memberId: member.id, priority: member.priority },
         priority: 'critical',
-        channels: ['in_app', 'whatsapp'],
+        channels: ['in_app', 'whatsapp', 'push'],
         toPhone: member.phone,
         whatsappTemplate: 'smartdoor_emergency',
       })

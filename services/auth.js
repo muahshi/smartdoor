@@ -8,6 +8,7 @@
  */
 
 import { supabase } from './supabase.js';
+import { unregisterDevice } from './pushRegistration.js';
 
 const AUTH_KEY      = 'sd_owner_session';
 const DEVICE_KEY    = 'sd_device_trusted';
@@ -138,6 +139,10 @@ export async function logoutOwner() {
     const session = await getCurrentOwner();
     if (session) {
       await _logAudit(session.id, 'logout', {});
+      // Deactivate this device's push registration server-side. Doesn't
+      // revoke the browser subscription (a fresh login re-registers it
+      // instantly) — just stops this device receiving push while logged out.
+      await unregisterDevice(session.id).catch(() => {});
     }
     await supabase.auth.signOut();
     localStorage.removeItem(AUTH_KEY);
