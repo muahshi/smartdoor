@@ -84,6 +84,21 @@ const supabaseAnon = resolveVar('VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
 // and never ships to the browser; it stays Edge-Function-only.
 const razorpayKeyId = resolveVar('VITE_RAZORPAY_KEY_ID', 'RAZORPAY_KEY_ID');
 
+// ── Push notifications (Migration 33 / FCM-ready architecture) ──
+// VAPID public key is safe to ship to the browser (it's the "public" half —
+// the private key stays in the send-push Edge Function secret only).
+// Firebase web config is also public-safe by design (Google's own docs
+// confirm this — it identifies the project, it does not authenticate).
+// Both are OPTIONAL: leave unset and push registration simply no-ops
+// client-side until they're configured (see services/pushRegistration.js).
+const vapidPublicKey = resolveVar('VITE_VAPID_PUBLIC_KEY', 'VAPID_PUBLIC_KEY');
+const firebaseConfigRaw = resolveVar('VITE_FIREBASE_CONFIG', 'FIREBASE_CONFIG'); // JSON string, e.g. {"apiKey":"...","authDomain":"...","projectId":"...","messagingSenderId":"...","appId":"...","vapidKey":"..."}
+let firebaseConfig = null;
+if (firebaseConfigRaw) {
+  try { firebaseConfig = JSON.parse(firebaseConfigRaw); }
+  catch (_) { console.warn('\n⚠️  [build-env] VITE_FIREBASE_CONFIG is not valid JSON — ignoring, FCM stays disabled.\n'); }
+}
+
 const required = {
   'VITE_SUPABASE_URL / SUPABASE_URL': supabaseUrl,
   'VITE_SUPABASE_ANON_KEY / SUPABASE_ANON_KEY': supabaseAnon,
@@ -125,6 +140,8 @@ const config = {
   supabaseUrl,
   supabaseAnon,
   razorpayKeyId,
+  vapidPublicKey,
+  firebaseConfig,
   groqApiKey: '', // Removed: GROQ_API_KEY is server-side only (groq-proxy Edge Function)
   sentryDsn: process.env.VITE_SENTRY_DSN || '',
   gaId: process.env.VITE_GA_MEASUREMENT_ID || '',
