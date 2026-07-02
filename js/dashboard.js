@@ -440,6 +440,30 @@ const DashboardModule = (() => {
     });
 
     state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
+
+    // ────────── NOTIFICATION CLICK → OPEN EXACT CONVERSATION (Req 6) ──────────
+    // sw.js posts { type:'notification_click', notifData } to this window on
+    // click (see services/notificationDispatcher.js's own listener, which
+    // only logs it). notifData.conversationId is now populated for every
+    // event type (bell/QR/voice/text/SOS all attach conversation_id — see
+    // sql/32_conversation_unification_v2.sql + visitor.html), so this is the
+    // single place that turns "tapped a notification" into "Inbox thread is
+    // open, scrolled to the right conversation" — no new channel, reuses the
+    // existing Inbox rendering functions (openThread/refreshInbox) as-is.
+    if ('serviceWorker' in navigator) {
+      const onNotifClick = (event) => {
+        const msg = event.data;
+        if (msg?.type !== 'notification_click') return;
+        const conversationId = msg.notifData?.conversationId;
+        if (!conversationId) return; // nothing to deep-link to — app.html already opened via sw.js's own openWindow/focus
+        if (typeof window.switchMobileTab === 'function') {
+          window.switchMobileTab('inbox', document.querySelector('.tab-btn[data-tab="inbox"]'), document.querySelector('.bottom-nav-item[onclick*="inbox"]'));
+        }
+        refreshInbox().then(() => openThread(conversationId));
+      };
+      navigator.serviceWorker.addEventListener('message', onNotifClick);
+      state._realtimeUnsubs.push(() => navigator.serviceWorker.removeEventListener('message', onNotifClick));
+    }
   }
 
   function _bumpStat(eventType) {
@@ -1454,8 +1478,18 @@ const DashboardModule = (() => {
     if (m.conversation_id !== state.inbox.activeId) return;
     const time = new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const ticks = m.sender_type === 'owner' ? (m.seen_at ? '✓✓' : m.delivered_at ? '✓✓' : '✓') : '';
-    const bubbleClass = m.sender_type === 'owner' ? 'owner' : m.sender_type === 'ai' ? 'ai' : 'visitor';
-    const senderLabel = m.sender_type === 'ai' ? `🤖 ${_esc(m.sender_name || 'AI Receptionist')}` : m.sender_type === 'owner' ? '' : '👤 Visitor';
+    const bubbleClass = m.sender_type === 'owner' ? 'owner' : m.sender_type === 'ai' ? 'ai' : m.sender_type === 'system' ? 'system' : 'visitor';
+    const senderLabel = m.sender_type === 'ai' ? `🤖 ${_esc(m.sender_name || 'AI Receptionist')}` : m.sender_type === 'owner' ? '' : m.sender_type === 'system' ? '' : '👤 Visitor';
+
+    if (m.sender_type === 'system') {
+      const html = `<div class="inbox-bubble system">${_esc(m.text || '')} · ${time}</div>`;
+      ['inbox-thread-messages', 'inbox-thread-messages-d'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.insertAdjacentHTML('beforeend', html);
+      });
+      if (!skipScroll) _scrollThreadToBottom();
+      return;
+    }
 
     let bodyHTML;
     if (m.message_type === 'voice') {
@@ -1658,6 +1692,7 @@ const DashboardModule = (() => {
     setChartRange,
     playVoiceNote,
     refreshInbox,
+    openThread,
     closeInboxThread,
     togglePinActive,
     toggleInboxMenu,
