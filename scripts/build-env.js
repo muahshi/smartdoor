@@ -84,19 +84,29 @@ const supabaseAnon = resolveVar('VITE_SUPABASE_ANON_KEY', 'SUPABASE_ANON_KEY');
 // and never ships to the browser; it stays Edge-Function-only.
 const razorpayKeyId = resolveVar('VITE_RAZORPAY_KEY_ID', 'RAZORPAY_KEY_ID');
 
-// ── Push notifications (Migration 33 / FCM-ready architecture) ──
-// VAPID public key is safe to ship to the browser (it's the "public" half —
-// the private key stays in the send-push Edge Function secret only).
-// Firebase web config is also public-safe by design (Google's own docs
-// confirm this — it identifies the project, it does not authenticate).
-// Both are OPTIONAL: leave unset and push registration simply no-ops
-// client-side until they're configured (see services/pushRegistration.js).
-const vapidPublicKey = resolveVar('VITE_VAPID_PUBLIC_KEY', 'VAPID_PUBLIC_KEY');
-const firebaseConfigRaw = resolveVar('VITE_FIREBASE_CONFIG', 'FIREBASE_CONFIG'); // JSON string, e.g. {"apiKey":"...","authDomain":"...","projectId":"...","messagingSenderId":"...","appId":"...","vapidKey":"..."}
-let firebaseConfig = null;
-if (firebaseConfigRaw) {
-  try { firebaseConfig = JSON.parse(firebaseConfigRaw); }
-  catch (_) { console.warn('\n⚠️  [build-env] VITE_FIREBASE_CONFIG is not valid JSON — ignoring, FCM stays disabled.\n'); }
+// Firebase — CLIENT-SAFE config only (Phase 4c, background push via FCM).
+// These are the public web app keys, meant to ship to the browser — that's
+// how Firebase Web push always works, the token exchange is what's secret.
+// FIREBASE_PRIVATE_KEY and FIREBASE_CLIENT_EMAIL are NOT read here and must
+// NEVER be added to this list — those two are the service-account secret
+// half and belong ONLY in Supabase Edge Function secrets (see
+// supabase/functions/send-push/index.ts), never in a Vercel env var that
+// this script bakes into window.__SD_CONFIG__.
+const firebase = {
+  apiKey:            resolveVar('VITE_FIREBASE_API_KEY', 'FIREBASE_API_KEY'),
+  authDomain:        resolveVar('VITE_FIREBASE_AUTH_DOMAIN', 'FIREBASE_AUTH_DOMAIN'),
+  projectId:         resolveVar('VITE_FIREBASE_PROJECT_ID', 'FIREBASE_PROJECT_ID'),
+  storageBucket:     resolveVar('VITE_FIREBASE_STORAGE_BUCKET', 'FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: resolveVar('VITE_FIREBASE_MESSAGING_SENDER_ID', 'FIREBASE_MESSAGING_SENDER_ID'),
+  appId:             resolveVar('VITE_FIREBASE_APP_ID', 'FIREBASE_APP_ID'),
+  measurementId:     resolveVar('VITE_FIREBASE_MEASUREMENT_ID', 'FIREBASE_MEASUREMENT_ID'),
+  vapidKey:          resolveVar('VITE_FIREBASE_VAPID_KEY', 'FIREBASE_VAPID_KEY'),
+};
+if (!firebase.apiKey || !firebase.vapidKey) {
+  console.warn(
+    `\n⚠️  [build-env] Firebase push config incomplete — background push notifications will be disabled.\n` +
+    `   (Foreground notifications via services/notificationDispatcher.js are unaffected.)\n`
+  );
 }
 
 const required = {
@@ -140,8 +150,7 @@ const config = {
   supabaseUrl,
   supabaseAnon,
   razorpayKeyId,
-  vapidPublicKey,
-  firebaseConfig,
+  firebase,
   groqApiKey: '', // Removed: GROQ_API_KEY is server-side only (groq-proxy Edge Function)
   sentryDsn: process.env.VITE_SENTRY_DSN || '',
   gaId: process.env.VITE_GA_MEASUREMENT_ID || '',
