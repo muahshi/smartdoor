@@ -114,7 +114,7 @@ export async function endMaskedCall(callId, ownerId, clientDurationSecs = 0) {
  * @param {string} params.content
  * @param {('text'|'emergency')} [params.messageType]
  */
-export async function sendTextMessage({ ownerId, plateId, content, messageType = 'text' }) {
+export async function sendTextMessage({ ownerId, plateId, content, messageType = 'text', conversationId = null }) {
   const actionType = messageType === 'emergency' ? 'sos' : 'text_message';
   const gateResult = await gate(plateId, actionType);
   if (!gateResult.allowed) {
@@ -136,6 +136,9 @@ export async function sendTextMessage({ ownerId, plateId, content, messageType =
         message_type: messageType,
         content,
         priority: messageType === 'emergency' ? 'critical' : 'normal',
+        // conversation_id (optional, migration 32) — lets the OS notification
+        // for this row deep-link straight into the Inbox thread it belongs to.
+        conversation_id: conversationId,
       });
 
     if (error) throw error;
@@ -154,7 +157,7 @@ export async function sendTextMessage({ ownerId, plateId, content, messageType =
  * @param {string} params.plateId
  * @param {Array} params.familyMembers  from services/security.js#getFamilyMembers()
  */
-export async function triggerEmergency({ ownerId, plateId, familyMembers = [] }) {
+export async function triggerEmergency({ ownerId, plateId, familyMembers = [], conversationId = null }) {
   const gateResult = await gate(plateId, 'sos');
   if (!gateResult.allowed) {
     return { success: false, rateLimited: true, error: 'Emergency alert already sent. Help is on the way.' };
@@ -162,7 +165,7 @@ export async function triggerEmergency({ ownerId, plateId, familyMembers = [] })
 
   // Log the emergency as a message_logs entry too, so it shows in the
   // unified communication feed alongside calls/voice notes/text messages.
-  await sendTextMessage({ ownerId, plateId, content: 'SOS — emergency triggered at the door.', messageType: 'emergency' });
+  await sendTextMessage({ ownerId, plateId, content: 'SOS — emergency triggered at the door.', messageType: 'emergency', conversationId });
 
   const broadcast = await triggerEmergencyBroadcast(ownerId, plateId, familyMembers);
   await _audit(ownerId, 'emergency_triggered', { plateId, membersNotified: broadcast.membersNotified });

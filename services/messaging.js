@@ -26,17 +26,37 @@ import { notifyNewConversationMessage } from './notifications.js';
 const VOICE_BUCKET = 'voice-notes';
 
 // ────────── VISITOR SESSION ID ──────────
-// One conversation per browser tab session per plate. Stored in
-// sessionStorage (not localStorage) so a fresh visit later starts a new
-// thread, mirroring how a real visitor "session" at the door works.
-export function getVisitorSessionId(plateId) {
-  const key = `sd_conv_session_${plateId}`;
-  let id = sessionStorage.getItem(key);
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem(key, id);
+// Identity anchor for "is this the same visitor?" across QR rescans.
+//
+// FIX (Phase 4b / migration 32): this used to be a sessionStorage id that
+// reset on every new browser tab — so scanning the same QR twice within a
+// minute, in two tabs, created two separate conversations. Requirement:
+// "if a visitor scans the QR again within 24h, reuse the same
+// conversation." That needs an identity that survives across tabs/visits,
+// not one scoped to a single tab session.
+//
+// Reuses the SAME persistent localStorage fingerprint ('sd_visitor_fp')
+// that visitor.html already generates for remember_visitor() (returning
+// visitor recognition) — one source of visitor identity, not a second,
+// duplicate mechanism. The actual 24h-window / resolved-conversation
+// reuse logic lives in the get_or_create_conversation() SQL RPC
+// (sql/32_conversation_unification_v2.sql), which is the correct place
+// for it (avoids a client/server race on "is this still valid").
+export function getVisitorSessionId(_plateId) {
+  const key = 'sd_visitor_fp';
+  try {
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = 'v_' + Array.from(crypto.getRandomValues(new Uint8Array(12))).map((b) => b.toString(16).padStart(2, '0')).join('');
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch (_) {
+    // Private browsing / storage blocked — fall back to a per-call id.
+    // Conversation reuse degrades gracefully to "new thread every visit"
+    // rather than throwing.
+    return 'v_anon_' + Date.now();
   }
-  return id;
 }
 
 // ────────── VISITOR: GET OR CREATE CONVERSATION ──────────

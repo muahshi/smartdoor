@@ -130,7 +130,7 @@ export class VoiceRecorder {
  * @param {string} [params.mimeType]
  * @returns {Promise<{ success: boolean, voiceNote?: object, error?: string }>}
  */
-export async function uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mimeType = 'audio/webm' }) {
+export async function uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mimeType = 'audio/webm', conversationId = null }) {
   try {
     // Server-side rate limit gate (per plate)
     const gateResult = await gate(plateId, 'voice_message');
@@ -178,6 +178,9 @@ export async function uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mi
         message_type: 'voice',
         voice_note_id: row.id,
         priority: 'normal',
+        // conversation_id (optional, migration 32) — lets the OS notification
+        // for this row deep-link straight into the Inbox thread it belongs to.
+        conversation_id: conversationId,
       })
       .then(() => {})
       .catch((err) => console.error('[VoiceNotes] message_logs mirror failed:', err));

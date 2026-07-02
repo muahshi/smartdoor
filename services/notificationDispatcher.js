@@ -157,7 +157,11 @@ export async function notifyEvent(type, row, ownerId) {
       requireInteraction: cfg.requireInteraction,
       silent: false,
       timestamp: createdAt,
-      data: { id, type, ownerId, url: '/app.html', timestamp: createdAt },
+      // conversationId (Phase 4b, migration 32): visitor_logs / message_logs
+      // rows now carry conversation_id. Passing it through here is what lets
+      // js/dashboard.js's notification_click listener open the EXACT
+      // conversation the visitor started, instead of just the app shell.
+      data: { id, type, ownerId, conversationId: row?.conversation_id || null, url: '/app.html', timestamp: createdAt },
     });
     _updateLog(id, { status: 'delivered' });
   } catch (err) {
@@ -213,7 +217,7 @@ async function _runCatchUp(ownerId) {
     const [logsRes, msgRes] = await Promise.allSettled([
       supabase
         .from('visitor_logs')
-        .select('id, owner_id, plate_id, event_type, created_at')
+        .select('id, owner_id, plate_id, event_type, conversation_id, created_at')
         .eq('owner_id', ownerId)
         .in('event_type', ['bell_ring', 'qr_scan', 'sos_triggered'])
         .gte('created_at', since)
@@ -221,7 +225,7 @@ async function _runCatchUp(ownerId) {
         .limit(50),
       supabase
         .from('message_logs')
-        .select('id, owner_id, plate_id, message_type, content, duration_secs, created_at')
+        .select('id, owner_id, plate_id, message_type, content, duration_secs, conversation_id, created_at')
         .eq('owner_id', ownerId)
         .gte('created_at', since)
         .order('created_at', { ascending: true })
