@@ -710,8 +710,11 @@
       // so its OS notification can deep-link into the exact thread.
       ensureConversation(plate.owner_id, plate.plate_id).then((cr) => {
         const convId = cr.success ? cr.conversationId : null;
+        // Explicit id (Phase 4c) — reused as the push notification's tag,
+        // avoiding a select-after-insert round trip anon can't do anyway.
+        const rowId = crypto.randomUUID();
         supabase.from('visitor_logs').insert({
-          owner_id: plate.owner_id, plate_id: plate.plate_id,
+          id: rowId, owner_id: plate.owner_id, plate_id: plate.plate_id,
           event_type: 'qr_scan', user_agent: navigator.userAgent,
           conversation_id: convId,
         }).then(() => {});
@@ -721,6 +724,7 @@
             senderType: 'system', text: '📲 Visitor opened the Smart Door page (QR scan)',
           }).catch(() => {});
         }
+        _triggerPush(plate.owner_id, plate.plate_id, 'qr_scan', rowId, convId);
       });
 
       renderVisitorExperience(state);
@@ -1622,6 +1626,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           durationSecs, existingStoragePath: r.voiceNote.storagePath,
         }).catch(() => {});
       }
+      if (r.success && r.voiceNote?.id) _triggerPush(ownerId, plateId, 'voice', r.voiceNote.id, convId);
       if (r.success) {
         if (icon) icon.textContent = '✅';
         if (label) label.textContent = 'Voice note sent!';
@@ -1679,6 +1684,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       // Mirror into the unified conversation (Phase 4 Inbox) — best-effort,
       // never blocks the existing send flow above.
       if (convId) sendConvMessage({ conversationId: convId, ownerId, plateId, senderType: 'visitor', text: content }).catch(() => {});
+      if (r.success && r.id) _triggerPush(ownerId, plateId, 'text', r.id, convId);
       if (r.success) {
         textInput.value = '';
         msgPanel?.classList.remove('open');
@@ -1697,6 +1703,26 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
     });
   }
 
+  // Best-effort call to send-push (Phase 4c) so the owner gets a REAL
+  // background push even if their dashboard/PWA is fully closed — the
+  // foreground realtime path in services/notificationDispatcher.js only
+  // fires while their app/tab is open. Never blocks or throws into the
+  // caller; if Firebase isn't configured server-side this just no-ops.
+  // `type` here is the push-event vocabulary (bell_ring|qr_scan|voice|text|sos),
+  // matching EVENT_CONFIG in supabase/functions/send-push/index.ts exactly.
+  function _triggerPush(ownerId, plateId, type, rowId, conversationId) {
+    try {
+      const supabaseUrl = window.__SD_CONFIG__?.supabaseUrl || '';
+      const anonKey = window.__SD_CONFIG__?.supabaseAnon || '';
+      if (!supabaseUrl || !anonKey || !rowId) return;
+      fetch(`${supabaseUrl}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+        body: JSON.stringify({ ownerId, plateId, type, rowId, conversationId }),
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   async function _logVisitorEvent(ownerId, plateId, eventType) {
     try {
       const { supabase } = await import('./services/supabase.js');
@@ -1708,8 +1734,12 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       const cr = await ensureConversation(ownerId, plateId);
       const convId = cr.success ? cr.conversationId : null;
 
+      // Explicit id so it can be reused as the push notification's tag
+      // (Phase 4c) without a select-after-insert round trip — anon can't
+      // read back its own visitor_logs row (RLS is owner-only for SELECT).
+      const rowId = crypto.randomUUID();
       await supabase.from('visitor_logs').insert({
-        owner_id: ownerId, plate_id: plateId, event_type: eventType,
+        id: rowId, owner_id: ownerId, plate_id: plateId, event_type: eventType,
         conversation_id: convId,
       });
 
@@ -1726,6 +1756,9 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           }).catch(() => {});
         }
       }
+
+      const PUSH_TYPE = { bell_ring: 'bell_ring', sos_triggered: 'sos' };
+      if (PUSH_TYPE[eventType]) _triggerPush(ownerId, plateId, PUSH_TYPE[eventType], rowId, convId);
     } catch {}
   }
 

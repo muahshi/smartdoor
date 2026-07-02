@@ -465,6 +465,13 @@
 
 <!-- CONFIG: Generated at Vercel build time by scripts/build-env.js — DO NOT hardcode keys here -->
 <script src="config/env.generated.js"></script>
+<!-- Firebase (Phase 4c — background push via FCM). Compat build, matching
+     this repo's no-bundler setup (see scripts/build-env.js). Only used by
+     services/push.js, imported from js/dashboard.js. Degrades silently if
+     window.__SD_CONFIG__.firebase.apiKey is empty — foreground notifications
+     don't depend on this at all. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
 
 <!-- AUTH GUARD: Owner-only page. Redirect to /login if no valid session. -->
