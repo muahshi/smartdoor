@@ -17,6 +17,7 @@ import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from 
 import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, formatLogForDisplay } from '../services/logs.js';
 import { subscribeToNotifications } from '../services/notifications.js';
 import { initNotificationDispatcher, notifyEvent, ensureNotificationPermission } from '../services/notificationDispatcher.js';
+import { registerDevice, wireSubscriptionRefresh } from '../services/pushRegistration.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
@@ -387,6 +388,15 @@ const DashboardModule = (() => {
     // Opens NO realtime channels of its own (see services/notificationDispatcher.js).
     const unsubDispatcher = initNotificationDispatcher(ownerId);
 
+    // Register THIS device for background push (Web Push VAPID, or FCM once
+    // a Firebase project is configured) so notifications keep arriving after
+    // the PWA is closed/backgrounded — see services/pushRegistration.js and
+    // sql/33_push_notifications.sql. Silently no-ops if permission was
+    // denied or no push provider is configured yet; existing in-app/local
+    // notification behavior is unaffected either way.
+    registerDevice(ownerId).catch(() => {});
+    const unsubPushRefresh = wireSubscriptionRefresh(ownerId);
+
     // FIX (stabilization audit): services/notifications.js' dispatch()/
     // createNotification() writes to the `notifications` table for every
     // lifecycle event (order created, shipped, delivered, activated,
@@ -439,7 +449,7 @@ const DashboardModule = (() => {
       }
     });
 
-    state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
+    state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher, unsubPushRefresh];
 
     // ────────── NOTIFICATION CLICK → OPEN EXACT CONVERSATION (Req 6) ──────────
     // sw.js posts { type:'notification_click', notifData } to this window on
