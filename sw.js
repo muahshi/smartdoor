@@ -1,7 +1,7 @@
 // Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
-const CACHE_NAME = 'smartdoor-v6'; // bumped: notification pipeline fix (unique tags, push broadcast)
+const CACHE_NAME = 'smartdoor-v7'; // bumped: FCM-ready push architecture (notificationclose, sync, pushsubscriptionchange)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -181,10 +181,84 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+// ── Notification dismissed without tapping — track for the dispatch log ──
+self.addEventListener('notificationclose', (event) => {
+  const notifData = event.notification.data || {};
+  event.waitUntil(_broadcast({ type: 'notification_closed', notifData }));
+});
+
+// ── Push subscription changed (browser-initiated — key rotation, expiry) ──
+// The browser guarantees this fires with a chance to resubscribe BEFORE the
+// old subscription is fully gone. Resubscribe with the same VAPID key and
+// tell every open client so services/pushRegistration.js can upsert the new
+// endpoint into owner_devices — otherwise this device silently goes dark.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  const oldKey = event.oldSubscription?.options?.applicationServerKey;
+  event.waitUntil(
+    (async () => {
+      try {
+        if (oldKey) {
+          await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: oldKey });
+        }
+      } catch (err) {
+        console.warn('[SW] pushsubscriptionchange resubscribe failed:', err);
+      } finally {
+        await _broadcast({ type: 'PUSH_SUBSCRIPTION_CHANGED' });
+      }
+    })()
+  );
+});
+
+// ── Background Sync — offline queue for actions taken while disconnected ──
+// Pages register a 'smartdoor-sync' tag (see services/pushRegistration.js /
+// dashboard.js) when a network call fails offline; the browser replays this
+// event once connectivity returns, even if the tab is closed by then.
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'smartdoor-sync') {
+    event.waitUntil(_flushOfflineQueue());
+  }
+});
+
+const OFFLINE_QUEUE_CACHE = 'smartdoor-offline-queue';
+
+async function _flushOfflineQueue() {
+  try {
+    const cache = await caches.open(OFFLINE_QUEUE_CACHE);
+    const requests = await cache.keys();
+    for (const req of requests) {
+      try {
+        const stored = await cache.match(req);
+        const init = await stored.json();
+        const resp = await fetch(init.url, { method: init.method, headers: init.headers, body: init.body });
+        if (resp.ok) await cache.delete(req);
+      } catch (_) {
+        // Still offline / still failing — leave queued for next sync event.
+      }
+    }
+    await _broadcast({ type: 'offline_queue_flushed' });
+  } catch (err) {
+    console.warn('[SW] offline queue flush failed:', err);
+  }
+}
+
 // ── Message from page ──
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'CLEAR_BADGE') clearBadge();
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+
+  // Page queues an offline action: { type:'QUEUE_OFFLINE_ACTION', url, method, headers, body }
+  if (event.data?.type === 'QUEUE_OFFLINE_ACTION') {
+    event.waitUntil(
+      (async () => {
+        const cache = await caches.open(OFFLINE_QUEUE_CACHE);
+        const key = `offline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        await cache.put(
+          new Request(key),
+          new Response(JSON.stringify({ url: event.data.url, method: event.data.method || 'POST', headers: event.data.headers || {}, body: event.data.body }))
+        );
+      })()
+    );
+  }
 });
 
-console.log('[SW] Smart Door v2.0 loaded');
+console.log('[SW] Smart Door v3.0 (FCM-ready push architecture) loaded');
