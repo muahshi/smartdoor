@@ -165,7 +165,7 @@ export async function uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mi
       });
 
     if (insertError) throw insertError;
-    const row = { id: voiceNoteId };
+    const row = { id: voiceNoteId, storagePath };
 
     // Mirror into message_logs so this voice note appears in the unified
     // "Communication Logs" feed alongside calls/text/emergency messages

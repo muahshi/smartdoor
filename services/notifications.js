@@ -168,6 +168,21 @@ export async function notifyCallRequest(ownerId, plateId, callId) {
   });
 }
 
+// Unified Inbox (Phase 4) — fired once per visitor conversation turn, not
+// per legacy message_logs row, so the owner gets a single notification per
+// exchange instead of duplicate pings from the old + new pipelines.
+export async function notifyNewConversationMessage(ownerId, plateId, conversationId, { messageType = 'text', preview = '' } = {}) {
+  return dispatch({
+    ownerId,
+    type: 'inbox_message',
+    title: messageType === 'voice' ? '🎤 New voice message' : '💬 New message',
+    body: preview || 'A visitor sent a new message.',
+    payload: { plateId, conversationId },
+    priority: 'normal',
+    channels: ['in_app'],
+  });
+}
+
 export async function notifyStatusChange(ownerId, newStatus) {
   return dispatch({
     ownerId,
@@ -367,6 +382,7 @@ export default {
   notifyBellRing,
   notifyVoiceNote,
   notifyCallRequest,
+  notifyNewConversationMessage,
   notifyStatusChange,
   triggerEmergencyBroadcast,
   getNotifications,
