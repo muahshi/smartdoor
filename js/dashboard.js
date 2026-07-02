@@ -17,7 +17,7 @@ import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from 
 import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, formatLogForDisplay } from '../services/logs.js';
 import { subscribeToNotifications } from '../services/notifications.js';
 import { initNotificationDispatcher, notifyEvent, ensureNotificationPermission } from '../services/notificationDispatcher.js';
-import { registerDevice, wireSubscriptionRefresh } from '../services/pushRegistration.js';
+import { subscribeOwnerToPush } from '../services/push.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
@@ -340,7 +340,15 @@ const DashboardModule = (() => {
 
   function _initNotifications() {
     if (document.visibilityState === 'visible') {
-      ensureNotificationPermission().catch(() => {});
+      ensureNotificationPermission().then((perm) => {
+        // Background push (Phase 4c) rides on the SAME permission grant —
+        // no separate prompt. Best-effort: if Firebase isn't configured for
+        // this deployment (window.__SD_CONFIG__.firebase.apiKey empty),
+        // this silently no-ops and foreground notifications still work.
+        if (perm === 'granted' && state.owner?.id) {
+          subscribeOwnerToPush(state.owner.id).catch(() => {});
+        }
+      }).catch(() => {});
     }
     navigator.serviceWorker?.ready.then(reg => {
       reg.active?.postMessage({ type: 'CLEAR_BADGE' });
@@ -387,15 +395,6 @@ const DashboardModule = (() => {
     // Permission request + click-tracking + visibility-regain catch-up.
     // Opens NO realtime channels of its own (see services/notificationDispatcher.js).
     const unsubDispatcher = initNotificationDispatcher(ownerId);
-
-    // Register THIS device for background push (Web Push VAPID, or FCM once
-    // a Firebase project is configured) so notifications keep arriving after
-    // the PWA is closed/backgrounded — see services/pushRegistration.js and
-    // sql/33_push_notifications.sql. Silently no-ops if permission was
-    // denied or no push provider is configured yet; existing in-app/local
-    // notification behavior is unaffected either way.
-    registerDevice(ownerId).catch(() => {});
-    const unsubPushRefresh = wireSubscriptionRefresh(ownerId);
 
     // FIX (stabilization audit): services/notifications.js' dispatch()/
     // createNotification() writes to the `notifications` table for every
@@ -449,7 +448,7 @@ const DashboardModule = (() => {
       }
     });
 
-    state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher, unsubPushRefresh];
+    state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
 
     // ────────── NOTIFICATION CLICK → OPEN EXACT CONVERSATION (Req 6) ──────────
     // sw.js posts { type:'notification_click', notifData } to this window on
