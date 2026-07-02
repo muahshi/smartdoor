@@ -127,9 +127,16 @@ export async function sendTextMessage({ ownerId, plateId, content, messageType =
     // Supabase re-evaluates the SELECT policy when .select() is chained;
     // anon gets 0 rows back which surfaces as "violates row-level security
     // policy" even though the INSERT itself succeeded.
+    //
+    // id is generated client-side (rather than left to the column default)
+    // so the caller knows it immediately and can pass the SAME id to
+    // supabase/functions/send-push as `rowId` — that id becomes the OS
+    // notification's tag, keeping it unique per event without a round trip.
+    const id = crypto.randomUUID();
     const { error } = await supabase
       .from('message_logs')
       .insert({
+        id,
         owner_id: ownerId,
         plate_id: plateId,
         visitor_identifier: _getVisitorIdentifier(),
@@ -142,7 +149,7 @@ export async function sendTextMessage({ ownerId, plateId, content, messageType =
       });
 
     if (error) throw error;
-    return { success: true };
+    return { success: true, id };
   } catch (err) {
     console.error('[Communication] sendTextMessage error:', err);
     return { success: false, error: err.message };

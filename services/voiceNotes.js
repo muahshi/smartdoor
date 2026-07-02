@@ -169,10 +169,14 @@ export async function uploadVoiceNote({ blob, durationSecs, ownerId, plateId, mi
 
     // Mirror into message_logs so this voice note appears in the unified
     // "Communication Logs" feed alongside calls/text/emergency messages
-    // (see services/communication.js#getCommunicationLogs).
+    // (see services/communication.js#getCommunicationLogs). Reuses
+    // voiceNoteId as this row's own id too — one id to pass to
+    // supabase/functions/send-push as `rowId`, instead of generating a
+    // second one just for this insert.
     supabase
       .from('message_logs')
       .insert({
+        id: voiceNoteId,
         owner_id: ownerId,
         plate_id: plateId,
         message_type: 'voice',
