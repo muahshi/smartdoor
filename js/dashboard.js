@@ -23,7 +23,14 @@ import { getOnboardingProgress, markOnboardingStep } from '../services/customerS
 import { getOrderSummary, subscribeToOrderTracking } from '../services/orders.js';
 import { getCommunicationLogs, subscribeToCommunicationLogs } from '../services/communication.js';
 import { getVoiceNoteUrl } from '../services/voiceNotes.js';
+import { VoiceRecorder } from '../services/voiceNotes.js';
 import { supabase } from '../services/supabase.js';
+import {
+  listConversations, subscribeToInbox, getConversationMessages, subscribeToConversation,
+  markConversationSeen, pinConversation, setConversationStatus, deleteConversation,
+  sendOwnerReply, sendOwnerVoiceReply, STATIC_QUICK_REPLIES, getAISuggestedReplies,
+  generateAISummary, getInboxUnreadCount, subscribeToTyping, sendTypingSignal,
+} from '../services/messaging.js';
 
 const DashboardModule = (() => {
   // ────────── STATE ──────────
@@ -45,6 +52,7 @@ const DashboardModule = (() => {
     subscription: null,
     orderSummary: null,          // Phase 6: latest order tracking
     onboarding: null,            // Setup checklist progress
+    inbox: { conversations: [], activeId: null, activeConversation: null, filter: 'all', search: '', quickReplies: STATIC_QUICK_REPLIES.slice(0, 3) },
     _realtimeUnsubs: [],
   };
 
@@ -103,9 +111,11 @@ const DashboardModule = (() => {
     setupFamilyMemberActions();
     setupSecurityTimeline();
     updateSubscriptionDays();
+    setupInbox();
 
     // Initial unread badge load
     _refreshUnreadBadge(state.owner.id);
+    _refreshInboxUnreadBadge();
 
     // Setup checklist — new owner onboarding guidance
     await _loadAndRenderSetupChecklist();
@@ -858,6 +868,7 @@ const DashboardModule = (() => {
       ['welcome-message',     'welcome_message'],
       ['visitor-greeting',    'visitor_greeting'],
       ['ai-name',             'ai_name'],
+      ['ai-voice-gender',     'ai_voice_gender'],
       ['greeting-style',      'greeting_style'],
       ['preferred-language',  'preferred_language'],
       ['hours-start',         'business_hours_start'],
@@ -1263,7 +1274,371 @@ const DashboardModule = (() => {
     }
   };
 
-  // ────────── VOICE NOTE PLAYBACK ──────────
+  // ══════════════════════════════════════════════════════════════
+  // INBOX (Phase 4 — Unified Messaging)
+  // ══════════════════════════════════════════════════════════════
+  let _inboxUnsub = null;
+  let _threadUnsub = null;
+  let _typingUnsub = null;
+  let _inboxRecorder = null;
+
+  function setupInbox() {
+    // Search (mobile + desktop)
+    ['inbox-search', 'inbox-search-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      el?.addEventListener('input', _debounce(() => {
+        state.inbox.search = el.value;
+        refreshInbox();
+      }, 300));
+    });
+
+    // Filter chips (mobile + desktop)
+    ['inbox-filter-chips', 'inbox-filter-chips-d'].forEach((containerId) => {
+      const container = document.getElementById(containerId);
+      container?.querySelectorAll('.inbox-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll(`#${containerId} .inbox-chip`).forEach((c) => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.inbox.filter = chip.dataset.filter;
+          refreshInbox();
+        });
+      });
+    });
+
+    // Reply send (mobile + desktop)
+    [['inbox-reply-input', 'inbox-reply-send'], ['inbox-reply-input-d', 'inbox-reply-send-d']].forEach(([inputId, btnId]) => {
+      const input = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      const doSend = () => _sendActiveReply(input);
+      btn?.addEventListener('click', doSend);
+      input?.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSend(); });
+      input?.addEventListener('input', _debounce(() => {
+        if (state.inbox.activeId) sendTypingSignal(state.inbox.activeId, 'owner');
+      }, 400));
+    });
+
+    // Voice reply (mobile + desktop)
+    ['inbox-voice-btn', 'inbox-voice-btn-d'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('click', () => _toggleVoiceReply(id));
+    });
+
+    // Realtime — refresh list on any conversation/message change for this owner
+    if (state.owner?.id) {
+      _inboxUnsub = subscribeToInbox(state.owner.id, () => {
+        refreshInbox();
+        _refreshInboxUnreadBadge();
+      });
+      state._realtimeUnsubs.push(_inboxUnsub);
+    }
+
+    refreshInbox();
+  }
+
+  async function refreshInbox() {
+    if (!state.owner?.id) return;
+    const { conversations } = await listConversations(state.owner.id, {
+      filter: ['all','unread','pinned','archived','resolved','active'].includes(state.inbox.filter) ? state.inbox.filter : 'all',
+      tag: ['all','unread','pinned','archived','resolved','active'].includes(state.inbox.filter) ? null : state.inbox.filter,
+      search: state.inbox.search,
+    });
+    state.inbox.conversations = conversations;
+    renderInboxList();
+    _refreshInboxUnreadBadge();
+  }
+
+  function renderInboxList() {
+    const rows = state.inbox.conversations.map((c) => {
+      const tagPill = c.tags?.[0] ? `<span class="inbox-tag-pill">${_esc(c.tags[0])}</span>` : (c.last_intent ? `<span class="inbox-tag-pill">${_esc(c.last_intent)}</span>` : '');
+      const time = _formatRelativeTime(c.last_message_at);
+      const avatar = c.status === 'archived' ? '🗄️' : c.status === 'resolved' ? '✅' : (c.last_intent === 'Emergency' ? '🚨' : '💬');
+      return `
+        <div class="inbox-row" data-conv-id="${c.id}">
+          <div class="inbox-avatar">${avatar}</div>
+          <div class="inbox-meta">
+            <div class="inbox-name">${c.pinned ? '📌 ' : ''}${_esc(c.plate_id)} ${tagPill}</div>
+            <div class="inbox-preview">${_esc(c.last_message_preview || 'New conversation')}</div>
+          </div>
+          <div class="inbox-right">
+            <div class="inbox-time">${time}</div>
+            ${c.unread_count > 0 ? `<div class="inbox-unread-dot">${c.unread_count}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    const empty = !state.inbox.conversations.length;
+    const listHTML = rows || '';
+    ['inbox-list', 'inbox-list-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = listHTML;
+    });
+    ['inbox-empty', 'inbox-empty-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = empty ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('.inbox-row').forEach((row) => {
+      row.addEventListener('click', () => openThread(row.dataset.convId));
+    });
+
+    const countLabel = document.getElementById('inbox-count-label');
+    if (countLabel) countLabel.textContent = state.inbox.conversations.length ? `${state.inbox.conversations.length} conversation${state.inbox.conversations.length === 1 ? '' : 's'}` : '';
+  }
+
+  async function openThread(conversationId) {
+    state.inbox.activeId = conversationId;
+    state.inbox.activeConversation = state.inbox.conversations.find((c) => c.id === conversationId) || null;
+
+    // Show panels
+    const overlay = document.getElementById('inbox-thread-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    const emptyD = document.getElementById('inbox-thread-empty-d');
+    const panelD = document.getElementById('inbox-thread-panel-d');
+    if (emptyD) emptyD.style.display = 'none';
+    if (panelD) panelD.style.display = 'flex';
+
+    _renderThreadHeader();
+    await _loadAndRenderThreadMessages(conversationId);
+    markConversationSeen(conversationId).then(() => { refreshInbox(); });
+
+    // Live updates for this thread
+    _threadUnsub?.();
+    _threadUnsub = subscribeToConversation(conversationId, (msg) => {
+      _appendThreadBubble(msg);
+      if (msg.sender_type === 'visitor') markConversationSeen(conversationId);
+    });
+
+    // Typing indicator
+    _typingUnsub?.();
+    _typingUnsub = subscribeToTyping(conversationId, (payload) => {
+      if (payload.who !== 'visitor') return;
+      ['inbox-typing-indicator', 'inbox-typing-indicator-d'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = 'block';
+        clearTimeout(el._hideTimer);
+        el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 3000);
+      });
+    });
+
+    _renderQuickReplies();
+    document.getElementById('inbox-summary-banner')?.style && (document.getElementById('inbox-summary-banner').style.display = 'none');
+    document.getElementById('inbox-summary-banner-d')?.style && (document.getElementById('inbox-summary-banner-d').style.display = 'none');
+    if (state.inbox.activeConversation?.ai_summary) _showSummary(state.inbox.activeConversation.ai_summary);
+  }
+
+  function closeInboxThread() {
+    const overlay = document.getElementById('inbox-thread-overlay');
+    if (overlay) overlay.style.display = 'none';
+    _threadUnsub?.(); _threadUnsub = null;
+    _typingUnsub?.(); _typingUnsub = null;
+  }
+
+  function _renderThreadHeader() {
+    const c = state.inbox.activeConversation;
+    if (!c) return;
+    const title = `${c.plate_id}${c.tags?.[0] ? ' · ' + c.tags[0] : ''}`;
+    const subtitle = c.handled_by === 'ai' ? '🤖 Handled by AI receptionist' : (c.status === 'resolved' ? '✅ Resolved' : c.status === 'archived' ? '🗄️ Archived' : 'Active conversation');
+    ['inbox-thread-title', 'inbox-thread-title-d'].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = title; });
+    ['inbox-thread-subtitle', 'inbox-thread-subtitle-d'].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = subtitle; });
+    ['inbox-pin-btn', 'inbox-pin-btn-d'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.opacity = c.pinned ? '1' : '0.4'; });
+  }
+
+  async function _loadAndRenderThreadMessages(conversationId) {
+    const { messages } = await getConversationMessages(conversationId);
+    ['inbox-thread-messages', 'inbox-thread-messages-d'].forEach((id) => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    messages.forEach((m) => _appendThreadBubble(m, { skipScroll: true }));
+    _scrollThreadToBottom();
+  }
+
+  function _appendThreadBubble(m, { skipScroll = false } = {}) {
+    if (m.conversation_id !== state.inbox.activeId) return;
+    const time = new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const ticks = m.sender_type === 'owner' ? (m.seen_at ? '✓✓' : m.delivered_at ? '✓✓' : '✓') : '';
+    const bubbleClass = m.sender_type === 'owner' ? 'owner' : m.sender_type === 'ai' ? 'ai' : 'visitor';
+    const senderLabel = m.sender_type === 'ai' ? `🤖 ${_esc(m.sender_name || 'AI Receptionist')}` : m.sender_type === 'owner' ? '' : '👤 Visitor';
+
+    let bodyHTML;
+    if (m.message_type === 'voice') {
+      const btnId = `play-${m.id}`;
+      bodyHTML = `🎤 Voice message (${m.voice_duration_secs || 0}s) <button id="${btnId}" style="margin-left:6px;background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.72rem;">▶ Play</button>`;
+    } else {
+      bodyHTML = _esc(m.text || '');
+    }
+
+    const html = `
+      <div class="inbox-bubble ${bubbleClass}">
+        ${senderLabel ? `<div style="font-size:0.62rem;opacity:0.6;margin-bottom:3px;">${senderLabel}</div>` : ''}
+        <div>${bodyHTML}</div>
+        <div class="inbox-bubble-meta">${time} ${ticks}</div>
+      </div>`;
+
+    ['inbox-thread-messages', 'inbox-thread-messages-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.insertAdjacentHTML('beforeend', html);
+    });
+
+    if (m.message_type === 'voice') {
+      document.querySelectorAll(`#play-${m.id}`).forEach((btn) => {
+        btn.addEventListener('click', () => playVoiceNote(m.voice_url));
+      });
+    }
+
+    if (!skipScroll) _scrollThreadToBottom();
+  }
+
+  function _scrollThreadToBottom() {
+    ['inbox-thread-messages', 'inbox-thread-messages-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  async function _sendActiveReply(input) {
+    const text = input?.value?.trim();
+    if (!text || !state.inbox.activeId || !state.owner?.id) return;
+    const c = state.inbox.activeConversation;
+    input.value = '';
+    await sendOwnerReply({ conversationId: state.inbox.activeId, ownerId: state.owner.id, plateId: c?.plate_id, text, senderName: state.owner.full_name || 'Owner' });
+  }
+
+  async function _toggleVoiceReply(btnId) {
+    const btn = document.getElementById(btnId);
+    if (!state.inbox.activeId) return;
+    const c = state.inbox.activeConversation;
+    if (!_inboxRecorder) {
+      try {
+        _inboxRecorder = await VoiceRecorder.start({ maxDurationSecs: 30, onTick: () => {} });
+        btn.textContent = '⏺️';
+        btn.style.background = 'rgba(239,68,68,0.2)';
+      } catch (err) { showToast(err.message || 'Microphone access failed', 'danger'); }
+      return;
+    }
+    const { blob, durationSecs, mimeType } = await _inboxRecorder.stop();
+    _inboxRecorder = null;
+    btn.textContent = '🎤';
+    btn.style.background = 'rgba(139,92,246,0.15)';
+    await sendOwnerVoiceReply({ conversationId: state.inbox.activeId, ownerId: state.owner.id, plateId: c?.plate_id, blob, durationSecs, senderName: state.owner.full_name || 'Owner' });
+  }
+
+  async function _renderQuickReplies() {
+    const c = state.inbox.activeConversation;
+    let replies = STATIC_QUICK_REPLIES.slice(0, 4);
+    // Ask AI for context-aware suggestions based on the visitor's last message
+    try {
+      const { messages } = await getConversationMessages(state.inbox.activeId, { limit: 20 });
+      const lastVisitorMsg = [...messages].reverse().find((m) => m.sender_type === 'visitor' && m.text);
+      if (lastVisitorMsg) {
+        const r = await getAISuggestedReplies({ lastVisitorText: lastVisitorMsg.text, intent: c?.last_intent });
+        if (r.replies?.length) replies = r.replies;
+      }
+    } catch (_) {}
+
+    const html = replies.map((r) => `<div class="inbox-quick-chip">${_esc(r)}</div>`).join('');
+    ['inbox-quick-replies', 'inbox-quick-replies-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = html;
+      el.querySelectorAll('.inbox-quick-chip').forEach((chip, i) => {
+        chip.addEventListener('click', async () => {
+          if (!state.inbox.activeId) return;
+          await sendOwnerReply({ conversationId: state.inbox.activeId, ownerId: state.owner.id, plateId: c?.plate_id, text: replies[i], senderName: state.owner.full_name || 'Owner' });
+        });
+      });
+    });
+  }
+
+  function toggleInboxMenu() {
+    const menu = document.getElementById('inbox-menu');
+    if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+  }
+
+  async function togglePinActive() {
+    const c = state.inbox.activeConversation;
+    if (!c) return;
+    await pinConversation(c.id, !c.pinned);
+    c.pinned = !c.pinned;
+    _renderThreadHeader();
+    refreshInbox();
+  }
+
+  async function resolveActive() {
+    if (!state.inbox.activeId) return;
+    await setConversationStatus(state.inbox.activeId, 'resolved');
+    showToast('✅ Marked as resolved', 'success');
+    toggleInboxMenu();
+    refreshInbox();
+    _renderThreadHeader();
+  }
+
+  async function archiveActive() {
+    if (!state.inbox.activeId) return;
+    await setConversationStatus(state.inbox.activeId, 'archived');
+    showToast('🗄️ Conversation archived', 'success');
+    toggleInboxMenu();
+    closeInboxThread();
+    refreshInbox();
+  }
+
+  async function deleteActive() {
+    if (!state.inbox.activeId) return;
+    if (!window.confirm('Delete this conversation permanently? This cannot be undone.')) return;
+    await deleteConversation(state.inbox.activeId);
+    showToast('🗑️ Conversation deleted', 'success');
+    toggleInboxMenu();
+    closeInboxThread();
+    refreshInbox();
+  }
+
+  async function generateSummaryActive() {
+    const c = state.inbox.activeConversation;
+    if (!c) return;
+    showToast('🧠 Generating AI summary…', 'info');
+    const r = await generateAISummary(c.id, state.owner.id, c.plate_id);
+    if (r.success) { _showSummary(r.summary); c.ai_summary = r.summary; }
+    else showToast(r.error || 'Could not generate summary', 'danger');
+  }
+
+  function _showSummary(text) {
+    ['inbox-summary-banner', 'inbox-summary-banner-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = `🧠 ${text}`;
+      el.style.display = 'block';
+    });
+  }
+
+  async function _refreshInboxUnreadBadge() {
+    if (!state.owner?.id) return;
+    try {
+      const count = await getInboxUnreadCount(state.owner.id);
+      document.querySelectorAll('[data-inbox-unread-badge]').forEach((el) => {
+        el.textContent = count > 99 ? '99+' : String(count);
+        el.style.display = count > 0 ? 'inline-block' : 'none';
+      });
+    } catch (_) {}
+  }
+
+  function _formatRelativeTime(iso) {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'now';
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.floor(hrs / 24)}d`;
+  }
+
+  function _esc(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function _debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+
+
   async function playVoiceNote(storagePath) {
     const result = await getVoiceNoteUrl(storagePath);
     if (!result.success) {
@@ -1282,6 +1657,14 @@ const DashboardModule = (() => {
     removeMember,
     setChartRange,
     playVoiceNote,
+    refreshInbox,
+    closeInboxThread,
+    togglePinActive,
+    toggleInboxMenu,
+    resolveActive,
+    archiveActive,
+    deleteActive,
+    generateSummaryActive,
     getState: () => ({ ...state }),
   };
 })();
