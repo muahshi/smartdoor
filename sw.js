@@ -1,7 +1,7 @@
 // Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
-const CACHE_NAME = 'smartdoor-v6'; // bumped: notification pipeline fix (unique tags, push broadcast)
+const CACHE_NAME = 'smartdoor-v7'; // bumped: FCM production integration (collapsible tags, reply action, escalation/reminder types)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -99,11 +99,26 @@ async function clearBadge() {
 }
 
 // ── Push — premium doorbell notification ──
+//
+// NOTE on Android "notification channels": a plain browser-installed PWA
+// (no TWA/native wrapper) cannot create or configure OS-level Android
+// notification channels itself — Chrome owns a single "Site notifications"
+// channel per origin and the OS's Settings > App > Notifications page is
+// where the PERSON sets that channel's importance/sound, not the site. The
+// closest a web app can get to "high importance + custom sound + strong
+// vibration" is exactly what's implemented here: Urgency:high on the FCM
+// message (supabase/functions/send-push), requireInteraction to keep it
+// on-screen, a strong custom vibration PATTERN (below), and a synthesized
+// doorbell chime played by the page itself (js/dashboard.js
+// playBellSound/playSosSound) for the foreground case — actual custom
+// *sound* on a background/OS-delivered notification is not exposed by the
+// Web Notifications spec on any browser as of this writing.
 self.addEventListener('push', (event) => {
   const data  = event.data ? event.data.json() : {};
   const type  = data.type || 'bell_ring';
   const isDoorbell = ['bell_ring', 'visitor_scan', 'sos'].includes(type);
   const isSOS = type === 'sos';
+  const isConversational = ['voice', 'text', 'ai_escalation'].includes(type);
 
   // Strong vibration for doorbell, critical pattern for SOS
   const vibrate = isSOS
@@ -117,35 +132,56 @@ self.addEventListener('push', (event) => {
   // FIX (notification pipeline audit): this used to tag every doorbell-type
   // push ('bell_ring', 'visitor_scan', 'sos') with the SAME fixed string
   // ('smartdoor-doorbell'), so two different real events (e.g. a bell ring
-  // followed by a QR scan) shared one tag. renotify:true is supposed to
-  // still re-alert on a repeat with the same tag, but relying on that
-  // per-OS/per-browser behavior is fragile — the safe, spec-guaranteed way
-  // to "never reuse previous notification" is to make the tag unique per
-  // event. Prefer an id the caller supplied (data.id — e.g. the DB row
-  // uuid); fall back to a timestamp+random suffix so it's still unique even
-  // if no id was sent.
+  // followed by a QR scan) shared one tag. That fix made every tag unique
+  // per event (per DB row) so nothing was ever silently merged.
+  //
+  // UPDATE (this pass): unique-per-row is still correct for messages/SOS —
+  // each is distinct content worth its own line in the tray — but for
+  // repeated DOORBELL PRESSES specifically it meant 5 rapid rings produced
+  // 5 stacked notifications. supabase/functions/send-push now computes and
+  // sends a stable `data.tag` for the collapsible types (bell_ring,
+  // qr_scan), keyed on the plate rather than the individual press, so a
+  // second ring REPLACES the first instead of stacking — renotify:true
+  // below still re-alerts (sound/vibrate) on every replace. Every other
+  // type keeps a per-row unique fallback tag exactly as before.
   const eventId = data.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tag = data.tag || `smartdoor-${type}-${eventId}`;
 
   const options = {
     body:      data.body || 'Someone is at your door!',
     icon:      '/images/favicon-192x192.png',
     badge:     '/images/favicon-192x192.png',
     vibrate,
-    tag:       `smartdoor-${type}-${eventId}`, // unique per event — never collides, never gets silently merged
-    renotify:  true,             // belt-and-braces, kept even though tag is already unique
-    requireInteraction: isDoorbell, // keeps notification on screen until acted on
+    tag,
+    renotify:  true,             // re-alert (sound/vibrate) even when the tag is reused (collapsible types)
+    requireInteraction: data.requireInteraction === 'true' || data.requireInteraction === true || isDoorbell,
     silent:    false,
-    data:      { id: eventId, url: data.url || '/app.html', type, conversationId: data.conversationId || null, timestamp: Date.now() },
+    data:      { id: eventId, url: data.url || '/app.html', type, plateId: data.plateId || null, conversationId: data.conversationId || null, timestamp: Date.now() },
+    // Actions (Req: Open, Reply, Dismiss where supported — the Notification
+    // Actions API itself is only supported by Chromium browsers; Safari/iOS
+    // silently ignores `actions` and just falls back to tap-to-open, which
+    // is the graceful degradation for that platform).
     actions: isSOS
       ? [
           { action: 'open',    title: '🚨 Open App' },
           { action: 'dismiss', title: '✕ Dismiss'  },
         ]
-      : [
-          { action: 'open',    title: '📲 Open Dashboard' },
-          { action: 'call',    title: '📞 Call Visitor'   },
-          { action: 'dismiss', title: '✕ Dismiss'         },
-        ],
+      : isConversational
+        ? [
+            { action: 'open',    title: '📲 Open' },
+            { action: 'reply',   title: '↩️ Reply' },
+            { action: 'dismiss', title: '✕ Dismiss' },
+          ]
+        : isDoorbell
+          ? [
+              { action: 'open',    title: '📲 Open Dashboard' },
+              { action: 'call',    title: '📞 Call Visitor'   },
+              { action: 'dismiss', title: '✕ Dismiss'         },
+            ]
+          : [
+              { action: 'open',    title: '📲 Open' },
+              { action: 'dismiss', title: '✕ Dismiss' },
+            ],
   };
 
   event.waitUntil(
@@ -176,7 +212,13 @@ self.addEventListener('notificationclick', (event) => {
   const notifData = event.notification.data || {};
   let targetUrl   = notifData.url || '/app.html';
 
-  if (event.action === 'call')    targetUrl = '/app.html?action=call';
+  if (event.action === 'call')  targetUrl = '/app.html?action=call';
+  // 'reply' opens straight into the Inbox thread (same deep link the
+  // default 'open'/body-tap action uses when a conversationId is present)
+  // — the focused window's message listener (js/dashboard.js) is what
+  // actually focuses the reply textbox once the thread is open, driven off
+  // the `action:'reply'` it receives below.
+  if (event.action === 'reply') targetUrl = notifData.conversationId ? '/app.html?tab=inbox' : targetUrl;
   if (event.action === 'dismiss') { clearBadge(); return; }
 
   event.waitUntil(

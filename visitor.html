@@ -1319,7 +1319,22 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         if (!cr.success) return;
         const meta = { intent: intentData.intent, priority: intentData.priority, confidence: intentData.confidence };
         sendConvMessage({ conversationId: cr.conversationId, ownerId: s.owner.id, plateId: s.plate.plateId, senderType: 'visitor', text, metadata: meta }).catch(() => {});
-        sendConvMessage({ conversationId: cr.conversationId, ownerId: s.owner.id, plateId: s.plate.plateId, senderType: 'ai', senderName: (s.owner.profile?.aiName || 'Priya'), text: hinglishReply, aiGenerated: true, metadata: meta }).catch(() => {});
+        sendConvMessage({ conversationId: cr.conversationId, ownerId: s.owner.id, plateId: s.plate.plateId, senderType: 'ai', senderName: (s.owner.profile?.aiName || 'Priya'), text: hinglishReply, aiGenerated: true, metadata: meta })
+          .then((res) => {
+            // AI Escalation push: 'Critical'/Emergency already triggers a
+            // real SOS above (own EVENT_CONFIG entry) — this covers the
+            // next tier down, where the AI could reply but flagged that it
+            // couldn't fully resolve the visitor's need itself and the
+            // owner's personal reply/call would help. Throttled server-side
+            // (supabase/functions/send-push) so a chatty back-and-forth at
+            // 'High' priority doesn't spam repeat pushes.
+            const needsOwner = intentData.priority === 'High'
+              || ['call', 'text', 'voice'].includes(intentData.suggest_action);
+            if (needsOwner && res?.success && res.id) {
+              _triggerPush(s.owner.id, s.plate.plateId, 'ai_escalation', res.id, cr.conversationId);
+            }
+          })
+          .catch(() => {});
       });
     }
 
