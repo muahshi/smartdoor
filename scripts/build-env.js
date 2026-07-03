@@ -69,9 +69,36 @@ const ENV = resolveEnv();
 // mismatch is the root cause of window.__SD_CONFIG__ shipping with empty
 // Supabase values. Each var is now resolved against BOTH naming
 // conventions so the build works regardless of which one is set in Vercel.
+// ROOT-CAUSE FIX (production InvalidAccessError on PushManager.subscribe):
+// Env values were passed through verbatim from process.env. Both the local
+// .env.local parser above (which never strips quotes) and a value pasted
+// into the Vercel dashboard with surrounding quotes/trailing newline/space
+// (a very common copy-paste mistake for the Firebase VAPID key, which is a
+// long base64url string) would ship literal quote characters, a newline, or
+// spaces inside window.__SD_CONFIG__.firebase.vapidKey. That corrupted
+// string is still "truthy" (so every earlier presence check passes) but is
+// no longer valid base64url — atob() inside Firebase's getToken() decodes
+// it to the wrong byte length, and the browser rejects it at
+// pushManager.subscribe({ applicationServerKey }) with exactly:
+//   InvalidAccessError: The provided applicationServerKey is not valid.
+// _sanitize() strips wrapping quotes and all leading/trailing whitespace
+// from EVERY resolved var, regardless of source (.env.local or Vercel),
+// so this class of corruption can't reach the browser again.
+function _sanitize(v) {
+  if (typeof v !== 'string') return v;
+  let out = v.trim();
+  if (
+    (out.startsWith('"') && out.endsWith('"')) ||
+    (out.startsWith("'") && out.endsWith("'"))
+  ) {
+    out = out.slice(1, -1).trim();
+  }
+  return out;
+}
+
 function resolveVar(...names) {
   for (const name of names) {
-    if (process.env[name]) return process.env[name];
+    if (process.env[name]) return _sanitize(process.env[name]);
   }
   return '';
 }
