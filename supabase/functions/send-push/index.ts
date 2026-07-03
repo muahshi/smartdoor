@@ -9,22 +9,38 @@
  * showNotification() path documents itself as unable to do.
  *
  * Called from visitor.html right after a visitor event is logged
- * (qr_scan / bell_ring / sos_triggered / voice / text) — the VISITOR's
- * browser is guaranteed to be active at that moment, even if the OWNER's
- * isn't, so triggering from there is sufficient (no DB trigger / pg_net
+ * (qr_scan / bell_ring / sos_triggered / voice / text), from the AI
+ * receptionist turn handler when it needs the owner's personal attention
+ * (ai_escalation), and from the renewal engine (status_reminder) — every
+ * caller is either the VISITOR's browser (guaranteed active at that
+ * moment even if the owner's isn't) or a trusted server context, so
+ * triggering from the write-site is sufficient (no DB trigger / pg_net
  * needed, no new Postgres extension).
  *
- * Body: { ownerId, plateId, type, rowId, conversationId? }
- *   type: 'qr_scan' | 'bell_ring' | 'voice' | 'text' | 'sos'
- *   rowId: the visitor_logs/messages row's own uuid — reused as the OS
- *          notification tag (`smartdoor-{type}-{rowId}`) so this never
- *          double-shows alongside the foreground realtime path in
- *          services/notificationDispatcher.js (same tag scheme, see sw.js).
+ * Body: { ownerId, plateId, type, rowId, conversationId?, daysLeft?, expired? }
+ *   type: 'qr_scan' | 'bell_ring' | 'voice' | 'text' | 'sos' | 'ai_escalation' | 'status_reminder'
+ *   rowId: the visitor_logs/messages/subscriptions row's own uuid — reused
+ *          as the OS notification tag's uniqueness key. EXCEPTION: for the
+ *          "collapsible" types (bell_ring, qr_scan) the tag is keyed on
+ *          plateId instead of rowId on purpose — see COLLAPSIBLE_TYPES
+ *          below — so repeated bell presses / rapid re-scans REPLACE the
+ *          previous OS notification instead of stacking N separate ones.
+ *          renotify:true (set client-side in sw.js) still re-alerts
+ *          (sound/vibrate) on every replace.
+ *   plateId: optional for 'status_reminder' (subscriptions aren't tied to
+ *            a single plate) — required and ownership-verified for every
+ *            other type.
+ *   daysLeft / expired: status_reminder only — plain numbers/booleans used
+ *          to compute the body text server-side (see SECURITY note below).
  *
- * SECURITY: title/body are NEVER taken from the client — only `type` is,
- * mapped through a fixed allow-list below. This stops an anon visitor from
- * using this endpoint to push arbitrary text to an owner's phone. plateId
- * is verified to actually belong to ownerId before sending.
+ * SECURITY: title/body are NEVER taken from the client as free text — only
+ * `type` (+ numeric daysLeft/expired for status_reminder) is, mapped
+ * through a fixed allow-list below. This stops an anon visitor from using
+ * this endpoint to push arbitrary text to an owner's phone. plateId (when
+ * supplied) is verified to actually belong to ownerId before sending;
+ * ownerId itself is always verified to be a real user. qr_scan and
+ * status_reminder are additionally throttled per-owner (see _recentEvents)
+ * since they're the two types with no client-side rate limit upstream.
  *
  * Uses Firebase's HTTP v1 send API directly (fetch + a hand-signed OAuth2
  * service-account JWT via Web Crypto) instead of the firebase-admin SDK —
@@ -48,19 +64,40 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const EVENT_CONFIG: Record<string, { title: string; body: string; requireInteraction: boolean }> = {
-  bell_ring: { title: '🔔 Someone is at your door', body: 'A visitor rang the digital bell.', requireInteraction: true },
-  qr_scan:   { title: '📲 Someone scanned your QR', body: 'A visitor opened your Smart Door page.', requireInteraction: false },
-  voice:     { title: '🎤 New voice message', body: 'A visitor left a voice message.', requireInteraction: true },
-  text:      { title: '💬 New message from a visitor', body: 'A visitor sent you a text message.', requireInteraction: false },
-  sos:       { title: '🚨 EMERGENCY — SOS Triggered', body: 'A visitor pressed the SOS button. Respond immediately.', requireInteraction: true },
+  bell_ring:       { title: '🔔 Someone is at your door', body: 'A visitor rang the digital bell.', requireInteraction: true },
+  qr_scan:         { title: '📲 Someone scanned your QR', body: 'A visitor opened your Smart Door page.', requireInteraction: false },
+  voice:           { title: '🎤 New voice message', body: 'A visitor left a voice message.', requireInteraction: true },
+  text:            { title: '💬 New message from a visitor', body: 'A visitor sent you a text message.', requireInteraction: false },
+  sos:             { title: '🚨 EMERGENCY — SOS Triggered', body: 'A visitor pressed the SOS button. Respond immediately.', requireInteraction: true },
+  ai_escalation:   { title: '🙋 Visitor needs your attention', body: "Priya (AI) couldn't fully help this visitor — your personal reply may be needed.", requireInteraction: true },
+  // status_reminder's body is recomputed from daysLeft/expired below —
+  // this default is only the fallback if those fields are ever missing.
+  status_reminder: { title: '⏰ Subscription Reminder', body: 'Your Smart Door subscription needs your attention.', requireInteraction: false },
 };
 
-// Best-effort throttle for qr_scan only — bell/voice/text/sos are already
-// rate-limited client-side before this is ever called (see
-// services/rateLimiter.js#gate, invoked from communication.js/voiceNotes.js/
-// messaging.js). qr_scan has no such gate today, so guard it here.
+// Event types whose OS notification should REPLACE the previous one for the
+// same plate rather than stack up as separate notifications — e.g. a
+// visitor mashing the doorbell five times shows ONE updated notification,
+// not five. Tag is keyed on plateId instead of the row's own uuid for
+// these types only (see _buildTag below). Every other type keeps a
+// per-row unique tag so distinct messages/emergencies are never merged.
+const COLLAPSIBLE_TYPES = new Set(['bell_ring', 'qr_scan']);
+
+function _buildTag(type: string, plateId: string | null, rowId: string): string {
+  if (COLLAPSIBLE_TYPES.has(type) && plateId) return `smartdoor-${type}-${plateId}`;
+  return `smartdoor-${type}-${rowId}`;
+}
+
+// Best-effort throttle for event types with no client-side rate limit
+// upstream: qr_scan (see services/rateLimiter.js — bell/voice/text/sos are
+// already gated before this is ever called) and status_reminder (guards
+// against an owner_id being replayed to spam reminder pushes).
 // In-memory only — resets on cold start, which is fine for a soft throttle.
-const _recentScans = new Map<string, number>();
+const _recentEvents = new Map<string, number>();
+const THROTTLE_MS: Record<string, number> = {
+  qr_scan: 15_000,
+  status_reminder: 60 * 60 * 1000, // 1 reminder push per owner per hour, max
+};
 
 function _pemToArrayBuffer(pem: string): ArrayBuffer {
   const cleaned = pem
@@ -126,28 +163,41 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ success: false, error: 'Push not configured on server (missing FIREBASE_* secrets).' }), { status: 500, headers: corsHeaders });
     }
 
-    const { ownerId, plateId, type, rowId, conversationId = null } = await req.json();
+    const { ownerId, plateId = null, type, rowId, conversationId = null, daysLeft = null, expired = false } = await req.json();
     const cfg = EVENT_CONFIG[type];
-    if (!ownerId || !plateId || !rowId || !cfg) {
+    // plateId is required for every type EXCEPT status_reminder (a
+    // subscription isn't tied to one specific plate — see header comment).
+    const plateRequired = type !== 'status_reminder';
+    if (!ownerId || !rowId || !cfg || (plateRequired && !plateId)) {
       return new Response(JSON.stringify({ success: false, error: 'Missing or invalid fields.' }), { status: 400, headers: corsHeaders });
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    // Verify plateId really belongs to ownerId — stops an anon caller from
-    // pushing to an arbitrary owner by guessing/enumerating ids.
-    const { data: plate } = await supabase.from('plates').select('id').eq('plate_id', plateId).eq('owner_id', ownerId).maybeSingle();
-    if (!plate) {
-      return new Response(JSON.stringify({ success: false, error: 'plateId does not belong to ownerId.' }), { status: 403, headers: corsHeaders });
+    if (plateId) {
+      // Verify plateId really belongs to ownerId — stops an anon caller
+      // from pushing to an arbitrary owner by guessing/enumerating ids.
+      const { data: plate } = await supabase.from('plates').select('id').eq('plate_id', plateId).eq('owner_id', ownerId).maybeSingle();
+      if (!plate) {
+        return new Response(JSON.stringify({ success: false, error: 'plateId does not belong to ownerId.' }), { status: 403, headers: corsHeaders });
+      }
+    } else {
+      // status_reminder with no plateId — still verify ownerId is a real
+      // user so this can't be used to probe/spam arbitrary uuids.
+      const { data: owner } = await supabase.from('users').select('id').eq('id', ownerId).maybeSingle();
+      if (!owner) {
+        return new Response(JSON.stringify({ success: false, error: 'ownerId not found.' }), { status: 403, headers: corsHeaders });
+      }
     }
 
-    if (type === 'qr_scan') {
-      const key = `${ownerId}:${plateId}`;
-      const last = _recentScans.get(key) || 0;
-      if (Date.now() - last < 15000) {
+    const throttleMs = THROTTLE_MS[type];
+    if (throttleMs) {
+      const key = `${ownerId}:${plateId || '-'}:${type}`;
+      const last = _recentEvents.get(key) || 0;
+      if (Date.now() - last < throttleMs) {
         return new Response(JSON.stringify({ success: true, skipped: 'throttled' }), { status: 200, headers: corsHeaders });
       }
-      _recentScans.set(key, Date.now());
+      _recentEvents.set(key, Date.now());
     }
 
     const { data: subs, error: subsErr } = await supabase
@@ -162,18 +212,40 @@ serve(async (req: Request) => {
 
     const accessToken = await getGoogleAccessToken(clientEmail, privateKey);
 
-    // Data-only message (no top-level `notification` key) — sw.js's
-    // firebase.onBackgroundMessage() builds the notification manually with
-    // the same tag scheme the foreground realtime path uses, so a device
-    // that's both subscribed AND has an open tab never shows this twice.
+    // status_reminder body is computed from the numeric daysLeft/expired
+    // fields only (never free text) — see header SECURITY note.
+    let title = cfg.title;
+    let body = cfg.body;
+    if (type === 'status_reminder') {
+      const left = Number.isFinite(daysLeft) ? Number(daysLeft) : null;
+      if (expired || (left !== null && left <= 0)) {
+        title = '⚠️ Subscription Expired';
+        body = 'Your Smart Door subscription has expired. Renew now to restore full features.';
+      } else if (left !== null) {
+        title = `⏰ Renewal reminder — ${left} day${left === 1 ? '' : 's'} left`;
+        body = 'Renew now to avoid any interruption to your Smart Door.';
+      }
+    }
+
+    const tag = _buildTag(type, plateId, String(rowId));
+
+    // Data-only message (no top-level `notification` key) — sw.js reads
+    // this flat shape directly off the raw 'push' event (see sw.js header
+    // comment for why no separate firebase-messaging-sw.js/
+    // onBackgroundMessage() is used) and builds the notification with the
+    // SAME tag scheme the foreground realtime path
+    // (services/notificationDispatcher.js) uses, so a device that's both
+    // subscribed AND has an open tab never shows this twice.
     const dataPayload: Record<string, string> = {
       id: String(rowId),
       type: String(type),
-      title: cfg.title,
-      body: cfg.body,
-      url: '/app.html',
+      title,
+      body,
+      url: type === 'ai_escalation' || type === 'text' || type === 'voice' ? '/app.html?tab=inbox' : '/app.html',
       requireInteraction: String(cfg.requireInteraction),
       conversationId: conversationId ? String(conversationId) : '',
+      plateId: plateId ? String(plateId) : '',
+      tag,
     };
 
     let sent = 0;
@@ -187,7 +259,15 @@ serve(async (req: Request) => {
           message: {
             token: s.fcm_token,
             data: dataPayload,
+            // Urgency:high is the Web Push equivalent of an Android "high
+            // importance" channel for a browser-delivered PWA notification
+            // — Chrome/Android route this to wake the device and bypass
+            // Doze batching. android.priority is included too in case this
+            // project is ever wrapped as a TWA/native shell, where FCM's
+            // native Android channel_id/priority applies directly; it's a
+            // harmless no-op for plain browser delivery.
             webpush: { headers: { Urgency: 'high' } },
+            android: { priority: 'high' },
           },
         }),
       });
