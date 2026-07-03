@@ -52,7 +52,21 @@
     "logo": "https://mysmartdoor.in/images/favicon-512x512.png",
     "description": "India's 1st Smart Nameplate System for home privacy and visitor management.",
     "areaServed": "IN",
-    "sameAs": []
+    "foundingLocation": { "@type": "Place", "name": "Bhopal, Madhya Pradesh, India" },
+    "founder": {
+      "@type": "Person",
+      "name": "Mubashir Hasan",
+      "jobTitle": "AI Systems Architect & Founder",
+      "url": "https://muahshidigital.vercel.app/",
+      "sameAs": [
+        "https://muahshidigital.vercel.app/",
+        "https://github.com/muahshi"
+      ]
+    },
+    "sameAs": [
+      "https://github.com/muahshi",
+      "https://muahshidigital.vercel.app/"
+    ]
   }
   </script>
   <script type="application/ld+json">
@@ -166,6 +180,13 @@
     .lp-h2 .accent { color:var(--accent); }
     .lp-body { font-size:1rem; color:rgba(255,255,255,0.52); line-height:1.85; max-width:540px; }
     .divider-line { width:100%; height:1px; background:linear-gradient(90deg,transparent,var(--border-subtle),transparent); }
+    .faq-item { background:var(--navy-card); border:1px solid var(--border-subtle); border-radius:14px; padding:18px 20px; }
+    .faq-item summary { cursor:pointer; list-style:none; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:0.95rem; color:#fff; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .faq-item summary::-webkit-details-marker { display:none; }
+    .faq-item summary::after { content:'+'; font-size:1.3rem; color:var(--accent); flex-shrink:0; transition:transform 0.25s; }
+    .faq-item[open] summary::after { transform:rotate(45deg); }
+    .faq-item[open] summary { color:var(--accent); }
+    .faq-answer { font-size:0.85rem; line-height:1.7; color:rgba(255,255,255,0.55); padding-top:12px; }
 
     /* FEATURED PRODUCT */
     .featured-wrap { display:grid; grid-template-columns:1fr 1fr; gap:72px; align-items:center; }
@@ -826,6 +847,77 @@
   </div>
 </section>
 
+<!-- FAQ -->
+<div class="divider-line"></div>
+<section class="lp-section" id="faq">
+  <div class="lp-section-narrow">
+    <div style="text-align:center;margin-bottom:40px;" data-animate>
+      <div class="section-eyebrow">❓ Common Questions</div>
+      <h2 class="lp-h2">Frequently Asked<br/><span class="accent">Questions.</span></h2>
+    </div>
+    <div style="max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:12px;" data-animate>
+      <details class="faq-item">
+        <summary>What is Smart Door?</summary>
+        <div class="faq-answer">Smart Door is India's 1st Smart Nameplate System. It hides your real phone number from delivery agents, strangers, salespeople, and unwanted callers, while giving visitors a premium digital intercom experience through a QR code on your nameplate.</div>
+      </details>
+      <details class="faq-item">
+        <summary>How does Smart Door hide my phone number?</summary>
+        <div class="faq-answer">When a visitor scans the QR code on your Smart Door nameplate, the call is routed through our cloud calling system instead of dialing your real number directly. Your personal mobile number stays 100% hidden at all times.</div>
+      </details>
+      <details class="faq-item">
+        <summary>What does the AI Receptionist do?</summary>
+        <div class="faq-answer">The AI Receptionist answers visitor queries automatically, routes urgent calls to the right family member, and logs every visitor — so you don't miss important visits even when you're unavailable.</div>
+      </details>
+      <details class="faq-item">
+        <summary>How much does Smart Door cost?</summary>
+        <div class="faq-answer">Smart Door nameplates start at ₹1,499 with FREE pan-India shipping. Every order includes a 1-year privacy subscription (worth ₹299) at no extra cost.</div>
+      </details>
+      <details class="faq-item">
+        <summary>How fast is delivery?</summary>
+        <div class="faq-answer">Smart Door ships across India within 48 hours of order confirmation.</div>
+      </details>
+      <details class="faq-item">
+        <summary>Who built Smart Door?</summary>
+        <div class="faq-answer">Smart Door is built by Mubashir Hasan, an AI Systems Architect and founder based in Bhopal, Madhya Pradesh, India, who designs AI-powered products and automation systems.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- FOUNDER / ABOUT -->
+<div class="divider-line"></div>
+<section class="lp-section" style="background:var(--navy-2);" id="founder">
+  <div class="lp-section-narrow">
+    <div style="text-align:center;margin-bottom:40px;" data-animate>
+      <div class="section-eyebrow">👤 Built By</div>
+      <h2 class="lp-h2">Meet the<br/><span class="accent">Founder.</span></h2>
+    </div>
+    <div style="max-width:680px;margin:0 auto;background:var(--navy-card);border:1px solid var(--border-subtle);border-radius:20px;padding:36px;text-align:center;" data-animate>
+      <img src="https://muahshidigital.vercel.app/mubu_logo.webp" alt="Mubashir Hasan, Founder of Smart Door" width="88" height="88" style="border-radius:50%;object-fit:cover;margin:0 auto 18px;display:block;border:2px solid var(--border-blue);" loading="lazy" />
+      <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:#fff;">Mubashir Hasan</div>
+      <div style="font-size:0.82rem;color:var(--accent);font-weight:600;margin:4px 0 16px;">AI Systems Architect · MBA · Founder</div>
+      <p class="lp-body" style="text-align:center;margin:0 auto;max-width:560px;">Mubashir is an AI Systems Architect and MBA graduate based in Bhopal, India, with 4+ years of experience building automation platforms, AI products, and scalable digital infrastructure. Smart Door is one of several AI-powered systems he has founded and built end-to-end.</p>
+      <a href="https://muahshidigital.vercel.app/" target="_blank" rel="noopener" class="btn-hero-ghost" style="margin-top:20px;display:inline-flex;">View Full Profile →</a>
+    </div>
+  </div>
+</section>
+
+<!-- Structured Data: FAQPage -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "What is Smart Door?", "acceptedAnswer": { "@type": "Answer", "text": "Smart Door is India's 1st Smart Nameplate System. It hides your real phone number from delivery agents, strangers, salespeople, and unwanted callers, while giving visitors a premium digital intercom experience through a QR code on your nameplate." } },
+    { "@type": "Question", "name": "How does Smart Door hide my phone number?", "acceptedAnswer": { "@type": "Answer", "text": "When a visitor scans the QR code on your Smart Door nameplate, the call is routed through our cloud calling system instead of dialing your real number directly. Your personal mobile number stays 100% hidden at all times." } },
+    { "@type": "Question", "name": "What does the AI Receptionist do?", "acceptedAnswer": { "@type": "Answer", "text": "The AI Receptionist answers visitor queries automatically, routes urgent calls to the right family member, and logs every visitor — so you don't miss important visits even when you're unavailable." } },
+    { "@type": "Question", "name": "How much does Smart Door cost?", "acceptedAnswer": { "@type": "Answer", "text": "Smart Door nameplates start at ₹1,499 with FREE pan-India shipping. Every order includes a 1-year privacy subscription (worth ₹299) at no extra cost." } },
+    { "@type": "Question", "name": "How fast is delivery?", "acceptedAnswer": { "@type": "Answer", "text": "Smart Door ships across India within 48 hours of order confirmation." } },
+    { "@type": "Question", "name": "Who built Smart Door?", "acceptedAnswer": { "@type": "Answer", "text": "Smart Door is built by Mubashir Hasan, an AI Systems Architect and founder based in Bhopal, Madhya Pradesh, India, who designs AI-powered products and automation systems." } }
+  ]
+}
+</script>
+
 <!-- FOOTER -->
 <footer class="lp-footer">
   <div class="footer-grid">
@@ -843,7 +935,7 @@
     </div>
     <div>
       <div class="footer-col-title">Support</div>
-      <a href="#" class="footer-link">Installation Guide</a><a href="#" class="footer-link">FAQs</a><a href="mailto:hello@mysmartdoor.in" class="footer-link">hello@mysmartdoor.in</a><a href="tel:+918989898989" class="footer-link">+91 89898 98989</a>
+      <a href="#" class="footer-link">Installation Guide</a><a href="#faq" class="footer-link">FAQs</a><a href="mailto:hello@mysmartdoor.in" class="footer-link">hello@mysmartdoor.in</a><a href="tel:+918989898989" class="footer-link">+91 89898 98989</a>
     </div>
     <div>
       <div class="footer-col-title">Legal</div>
