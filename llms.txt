@@ -1,0 +1,25 @@
+# Smart Door
+
+> India's 1st Smart Nameplate System. Smart Door hides a homeowner's real phone number from delivery agents, strangers, salespeople, and unwanted callers, while giving visitors a premium digital intercom experience through a QR code on the nameplate — powered by an AI receptionist, smart call routing, and cloud calling.
+
+Smart Door is built and founded by Mubashir Hasan, an AI Systems Architect based in Bhopal, Madhya Pradesh, India.
+
+Key facts:
+- Product: Smart Nameplate (QR-based digital intercom + number-masking system)
+- Coverage: Pan-India, ships within 48 hours
+- Pricing: Starts at ₹1,499 with free shipping; includes 1-year privacy subscription (₹299 value) free
+- Core features: 100% phone number masking, AI receptionist, smart call routing, cloud calling, automatic visitor logging via QR scan
+- Founder: Mubashir Hasan (https://muahshidigital.vercel.app/)
+
+## Pages
+
+- [Home](https://mysmartdoor.in/): Product overview, pricing, FAQ, and founder information
+- [Live Demo](https://mysmartdoor.in/app): Interactive visitor-experience demo, no sign-up required
+- [Privacy Policy](https://mysmartdoor.in/legal/privacy-policy.html)
+- [Terms of Service](https://mysmartdoor.in/legal/terms-of-service.html)
+- [Shipping Policy](https://mysmartdoor.in/legal/shipping-policy.html)
+- [Return Policy](https://mysmartdoor.in/legal/refund-policy.html)
+
+## Contact
+
+- Email: hello@mysmartdoor.in
