@@ -22,13 +22,16 @@
  *    while the tab was backgrounded/throttled and notifies for it too,
  *    so a minimized-then-reopened PWA doesn't silently drop events.
  *
- * WHAT THIS FILE CANNOT FIX
- *  - True background delivery (tab fully closed / phone screen off for a
- *    long stretch) requires server-pushed Web Push (VAPID) or FCM. This
- *    app has no push subscription infrastructure at all today — see the
- *    audit report. Until that is built, delivery here is best-effort and
- *    only works while the tab/PWA process is alive (foreground or recently
- *    backgrounded), same as before this fix.
+ * TRUE BACKGROUND DELIVERY (tab fully closed / phone screen off) is handled
+ * by a separate, complementary path — services/push.js registers the
+ * device for Firebase Cloud Messaging, and supabase/functions/send-push
+ * delivers the actual OS push when the DB row is written, independent of
+ * whether this file's code is even running. sw.js's 'push' handler shows
+ * that notification using the SAME tag/action scheme this file uses (see
+ * COLLAPSIBLE_TYPES / _buildTag / _buildActions above), so a device that's
+ * both subscribed to push AND has this tab open never shows a duplicate —
+ * _wireClickTracking()'s 'push_delivered' listener below folds
+ * push-originated deliveries into the same dispatch log for debugging.
  */
 
 import { supabase } from './supabase.js';
@@ -102,7 +105,63 @@ const EVENT_CONFIG = {
     vibrate: [400, 100, 400, 100, 400],
     requireInteraction: true,
   },
+  ai_escalation: {
+    title: '🙋 Visitor needs your attention',
+    body: () => "Priya (AI) couldn't fully help this visitor — your personal reply may be needed.",
+    vibrate: [200, 80, 200],
+    requireInteraction: true,
+  },
+  status_reminder: {
+    title: '⏰ Subscription Reminder',
+    body: (row) => row?.body || 'Your Smart Door subscription needs your attention.',
+    vibrate: [150],
+    requireInteraction: false,
+  },
 };
+
+// Same "collapsible" rule as supabase/functions/send-push/index.ts — a
+// second bell press / QR re-scan for the same plate REPLACES the previous
+// OS notification instead of stacking a new one. Every other type keeps a
+// per-row unique tag. Kept in sync manually (small, well-commented list;
+// see that file's COLLAPSIBLE_TYPES for the canonical background-path copy).
+const COLLAPSIBLE_TYPES = new Set(['bell_ring', 'qr_scan']);
+
+function _buildTag(type, id, plateId) {
+  if (COLLAPSIBLE_TYPES.has(type) && plateId) return `smartdoor-${type}-${plateId}`;
+  return `smartdoor-${type}-${id}`;
+}
+
+// Notification action buttons — mirrors sw.js's push-path action sets so a
+// notification looks/behaves identically whether it was shown by the
+// foreground realtime path (here) or the background push path (sw.js).
+// Chromium browsers render these; Safari/iOS ignores `actions` entirely and
+// falls back to tap-to-open — a graceful, spec-defined degradation.
+function _buildActions(type) {
+  if (type === 'sos') {
+    return [
+      { action: 'open', title: '🚨 Open App' },
+      { action: 'dismiss', title: '✕ Dismiss' },
+    ];
+  }
+  if (['voice', 'text', 'ai_escalation'].includes(type)) {
+    return [
+      { action: 'open', title: '📲 Open' },
+      { action: 'reply', title: '↩️ Reply' },
+      { action: 'dismiss', title: '✕ Dismiss' },
+    ];
+  }
+  if (type === 'bell_ring') {
+    return [
+      { action: 'open', title: '📲 Open Dashboard' },
+      { action: 'call', title: '📞 Call Visitor' },
+      { action: 'dismiss', title: '✕ Dismiss' },
+    ];
+  }
+  return [
+    { action: 'open', title: '📲 Open' },
+    { action: 'dismiss', title: '✕ Dismiss' },
+  ];
+}
 
 // ────────── SHOW ONE NOTIFICATION (never reused, never suppressed) ──────────
 /**
@@ -131,7 +190,8 @@ export async function notifyEvent(type, row, ownerId) {
 
   const cfg = EVENT_CONFIG[type];
   const createdAt = row?.created_at ? new Date(row.created_at).getTime() : Date.now();
-  const tag = `smartdoor-${type}-${id}`; // GLOBALLY UNIQUE — includes the row's own uuid, so it can never collide with any other event, ever.
+  const plateId = row?.plate_id || row?.plateId || null;
+  const tag = _buildTag(type, id, plateId); // collapsible for bell_ring/qr_scan — see COLLAPSIBLE_TYPES above
 
   const logEntry = { id, type, tag, createdAt, status: 'created' };
   _pushLog(logEntry);
@@ -152,16 +212,17 @@ export async function notifyEvent(type, row, ownerId) {
       icon: '/images/favicon-192x192.png',
       badge: '/images/favicon-192x192.png',
       vibrate: cfg.vibrate,
-      tag,                          // unique per event — see comment above
-      renotify: true,               // belt-and-braces: even if a future change ever reintroduces a shared tag, force re-alert
+      tag,
+      renotify: true,               // re-alert (sound/vibrate) even when the tag is reused (collapsible types)
       requireInteraction: cfg.requireInteraction,
       silent: false,
       timestamp: createdAt,
+      actions: _buildActions(type), // Open / Reply / Dismiss (or Open / Call / Dismiss for bell_ring) — Chromium only, Safari degrades gracefully
       // conversationId (Phase 4b, migration 32): visitor_logs / message_logs
       // rows now carry conversation_id. Passing it through here is what lets
       // js/dashboard.js's notification_click listener open the EXACT
       // conversation the visitor started, instead of just the app shell.
-      data: { id, type, ownerId, conversationId: row?.conversation_id || null, url: '/app.html', timestamp: createdAt },
+      data: { id, type, ownerId, plateId, conversationId: row?.conversation_id || null, url: '/app.html', timestamp: createdAt },
     });
     _updateLog(id, { status: 'delivered' });
   } catch (err) {
@@ -189,9 +250,10 @@ function _wireClickTracking() {
     if (msg?.type === 'notification_click' && msg?.notifData?.id) {
       _updateLog(msg.notifData.id, { status: 'clicked' });
     }
-    // Real Web Push isn't wired up yet (see report), but sw.js already
-    // broadcasts these if a push ever does arrive — recording them here
-    // means the day push is added, this file needs zero changes to log it.
+    // sw.js broadcasts these whenever a background push is delivered/fails
+    // (see services/push.js + supabase/functions/send-push) — recording
+    // them here means push-originated deliveries show up in the same
+    // getDispatchLog() as foreground ones, for one unified debug view.
     if (msg?.type === 'push_delivered' && msg?.notifData?.id && !_dispatchedIds.has(msg.notifData.id)) {
       _dispatchedIds.add(msg.notifData.id);
       _pushLog({ id: msg.notifData.id, type: msg.notifData.type, tag: `push-${msg.notifData.id}`, createdAt: msg.notifData.timestamp, status: 'delivered', source: 'push' });
