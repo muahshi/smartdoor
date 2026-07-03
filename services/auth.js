@@ -8,7 +8,7 @@
  */
 
 import { supabase } from './supabase.js';
-import { unregisterDevice } from './pushRegistration.js';
+import { unsubscribeOwnerFromPush } from './push.js';
 
 const AUTH_KEY      = 'sd_owner_session';
 const DEVICE_KEY    = 'sd_device_trusted';
@@ -142,7 +142,17 @@ export async function logoutOwner() {
       // Deactivate this device's push registration server-side. Doesn't
       // revoke the browser subscription (a fresh login re-registers it
       // instantly) — just stops this device receiving push while logged out.
-      await unregisterDevice(session.id).catch(() => {});
+      //
+      // FIX (FCM production integration audit): this used to call
+      // unregisterDevice() from ./pushRegistration.js, which deletes from
+      // the `owner_devices` table — a parallel, unused registration scheme
+      // (its own dispatch trigger, sql/33_push_notifications.sql, sends a
+      // payload shape supabase/functions/send-push doesn't even accept).
+      // The table this app actually registers into is `push_subscriptions`
+      // (see services/push.js#subscribeOwnerToPush, wired from
+      // js/dashboard.js on login), so logout was silently cleaning up the
+      // WRONG table and this device kept receiving push after logout.
+      await unsubscribeOwnerFromPush(session.id).catch(() => {});
     }
     await supabase.auth.signOut();
     localStorage.removeItem(AUTH_KEY);
