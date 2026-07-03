@@ -44,6 +44,41 @@ let _refreshTimer = null;
 let _refreshListenersAttached = false;
 let _refreshCleanup = null;
 
+// ROOT-CAUSE FIX: PushManager.subscribe() throws
+// "InvalidAccessError: The provided applicationServerKey is not valid"
+// whenever the base64url string handed to Firebase's getToken() does not
+// decode to exactly 65 bytes starting with 0x04 (an uncompressed P-256
+// point) — the shape of every real Firebase Web Push VAPID public key.
+// Until now nothing validated the key client-side, so a corrupted value
+// (stray whitespace/newline from a copy-paste, wrapping quotes baked into
+// a Vercel env var, or the wrong key entirely — e.g. the legacy Server Key
+// instead of the "Web Push certificate" key from Firebase Console →
+// Project Settings → Cloud Messaging) sailed straight through every
+// earlier truthy check and only failed deep inside the browser API with
+// no indication of why. This validates the key BEFORE calling Firebase,
+// trims accidental whitespace, and fails with a specific, actionable
+// message instead of the opaque browser error.
+function _sanitizeVapidKey(rawKey) {
+  if (typeof rawKey !== 'string') return { key: null, error: 'VAPID key is missing.' };
+  const key = rawKey.trim().replace(/^["']|["']$/g, '');
+  if (!key) return { key: null, error: 'VAPID key is empty after trimming.' };
+  if (!/^[A-Za-z0-9\-_]+$/.test(key)) {
+    return { key: null, error: 'VAPID key contains invalid characters (expected base64url: A-Z a-z 0-9 - _). Check for stray quotes/whitespace in the Vercel env var.' };
+  }
+  let decodedLength;
+  try {
+    const padding = '='.repeat((4 - (key.length % 4)) % 4);
+    const base64 = (key + padding).replace(/-/g, '+').replace(/_/g, '/');
+    decodedLength = atob(base64).length;
+  } catch (e) {
+    return { key: null, error: 'VAPID key is not valid base64url and failed to decode.' };
+  }
+  if (decodedLength !== 65) {
+    return { key: null, error: `VAPID key decodes to ${decodedLength} bytes; a valid Firebase Web Push public key must decode to exactly 65 bytes. This is very likely the wrong key — copy the "Key pair" value from Firebase Console → Project Settings → Cloud Messaging → Web configuration → Web Push certificates (NOT the Server key).` };
+  }
+  return { key, error: null };
+}
+
 let _fbApp = null;
 function _getMessaging(fbConfig) {
   if (typeof firebase === 'undefined' || !firebase.messaging) return null;
@@ -74,8 +109,14 @@ export async function subscribeOwnerToPush(ownerId) {
     const messaging = _getMessaging(fbConfig);
     if (!messaging) return { success: false, error: 'Firebase Messaging SDK not loaded.' };
 
+    const { key: vapidKey, error: vapidError } = _sanitizeVapidKey(fbConfig.vapidKey);
+    if (!vapidKey) {
+      console.error('[Push] Invalid VAPID key — refusing to call PushManager.subscribe():', vapidError);
+      return { success: false, error: `Invalid VAPID key configuration: ${vapidError}` };
+    }
+
     const reg = await navigator.serviceWorker.ready; // reuses /sw.js — see file header
-    const token = await messaging.getToken({ vapidKey: fbConfig.vapidKey, serviceWorkerRegistration: reg });
+    const token = await messaging.getToken({ vapidKey, serviceWorkerRegistration: reg });
     if (!token) return { success: false, error: 'No FCM token returned (permission may have been revoked).' };
 
     const { error } = await supabase.from('push_subscriptions').upsert(
@@ -138,8 +179,11 @@ export async function unsubscribeOwnerFromPush(ownerId) {
     const messaging = _getMessaging(fbConfig);
     if (!messaging) return { success: false, error: 'Firebase Messaging SDK not loaded.' };
 
+    const { key: vapidKey } = _sanitizeVapidKey(fbConfig?.vapidKey);
     const reg = await navigator.serviceWorker.ready;
-    const token = await messaging.getToken({ vapidKey: fbConfig?.vapidKey, serviceWorkerRegistration: reg }).catch(() => null);
+    const token = vapidKey
+      ? await messaging.getToken({ vapidKey, serviceWorkerRegistration: reg }).catch(() => null)
+      : null;
     if (token) {
       await supabase.from('push_subscriptions').delete().eq('owner_id', ownerId).eq('fcm_token', token);
       await messaging.deleteToken();
