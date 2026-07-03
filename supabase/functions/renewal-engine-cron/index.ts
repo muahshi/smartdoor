@@ -18,11 +18,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const RENEWAL_WINDOWS = [
-  { days: 90, key: 'reminder_90d', channels: ['email'],                        priority: 'low'      },
-  { days: 30, key: 'reminder_30d', channels: ['email', 'whatsapp'],            priority: 'medium'   },
-  { days: 7,  key: 'reminder_7d',  channels: ['email', 'sms', 'whatsapp'],     priority: 'high'     },
-  { days: 1,  key: 'reminder_1d',  channels: ['email', 'sms', 'whatsapp', 'in_app'], priority: 'critical' },
-  { days: 0,  key: 'expired',      channels: ['email', 'sms', 'whatsapp', 'in_app'], priority: 'critical' },
+  { days: 90, key: 'reminder_90d', channels: ['email'],                                   priority: 'low'      },
+  { days: 30, key: 'reminder_30d', channels: ['email', 'whatsapp'],                       priority: 'medium'   },
+  { days: 7,  key: 'reminder_7d',  channels: ['email', 'sms', 'whatsapp', 'push'],         priority: 'high'     },
+  { days: 1,  key: 'reminder_1d',  channels: ['email', 'sms', 'whatsapp', 'in_app', 'push'], priority: 'critical' },
+  { days: 0,  key: 'expired',      channels: ['email', 'sms', 'whatsapp', 'in_app', 'push'], priority: 'critical' },
 ];
 
 serve(async (req) => {
@@ -134,6 +134,28 @@ serve(async (req) => {
             },
           });
           channelResults[channel] = waErr ? 'failed' : 'sent';
+
+        } else if (channel === 'push') {
+          // Status Reminder push (FCM production integration). Reuses
+          // supabase/functions/send-push exactly like every visitor event
+          // does — title/body are computed there from daysLeft/expired
+          // ONLY (never free text from this function), and it fans out to
+          // every device in push_subscriptions for this owner, working
+          // even if the owner's dashboard/PWA is fully closed. subscriptions
+          // aren't tied to one plate, so plateId is omitted (send-push
+          // treats it as optional for this type only — see its header
+          // comment). sub.id (this subscription's own uuid) doubles as the
+          // OS notification's unique tag key.
+          const { error: pushErr } = await supabase.functions.invoke('send-push', {
+            body: {
+              ownerId:  sub.owner_id,
+              type:     'status_reminder',
+              rowId:    sub.id,
+              daysLeft: Math.max(0, daysLeft),
+              expired:  daysLeft <= 0,
+            },
+          });
+          channelResults[channel] = pushErr ? 'failed' : 'sent';
 
         } else {
           channelResults[channel] = 'skipped_no_contact';
