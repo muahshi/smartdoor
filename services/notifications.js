@@ -7,7 +7,11 @@
  * CHANNEL ARCHITECTURE (future-proofed, not all active today):
  *   in_app  → always on, writes to `notifications` table, owner dashboard
  *             picks it up via realtime subscription.
- *   push    → stub. Wire to a Web Push / FCM Edge Function later.
+ *   push    → real for bell/qr/voice/text/sos/ai_escalation/status_reminder,
+ *             but sent directly at the write-site (visitor.html,
+ *             renewal-engine-cron) via supabase/functions/send-push, NOT
+ *             through this file's own CHANNELS.push (see its comment for
+ *             why: avoiding a double-notify for inbox_message specifically).
  *   sms     → stub. Wire to Exotel/Twilio SMS API later.
  *   whatsapp→ delegates to services/whatsapp.js (provider-agnostic).
  *   email   → stub. Wire to a transactional email provider later.
@@ -25,16 +29,31 @@ const CHANNELS = {
     // Already persisted by createNotification() — nothing extra to do.
     return { channel: 'in_app', status: 'sent' };
   },
-  push: async (_notification) => {
-    // Background push (Web Push VAPID + FCM) is dispatched server-side by a
-    // Postgres trigger the instant createNotification() above inserts the
-    // row (see sql/33_push_notifications.sql -> supabase/functions/
-    // send-push). Doing it there instead of here means push still fires
-    // even if the tab closes the millisecond after this call returns —
-    // exactly the "works when app is closed" guarantee this channel needs.
-    // Nothing to do client-side; this just records that delivery was
-    // delegated rather than skipped.
-    return { channel: 'push', status: 'delegated_to_db_trigger' };
+  push: async (notification) => {
+    // FIX (FCM production integration audit): this used to claim delivery
+    // was "delegated to a DB trigger" (sql/33_push_notifications.sql). That
+    // trigger is dormant (its own setup comment says system_config isn't
+    // populated) AND, even if enabled, posts a payload shape
+    // (`{table, record}`) that supabase/functions/send-push has never
+    // accepted — so real push was silently never sent via this path.
+    //
+    // Real background push today is sent directly, at the write-site, by
+    // the two callers that actually need it:
+    //   - visitor.html's _triggerPush() for bell/qr/voice/text/sos/
+    //     ai_escalation (fires the instant the visitor_logs/messages row
+    //     is written — the visitor's browser is guaranteed active then,
+    //     even if the owner's isn't)
+    //   - supabase/functions/renewal-engine-cron (+ services/renewalEngine.js
+    //     for the admin-triggered manual run) for status_reminder
+    // both calling supabase/functions/send-push directly.
+    //
+    // notifyNewConversationMessage() below (the one live caller that
+    // reaches this channel today) is intentionally left as a no-op here:
+    // every message that creates it is ALSO sent through
+    // services/communication.js's sendTextMessage/sendVoiceMessage, which
+    // already triggers the real push above — wiring a second send here
+    // would double-notify the owner for the same message.
+    return { channel: 'push', status: 'no_op_see_comment' };
   },
   sms: async (_notification) => {
     // TODO: integrate Exotel/Twilio SMS API via an Edge Function.

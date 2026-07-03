@@ -23,11 +23,11 @@ import { supabase } from './supabase.js';
 // ────────── RENEWAL TRIGGER WINDOWS ──────────
 
 export const RENEWAL_WINDOWS = [
-  { days: 90, key: 'reminder_90d', label: '90-Day Early Bird',  channels: ['email'],                        priority: 'low'    },
-  { days: 30, key: 'reminder_30d', label: '30-Day Reminder',    channels: ['email', 'whatsapp'],            priority: 'medium' },
-  { days: 7,  key: 'reminder_7d',  label: '7-Day Urgent',       channels: ['email', 'sms', 'whatsapp'],     priority: 'high'   },
-  { days: 1,  key: 'reminder_1d',  label: '1-Day Final Warning', channels: ['email', 'sms', 'whatsapp', 'in_app'], priority: 'critical' },
-  { days: 0,  key: 'expired',      label: 'Subscription Expired', channels: ['email', 'sms', 'whatsapp', 'in_app'], priority: 'critical' },
+  { days: 90, key: 'reminder_90d', label: '90-Day Early Bird',  channels: ['email'],                                   priority: 'low'    },
+  { days: 30, key: 'reminder_30d', label: '30-Day Reminder',    channels: ['email', 'whatsapp'],                       priority: 'medium' },
+  { days: 7,  key: 'reminder_7d',  label: '7-Day Urgent',       channels: ['email', 'sms', 'whatsapp', 'push'],        priority: 'high'   },
+  { days: 1,  key: 'reminder_1d',  label: '1-Day Final Warning', channels: ['email', 'sms', 'whatsapp', 'in_app', 'push'], priority: 'critical' },
+  { days: 0,  key: 'expired',      label: 'Subscription Expired', channels: ['email', 'sms', 'whatsapp', 'in_app', 'push'], priority: 'critical' },
 ];
 
 // ────────── RUN DAILY RENEWAL CHECK ──────────
@@ -118,6 +118,9 @@ async function _dispatchRenewalNotification(sub, window, daysLeft) {
     renewalPrice: `₹${sub.renewal_price || 999}`,
     renewalLink:  `https://smartdoor.in/app#renew`,
     windowLabel:  window.label,
+    subscriptionId: sub.id,
+    ownerId:      sub.owner_id,
+    expired:      daysLeft <= 0,
   };
 
   for (const channel of window.channels) {
@@ -189,6 +192,25 @@ async function _sendViaChannel(channel, owner, data, window) {
             to:           owner.phone,
             templateName: 'smartdoor_renewal',
             templateVars: data,
+          }
+        });
+        return { status: 'sent' };
+
+      case 'push':
+        // Status Reminder push — same edge function every visitor event
+        // uses (supabase/functions/send-push). title/body are computed
+        // there from daysLeft/expired only; this admin-triggered manual
+        // run mirrors exactly what the daily cron
+        // (supabase/functions/renewal-engine-cron) already sends
+        // automatically, so a manual "run renewal check now" from the
+        // admin panel behaves identically to the scheduled one.
+        await supabase.functions.invoke('send-push', {
+          body: {
+            ownerId:  data.ownerId,
+            type:     'status_reminder',
+            rowId:    data.subscriptionId,
+            daysLeft: data.daysLeft,
+            expired:  data.expired,
           }
         });
         return { status: 'sent' };
