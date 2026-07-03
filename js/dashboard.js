@@ -17,7 +17,7 @@ import { getCurrentOwner, requireAuth, logoutOwner, startInactivityTimer } from 
 import { getLogs, getTodayStats, getWeeklyData, getMonthlyData, getWeeklyGrowth, getScanHeatmapData, logEvent, subscribeToLogs, formatLogForDisplay } from '../services/logs.js';
 import { subscribeToNotifications } from '../services/notifications.js';
 import { initNotificationDispatcher, notifyEvent, ensureNotificationPermission } from '../services/notificationDispatcher.js';
-import { subscribeOwnerToPush } from '../services/push.js';
+import { subscribeOwnerToPush, wireTokenRefresh } from '../services/push.js';
 import { getSecurityRules, updateSecurityRules, updateOwnerStatus, getFamilyMembers, addFamilyMember, removeFamilyMember, reorderFamilyMembers } from '../services/security.js';
 import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
@@ -347,12 +347,54 @@ const DashboardModule = (() => {
         // this silently no-ops and foreground notifications still work.
         if (perm === 'granted' && state.owner?.id) {
           subscribeOwnerToPush(state.owner.id).catch(() => {});
+          // Automatic token refresh (Req: "refresh expired tokens") — one
+          // interval + foreground-regain listener for the lifetime of this
+          // tab; see services/push.js#wireTokenRefresh for why there's no
+          // push-based "token changed" event to listen for instead.
+          wireTokenRefresh(state.owner.id);
+        } else if (perm !== 'granted') {
+          // Graceful fallback (Req): permission denied or not yet asked (the
+          // latter mainly matters on iOS Safari, where requestPermission()
+          // must be called from a genuine user gesture — automatic requests
+          // on load are silently ignored there). Either way, foreground
+          // in-tab notifications/toasts keep working regardless via
+          // services/notificationDispatcher.js; only OS-level/background
+          // delivery is unavailable until the person taps to enable it.
+          _showEnableNotificationsBanner(state.owner.id, perm);
         }
       }).catch(() => {});
     }
     navigator.serviceWorker?.ready.then(reg => {
       reg.active?.postMessage({ type: 'CLEAR_BADGE' });
     }).catch(() => {});
+  }
+
+  // Minimal, dismissible banner asking the owner to tap to enable
+  // notifications — exists specifically so the permission prompt is always
+  // triggered by a real user gesture (required by iOS Safari Web Push for
+  // installed PWAs; Chrome/Android work either way but this is harmless
+  // there too). No layout/markup changes elsewhere: injects one small,
+  // self-contained element and removes itself on tap or dismiss.
+  function _showEnableNotificationsBanner(ownerId, perm) {
+    if (perm === 'denied') return; // browser will silently no-op requestPermission() again anyway — nothing useful to prompt for
+    if (document.getElementById('sd-enable-push-banner')) return;
+    const bar = document.createElement('div');
+    bar.id = 'sd-enable-push-banner';
+    bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:9999;background:#111827;color:#fff;padding:12px 14px;border-radius:12px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:14px;';
+    bar.innerHTML = `<span style="flex:1;">🔔 Enable notifications so you never miss a visitor.</span>
+      <button id="sd-enable-push-yes" style="background:#22c55e;color:#fff;border:0;border-radius:8px;padding:8px 12px;font-weight:600;">Enable</button>
+      <button id="sd-enable-push-no" style="background:transparent;color:#9ca3af;border:0;padding:8px 6px;">✕</button>`;
+    document.body.appendChild(bar);
+    bar.querySelector('#sd-enable-push-no').onclick = () => bar.remove();
+    bar.querySelector('#sd-enable-push-yes').onclick = async () => {
+      // Genuine tap-driven call — safe on iOS Safari as well as Chrome.
+      const p = await ensureNotificationPermission().catch(() => 'denied');
+      if (p === 'granted') {
+        await subscribeOwnerToPush(ownerId).catch(() => {});
+        wireTokenRefresh(ownerId);
+      }
+      bar.remove();
+    };
   }
 
   // ────────── REALTIME SETUP ──────────
@@ -407,8 +449,18 @@ const DashboardModule = (() => {
     // message_logs / call_logs above, so only surface 'status_change' here
     // (order + subscription lifecycle) to avoid duplicate toasts.
     const unsubNotifications = subscribeToNotifications(ownerId, (notif) => {
-      if (notif.type !== 'status_change') return;
+      if (notif.type !== 'status_change' && notif.type !== 'subscription_renewal') return;
       showToast(`${notif.title}${notif.body ? ' — ' + notif.body : ''}`, notif.priority === 'high' ? 'warning' : 'info');
+      // subscription_renewal rows are the "Status Reminder" event — also
+      // surface it as a real OS notification (mirrors bell/voice/text/SOS
+      // above) rather than only an in-tab toast. The actual background
+      // push for this type is sent directly from
+      // supabase/functions/renewal-engine-cron (works even with the
+      // dashboard fully closed); this foreground path just keeps the two
+      // channels visually consistent when the tab happens to be open.
+      if (notif.type === 'subscription_renewal') {
+        notifyEvent('status_reminder', { id: notif.id, created_at: notif.created_at, body: notif.body }, ownerId);
+      }
     });
 
     // Communication engine: call history + voice notes + messages + emergency alerts
@@ -468,7 +520,21 @@ const DashboardModule = (() => {
         if (typeof window.switchMobileTab === 'function') {
           window.switchMobileTab('inbox', document.querySelector('.tab-btn[data-tab="inbox"]'), document.querySelector('.bottom-nav-item[onclick*="inbox"]'));
         }
-        refreshInbox().then(() => openThread(conversationId));
+        refreshInbox().then(() => {
+          openThread(conversationId);
+          // 'Reply' notification action (sw.js/notificationDispatcher.js) —
+          // focus whichever reply box is actually visible (mobile vs
+          // desktop layout use separate input ids) instead of just opening
+          // the thread, so the person can start typing immediately.
+          if (msg.action === 'reply') {
+            requestAnimationFrame(() => {
+              const input = document.getElementById('inbox-reply-input-d')?.offsetParent
+                ? document.getElementById('inbox-reply-input-d')
+                : document.getElementById('inbox-reply-input');
+              input?.focus();
+            });
+          }
+        });
       };
       navigator.serviceWorker.addEventListener('message', onNotifClick);
       state._realtimeUnsubs.push(() => navigator.serviceWorker.removeEventListener('message', onNotifClick));
