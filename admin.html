@@ -633,34 +633,34 @@
     <div class="nav-item" data-panel="provisioning" data-resource="customers" data-action="write" onclick="switchPanel('provisioning', this)">
       <span class="nav-icon">➕</span> Provisioning
     </div>
-    <div class="nav-item" data-panel="customers" onclick="switchPanel('customers', this)">
+    <div class="nav-item" data-panel="customers" data-resource="customers" onclick="switchPanel('customers', this)">
       <span class="nav-icon">👥</span> Customers
     </div>
-    <div class="nav-item" data-panel="orders" onclick="switchPanel('orders', this)">
+    <div class="nav-item" data-panel="orders" data-resource="orders" onclick="switchPanel('orders', this)">
       <span class="nav-icon">🛒</span> Orders
     </div>
-    <div class="nav-item" data-panel="subscriptions" onclick="switchPanel('subscriptions', this)">
+    <div class="nav-item" data-panel="subscriptions" data-resource="subscriptions" onclick="switchPanel('subscriptions', this)">
       <span class="nav-icon">🔄</span> Subscriptions
     </div>
   </div>
 
   <div class="sidebar-section">
     <div class="sidebar-section-label">Production</div>
-    <div class="nav-item" data-panel="manufacturing" onclick="switchPanel('manufacturing', this)">
+    <div class="nav-item" data-panel="manufacturing" data-resource="manufacturing" onclick="switchPanel('manufacturing', this)">
       <span class="nav-icon">🏭</span> Manufacturing
     </div>
-    <div class="nav-item" data-panel="qr" onclick="switchPanel('qr', this)">
+    <div class="nav-item" data-panel="qr" data-resource="qr" onclick="switchPanel('qr', this)">
       <span class="nav-icon">📱</span> QR Management
     </div>
   </div>
 
   <div class="sidebar-section">
     <div class="sidebar-section-label">Support</div>
-    <div class="nav-item" data-panel="support" onclick="switchPanel('support', this)">
+    <div class="nav-item" data-panel="support" data-resource="support" onclick="switchPanel('support', this)">
       <span class="nav-icon">🎫</span> Support Center
       <span class="nav-badge" id="openTicketsBadge">0</span>
     </div>
-    <div class="nav-item" data-panel="communication" onclick="switchPanel('communication', this)">
+    <div class="nav-item" data-panel="communication" data-resource="communication" onclick="switchPanel('communication', this)">
       <span class="nav-icon">📞</span> Communication
       <span class="nav-badge" id="unreadMsgBadge" data-unread-badge style="display:none;"></span>
     </div>
@@ -668,13 +668,13 @@
 
   <div class="sidebar-section">
     <div class="sidebar-section-label">System</div>
-    <div class="nav-item" data-panel="audit" onclick="switchPanel('audit', this)">
+    <div class="nav-item" data-panel="audit" data-resource="audit" onclick="switchPanel('audit', this)">
       <span class="nav-icon">📋</span> Audit Logs
     </div>
-    <div class="nav-item" data-panel="system" onclick="switchPanel('system', this)">
+    <div class="nav-item" data-panel="system" data-resource="system" onclick="switchPanel('system', this)">
       <span class="nav-icon">⚙️</span> System Health
     </div>
-    <div class="nav-item" data-panel="team" onclick="switchPanel('team', this)">
+    <div class="nav-item" data-panel="team" data-resource="team" data-action="manage" onclick="switchPanel('team', this)">
       <span class="nav-icon">🛡️</span> Admin Team
     </div>
   </div>
@@ -1363,7 +1363,8 @@ function hasPermission(session, resource, action = 'read') {
   return rp.includes(action) || rp.includes('manage');
 }
 function isSuperAdmin(s) { return s?.role === 'super_admin'; }
-function canAccessRevenue(s) { return s?.role !== 'dealer' && (hasPermission(s,'analytics') || isSuperAdmin(s)); }
+const REVENUE_RESTRICTED_ROLES = ['dealer', 'franchise', 'installer'];
+function canAccessRevenue(s) { return !REVENUE_RESTRICTED_ROLES.includes(s?.role) && (hasPermission(s,'analytics') || isSuperAdmin(s)); }
 
 // ── EDGE CALL ──
 let _authFailCount = 0;
@@ -1507,7 +1508,41 @@ function barChart(cid,labels,vals,label,color){
 
 // ── NAVIGATION ──
 let currentPanel = 'dashboard';
+// Same resource/action each panel's nav-item is tagged with (data-resource/
+// data-action). Nav hiding alone is cosmetic — this map lets switchPanel()
+// itself refuse to render a panel the current role isn't permitted to see,
+// even if it's invoked directly (console, stale link, future bug).
+const PANEL_RBAC = {
+  analytics:     { resource: 'analytics' },
+  financial:     { revenueOnly: true },
+  provisioning:  { resource: 'customers', action: 'write' },
+  customers:     { resource: 'customers' },
+  orders:        { resource: 'orders' },
+  subscriptions: { resource: 'subscriptions' },
+  manufacturing: { resource: 'manufacturing' },
+  qr:            { resource: 'qr' },
+  support:       { resource: 'support' },
+  communication: { resource: 'communication' },
+  audit:         { resource: 'audit' },
+  system:        { resource: 'system' },
+  team:          { resource: 'team', action: 'manage' },
+  // dashboard has no entry — every authenticated admin role may see it.
+};
+function isPanelAllowed(panelId, session) {
+  const rule = PANEL_RBAC[panelId];
+  if (!rule) return true;
+  if (rule.revenueOnly) return canAccessRevenue(session);
+  return hasPermission(session, rule.resource, rule.action || 'read');
+}
 window.switchPanel = function(panelId, navEl) {
+  const s = getAdminSession();
+  if (!isPanelAllowed(panelId, s)) {
+    if (typeof showToast === 'function') showToast("You don't have access to that section.", 'error');
+    if (panelId !== 'dashboard') {
+      window.switchPanel('dashboard', document.querySelector('[data-panel=dashboard]'));
+    }
+    return;
+  }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const panel = document.getElementById('panel-'+panelId);
@@ -2104,7 +2139,10 @@ async function loadTeam() {
     <td><button class="btn btn-ghost btn-sm" onclick="showToast('Role: ${a.role_name||'—'}','info')">Details</button></td>
   </tr>`).join('');
 }
-window.openAddAdminModal=function(){showToast('Add admin coming soon','info');};
+window.openAddAdminModal=function(){
+  if (!isSuperAdmin(getAdminSession())) { showToast("You don't have access to that action.", 'error'); return; }
+  showToast('Add admin coming soon','info');
+};
 
 // ── PROVISIONING ──
 window.submitCreateCustomer = async function() {

@@ -23,7 +23,19 @@ export const ADMIN_ROLES = {
   SUPPORT:        'support',
   ANALYST:        'analyst',
   DEALER:         'dealer', // Phase 12 — Internal Admin Portal: create customer + plate, no revenue
+  FRANCHISE:      'franchise', // Phase 2 RBAC — regional partner: customers + plates, no revenue
+  INSTALLER:      'installer', // Phase 2 RBAC — field technician: commission plates on-site, no revenue
 };
+
+/** Roles that must never see revenue/financial data, regardless of
+ *  any 'analytics' grant they may pick up later (per brief). Kept as
+ *  an explicit list rather than an "is field staff" flag so each
+ *  exclusion is a deliberate, auditable decision. */
+const REVENUE_RESTRICTED_ROLES = [
+  ADMIN_ROLES.DEALER,
+  ADMIN_ROLES.FRANCHISE,
+  ADMIN_ROLES.INSTALLER,
+];
 
 export const PERMISSIONS = {
   CUSTOMERS:          'customers',
@@ -342,9 +354,11 @@ export function isSuperAdmin(session) {
   return session?.role === ADMIN_ROLES.SUPER_ADMIN;
 }
 
-/** Dealer role is explicitly barred from revenue/financial data (per brief). */
+/** Dealer, franchise & installer roles are explicitly barred from
+ *  revenue/financial data (per brief), even if they somehow acquire
+ *  an 'analytics' grant later. */
 export function canAccessRevenue(session) {
   if (!session) return false;
-  if (session.role === ADMIN_ROLES.DEALER) return false;
+  if (REVENUE_RESTRICTED_ROLES.includes(session.role)) return false;
   return hasPermission(session, PERMISSIONS.ANALYTICS) || isSuperAdmin(session);
 }
