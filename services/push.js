@@ -79,6 +79,29 @@ function _sanitizeVapidKey(rawKey) {
   return { key, error: null };
 }
 
+// ROOT-CAUSE FIX (Installations: Create Installation request failed with
+// "403 PERMISSION_DENIED"): the only check here used to be `apiKey` +
+// `vapidKey`. That's not enough — Firebase Installations identifies WHICH
+// app/project an installation belongs to using projectId, appId, and
+// messagingSenderId too. If any of those is blank (e.g. only the apiKey/
+// vapidKey pair was rotated, as happens when someone regenerates just the
+// "Web Push certificate" in Firebase Console without re-copying the rest
+// of the Web App's config block), firebase.initializeApp() still succeeds
+// silently — there's no error until the Installations backend rejects the
+// incomplete/mismatched identity with a bare, unhelpful 403. Validating
+// the full set BEFORE initializeApp() turns that opaque backend 403 into
+// an actionable message naming exactly which field is missing.
+const REQUIRED_FIREBASE_FIELDS = ['apiKey', 'authDomain', 'projectId', 'messagingSenderId', 'appId', 'vapidKey'];
+
+function _validateFirebaseConfig(fbConfig) {
+  if (!fbConfig) return 'Firebase config missing — window.__SD_CONFIG__.firebase is not set. Check config/env.generated.js was built (scripts/build-env.js) with VITE_FIREBASE_* env vars set in Vercel.';
+  const missing = REQUIRED_FIREBASE_FIELDS.filter((f) => !fbConfig[f]);
+  if (missing.length) {
+    return `Firebase config incomplete — missing: ${missing.join(', ')}. All of apiKey/authDomain/projectId/messagingSenderId/appId/vapidKey must come from the SAME Firebase Console → Project Settings → Your apps → Web app config block, or Firebase Installations will reject requests with 403 PERMISSION_DENIED even though apiKey/vapidKey alone look fine.`;
+  }
+  return null;
+}
+
 let _fbApp = null;
 function _getMessaging(fbConfig) {
   if (typeof firebase === 'undefined' || !firebase.messaging) return null;
@@ -96,8 +119,10 @@ function _getMessaging(fbConfig) {
 export async function subscribeOwnerToPush(ownerId) {
   try {
     const fbConfig = window.__SD_CONFIG__?.firebase;
-    if (!fbConfig?.apiKey || !fbConfig?.vapidKey) {
-      return { success: false, error: 'Firebase push is not configured for this deployment.' };
+    const configError = _validateFirebaseConfig(fbConfig);
+    if (configError) {
+      console.error('[Push] Invalid Firebase config — refusing to call initializeApp():', configError);
+      return { success: false, error: configError };
     }
     if (!('serviceWorker' in navigator)) {
       return { success: false, error: 'Service workers not supported on this browser.' };
@@ -116,7 +141,28 @@ export async function subscribeOwnerToPush(ownerId) {
     }
 
     const reg = await navigator.serviceWorker.ready; // reuses /sw.js — see file header
-    const token = await messaging.getToken({ vapidKey, serviceWorkerRegistration: reg });
+    let token;
+    try {
+      token = await messaging.getToken({ vapidKey, serviceWorkerRegistration: reg });
+    } catch (tokenErr) {
+      const msg = String(tokenErr?.message || tokenErr);
+      // Installations 403s surface here, not at initializeApp() — the config
+      // fields all being *present* (checked above) doesn't guarantee they're
+      // *correct*. The remaining causes are all on the Firebase/GCP console
+      // side, not in this code: (1) the "Firebase Installations API" is a
+      // SEPARATE API from "Firebase Cloud Messaging API" in Google Cloud
+      // Console → APIs & Services, and must be enabled too; (2) the Web API
+      // key has an API restriction list that doesn't include the
+      // Installations/FCM APIs, or an HTTP referrer restriction that doesn't
+      // include https://mysmartdoor.in/*; (3) apiKey/projectId/appId are
+      // from different Firebase Web Apps (e.g. the VAPID key was
+      // regenerated under a second Web App entry in the same project).
+      if (/403|permission-denied|PERMISSION_DENIED/i.test(msg)) {
+        console.error('[Push] Firebase Installations rejected the request (403). This is a Firebase/Google Cloud Console configuration issue, not a code bug. Check: (1) "Firebase Installations API" is enabled in Google Cloud Console — it is separate from "Firebase Cloud Messaging API"; (2) the Web API key has no API/HTTP-referrer restriction blocking it; (3) apiKey/projectId/appId/messagingSenderId all belong to the same Firebase Web App.', tokenErr);
+        return { success: false, error: 'Firebase rejected the request (403 PERMISSION_DENIED) creating an Installation. Enable the "Firebase Installations API" in Google Cloud Console and check the Web API key\'s restrictions — this is a console configuration issue, not a code bug.' };
+      }
+      throw tokenErr;
+    }
     if (!token) return { success: false, error: 'No FCM token returned (permission may have been revoked).' };
 
     const { error } = await supabase.from('push_subscriptions').upsert(
