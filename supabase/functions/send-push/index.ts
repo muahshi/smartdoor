@@ -99,6 +99,21 @@ const THROTTLE_MS: Record<string, number> = {
   status_reminder: 60 * 60 * 1000, // 1 reminder push per owner per hour, max
 };
 
+// PHASE 3 (premium notification content): renders the exact wall-clock
+// moment of the event in the owner's local timezone (Bhopal/IST) so the
+// notification body itself shows "Plate SD-ABX9K7 · 4 Jul, 9:42 PM"
+// instead of a bare generic sentence. Server-computed only — never taken
+// from client free text (see SECURITY note above this file's header).
+function _formatIST(ts: number): string {
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true,
+    }).format(new Date(ts));
+  } catch (_) {
+    return new Date(ts).toISOString();
+  }
+}
+
 function _pemToArrayBuffer(pem: string): ArrayBuffer {
   const cleaned = pem
     .replace(/\\n/g, '\n')                    // env vars often arrive with literal \n
@@ -163,7 +178,7 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ success: false, error: 'Push not configured on server (missing FIREBASE_* secrets).' }), { status: 500, headers: corsHeaders });
     }
 
-    const { ownerId, plateId = null, type, rowId, conversationId = null, daysLeft = null, expired = false } = await req.json();
+    const { ownerId, plateId = null, type, rowId, conversationId = null, daysLeft = null, expired = false, imageUrl = null } = await req.json();
     const cfg = EVENT_CONFIG[type];
     // plateId is required for every type EXCEPT status_reminder (a
     // subscription isn't tied to one specific plate — see header comment).
@@ -229,6 +244,27 @@ serve(async (req: Request) => {
 
     const tag = _buildTag(type, plateId, String(rowId));
 
+    // PHASE 3 (premium notification content): append the QR plate + exact
+    // IST time to the body for every type except status_reminder (which
+    // already has its own fully custom, days-left-driven copy above).
+    // NOTE: this doorbell flow's visitor_logs/message_logs rows are
+    // intentionally anonymous — there is no visitor_name or category
+    // column anywhere in this pipeline (that only exists in the separate
+    // society/property_management visitor-pass module, a different
+    // feature entirely) — so "visitor name"/"category" are NOT fabricated
+    // here. plateId is the one real, already-verified identifier available
+    // at this point (ownership-checked above), so it's safe to interpolate.
+    const eventTs = Date.now();
+    if (type !== 'status_reminder' && plateId) {
+      body = `${body} · Plate ${plateId} · ${_formatIST(eventTs)}`;
+    }
+
+    // Optional visitor photo (e.g. a future camera-capture feature) — pure
+    // pass-through, ignored today since nothing currently sends imageUrl.
+    // Restricted to https:// to avoid a data:/javascript: URL ever landing
+    // in a notification's `image` field.
+    const safeImageUrl = typeof imageUrl === 'string' && /^https:\/\//i.test(imageUrl) ? imageUrl : '';
+
     // Data-only message (no top-level `notification` key) — sw.js reads
     // this flat shape directly off the raw 'push' event (see sw.js header
     // comment for why no separate firebase-messaging-sw.js/
@@ -246,6 +282,10 @@ serve(async (req: Request) => {
       conversationId: conversationId ? String(conversationId) : '',
       plateId: plateId ? String(plateId) : '',
       tag,
+      // Real event time (not "whenever the SW got around to processing the
+      // push"), so the OS tray's relative time ("2m ago") is accurate.
+      timestamp: String(eventTs),
+      image: safeImageUrl,
     };
 
     let sent = 0;
