@@ -119,6 +119,25 @@ const EVENT_CONFIG = {
   },
 };
 
+// PHASE 3 (premium notification content) — mirrors
+// supabase/functions/send-push/index.ts's _formatIST exactly, so a
+// foreground (this file) and background (sw.js, via send-push) notification
+// for the same event type read identically. Note: this doorbell flow's
+// visitor_logs/message_logs rows are intentionally anonymous (no
+// visitor_name/category column anywhere in this pipeline — that only
+// exists in the separate society/property_management visitor-pass module),
+// so only the real, already-available plateId + event time are appended —
+// nothing is fabricated.
+function _formatIST(ts) {
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true,
+    }).format(new Date(ts));
+  } catch (_) {
+    return new Date(ts).toLocaleString();
+  }
+}
+
 // Same "collapsible" rule as supabase/functions/send-push/index.ts — a
 // second bell press / QR re-scan for the same plate REPLACES the previous
 // OS notification instead of stacking a new one. Every other type keeps a
@@ -207,10 +226,19 @@ export async function notifyEvent(type, row, ownerId) {
       _updateLog(id, { status: 'failed', reason: 'no_service_worker' });
       return;
     }
+    // status_reminder has its own fully custom, days-left-driven copy —
+    // don't append plate/time to it (it has no plateId anyway).
+    const enrichedBody = (type !== 'status_reminder' && plateId)
+      ? `${cfg.body(row)} · Plate ${plateId} · ${_formatIST(createdAt)}`
+      : cfg.body(row);
+
     await reg.showNotification(cfg.title, {
-      body: cfg.body(row),
+      body: enrichedBody,
       icon: '/images/favicon-192x192.png',
       badge: '/images/favicon-192x192.png',
+      // Visitor photo, if a row ever carries one (no capture feature exists
+      // in this flow today — harmless no-op until one does).
+      image: row?.photo_url || row?.image_url || undefined,
       vibrate: cfg.vibrate,
       tag,
       renotify: true,               // re-alert (sound/vibrate) even when the tag is reused (collapsible types)
