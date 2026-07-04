@@ -178,7 +178,9 @@ export async function getCurrentOwner() {
       .from('users')
       .select('id, full_name, phone, email, plate_id, created_at')
       .eq('auth_user_id', user.id)
-      .single();
+      .maybeSingle(); // FIX: was .single() — 406s if no matching users row
+                      // exists yet (e.g. transient post-signup race), where
+                      // the caller already treats "no row" as null/no-op.
 
     if (error || !data) return null;
     return data;

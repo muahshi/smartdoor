@@ -24,9 +24,12 @@ export async function getSubscription(ownerId) {
     .select('*')
     .eq('owner_id', ownerId)
     .eq('status', 'active')
-    .single();
+    .maybeSingle(); // FIX: was .single() — 0 active-subscription rows is a
+                    // normal state (e.g. hardware_only owners), not an error.
+                    // .single() forces a 406 from PostgREST in that case.
 
   if (error) return { success: false, error: error.message };
+  if (!data) return { success: false, error: 'No active subscription.' };
 
   const plan       = PLANS[data.plan] || PLANS.hardware_only;
   const expiryDate = new Date(data.expiry_date);
@@ -91,7 +94,8 @@ export async function activateFromOrder(ownerId, orderId, plateId, plan = 'hardw
       .select('id')
       .eq('owner_id', ownerId)
       .eq('status', 'active')
-      .single();
+      .maybeSingle(); // FIX: was .single() — first-time activation has no
+                      // existing row yet, which is the expected path here.
 
     if (existing) {
       const { error } = await supabase

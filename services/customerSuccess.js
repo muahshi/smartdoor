@@ -34,9 +34,12 @@ export async function getOnboardingProgress(ownerId) {
       .from('customer_onboarding')
       .select('*')
       .eq('owner_id', ownerId)
-      .single();
+      .maybeSingle(); // FIX: was .single() — a brand-new owner has no
+                      // onboarding row yet. .single() still returned a 406
+                      // even though the PGRST116 code below was handled in
+                      // JS; maybeSingle() avoids the 406 response entirely.
 
-    if (error && error.code !== 'PGRST116') return { success: false, error: error.message };
+    if (error) return { success: false, error: error.message };
 
     const progress = data || {};
     let completedWeight = 0;

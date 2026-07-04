@@ -11,10 +11,13 @@ export async function getSecurityRules(ownerId) {
     .from('security_rules')
     .select('*')
     .eq('owner_id', ownerId)
-    .single();
+    .maybeSingle(); // FIX: was .single() — a new owner without a
+                    // security_rules row yet is normal, not an error.
 
   if (error) return { success: false, error: error.message };
-  return { success: true, rules: data };
+  // No row yet: return safe defaults instead of leaving callers with
+  // undefined data (rules?.night_mode_on etc. all resolve to falsy/off).
+  return { success: true, rules: data || {} };
 }
 
 // ────────── UPDATE SECURITY RULES ──────────
@@ -24,7 +27,9 @@ export async function updateSecurityRules(ownerId, updates) {
     .update(updates)
     .eq('owner_id', ownerId)
     .select()
-    .single();
+    .maybeSingle(); // FIX: was .single() — if no security_rules row exists
+                    // yet for this owner, UPDATE matches 0 rows and .single()
+                    // 406s instead of returning cleanly.
 
   if (error) return { success: false, error: error.message };
   return { success: true, rules: data };

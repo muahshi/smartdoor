@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Smart Door" />
   <title>Smart Door — PWA</title>
+  <link rel="icon" href="/images/favicon.ico" />
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json" />
@@ -487,9 +488,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
 
-<!-- AUTH GUARD: Owner-only page. Redirect to /login if no valid session. -->
+<!-- AUTH GUARD: Owner-only page. Redirect to /login if no valid session.
+     FIX (console audit): this previously called createClient() a second
+     time, independently of services/supabase.js's singleton. Two GoTrueClient
+     instances pointed at the same localStorage auth key is exactly what
+     triggers "Multiple GoTrueClient instances detected". Now reuses the
+     shared singleton instead of creating a new client. -->
 <script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  import { supabase } from './services/supabase.js';
   // Wait for env.generated.js to populate window.__SD_CONFIG__
   // env.generated.js is a sync <script src> loaded before this module,
   // but on slow connections it may not be parsed yet. Poll up to 2s.
@@ -503,11 +509,7 @@
   }
   waitForConfig(async function guardOwnerRoute() {
     try {
-      const cfg = window.__SD_CONFIG__;
-      const client = createClient(cfg.supabaseUrl, cfg.supabaseAnon, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
-      });
-      const { data: { session } } = await client.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         // No valid owner session — redirect to login
         window.location.replace('/login');
