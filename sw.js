@@ -1,7 +1,7 @@
 // Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
-const CACHE_NAME = 'smartdoor-v7'; // bumped: FCM production integration (collapsible tags, reply action, escalation/reminder types)
+const CACHE_NAME = 'smartdoor-v8'; // bumped: Phase 3 — accurate event timestamp + optional notification image
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -147,16 +147,28 @@ self.addEventListener('push', (event) => {
   const eventId = data.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const tag = data.tag || `smartdoor-${type}-${eventId}`;
 
+  // PHASE 3: use the ACTUAL event time supabase/functions/send-push
+  // computed (when it built the FCM message), not the moment this SW
+  // finished waking up and processing the push — those can legitimately
+  // differ by several seconds under Doze/battery-saver, and the OS tray's
+  // relative time ("2m ago") reads off whichever one we hand it here.
+  const eventTimestamp = Number(data.timestamp) || Date.now();
+
   const options = {
     body:      data.body || 'Someone is at your door!',
     icon:      '/images/favicon-192x192.png',
     badge:     '/images/favicon-192x192.png',
+    // Visitor photo, if the caller ever sends one (supabase/functions/
+    // send-push's optional imageUrl) — no photo-capture feature exists in
+    // the doorbell flow today, so this is a harmless no-op until one does.
+    image:     data.image || undefined,
     vibrate,
     tag,
     renotify:  true,             // re-alert (sound/vibrate) even when the tag is reused (collapsible types)
     requireInteraction: data.requireInteraction === 'true' || data.requireInteraction === true || isDoorbell,
     silent:    false,
-    data:      { id: eventId, url: data.url || '/app.html', type, plateId: data.plateId || null, conversationId: data.conversationId || null, timestamp: Date.now() },
+    timestamp: eventTimestamp,
+    data:      { id: eventId, url: data.url || '/app.html', type, plateId: data.plateId || null, conversationId: data.conversationId || null, timestamp: eventTimestamp },
     // Actions (Req: Open, Reply, Dismiss where supported — the Notification
     // Actions API itself is only supported by Chromium browsers; Safari/iOS
     // silently ignores `actions` and just falls back to tap-to-open, which
