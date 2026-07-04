@@ -205,3 +205,77 @@ console.log(`✅ [build-env] Wrote ${outFile} for environment: ${ENV}`);
 console.log(`   appUrl: ${config.appUrl}`);
 console.log(`   supabaseUrl: ${config.supabaseUrl ? config.supabaseUrl.replace(/(:\/\/)([^.]+)/, '$1***') : '(empty)'}`);
 console.log(`   razorpayKeyId: ${config.razorpayKeyId ? config.razorpayKeyId.slice(0, 12) + '…' : '(empty)'}`);
+
+// ── ROOT-CAUSE FIX (404 on /firebase-messaging-sw.js, Installations 403) ──
+// The repo never shipped a firebase-messaging-sw.js at the domain root, so
+// https://mysmartdoor.in/firebase-messaging-sw.js 404'd — the well-known
+// path the Firebase Installations/Messaging backend (and Firebase
+// Console's own "Send test message" tool) expects to exist. services/push.js
+// itself doesn't need this file (it hands getToken() the existing /sw.js
+// registration instead, on purpose — see sw.js's comment on why a second
+// 'push' listener here would double-fire notifications), but the file must
+// still exist at that exact URL for FCM's own backend checks to pass.
+// Generated here (like env.generated.js) so the real, non-secret Firebase
+// Web config is baked in at build time instead of being duplicated/hand-
+// maintained in a second place. A Firebase project is only "fully wired"
+// (Installations create() stops 403'ing) once apiKey + projectId + appId +
+// messagingSenderId are ALL present and from the SAME Firebase Web App —
+// a partial config (e.g. only apiKey/vapidKey were rotated) is the most
+// common cause of "everything looks configured but Installations still
+// rejects with 403 PERMISSION_DENIED".
+const firebaseFullyConfigured = !!(firebase.apiKey && firebase.projectId && firebase.appId && firebase.messagingSenderId);
+
+const swOutput = firebaseFullyConfigured
+  ? `// AUTO-GENERATED at build time by scripts/build-env.js
+// DO NOT EDIT DIRECTLY — DO NOT COMMIT TO GIT
+// Generated: ${config.buildTime}  |  Environment: ${ENV}
+//
+// Standard Firebase Web Push service worker
+// (https://firebase.google.com/docs/cloud-messaging/js/receive).
+//
+// NOTE: Smart Door does NOT register this file as its active service
+// worker — services/push.js passes getToken() the existing /sw.js
+// registration instead, so sw.js's own 'push' listener (which already
+// renders every notification type this app sends, with actions/vibration/
+// tags) stays the ONLY code path that displays a notification. Adding a
+// second listener here would race it and could double-fire an alert.
+// onBackgroundMessage below is a defensive fallback only — it runs if the
+// SDK ever falls back to registering this default file itself (e.g. a
+// future getToken() call that omits serviceWorkerRegistration), or if
+// Firebase Console's "Send test message" delivers a classic
+// notification-payload message straight to the default SW.
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+
+firebase.initializeApp(${JSON.stringify(firebase, null, 2)});
+
+const messaging = firebase.messaging();
+
+messaging.onBackgroundMessage((payload) => {
+  const data  = payload.data || {};
+  const title = payload.notification?.title || data.title || '🔔 Smart Door Alert';
+  const body  = payload.notification?.body  || data.body  || 'Someone is at your door!';
+  self.registration.showNotification(title, {
+    body,
+    icon:  '/images/favicon-192x192.png',
+    badge: '/images/favicon-192x192.png',
+    data:  { url: data.url || '/app.html' },
+  });
+});
+`
+  : `// AUTO-GENERATED at build time by scripts/build-env.js
+// DO NOT EDIT DIRECTLY — DO NOT COMMIT TO GIT
+// Generated: ${config.buildTime}  |  Environment: ${ENV}
+//
+// Firebase is not fully configured for this deployment (one or more of
+// VITE_FIREBASE_API_KEY / _PROJECT_ID / _APP_ID / _MESSAGING_SENDER_ID is
+// missing in this environment's Vercel env vars). This is an intentionally
+// inert placeholder so /firebase-messaging-sw.js returns 200 instead of
+// 404 — it registers no listeners and does nothing. Background push in
+// this deployment runs entirely through /sw.js (see services/push.js,
+// which no-ops safely when Firebase isn't configured).
+`;
+
+const swFile = path.join(__dirname, '..', 'firebase-messaging-sw.js');
+fs.writeFileSync(swFile, swOutput, 'utf8');
+console.log(`✅ [build-env] Wrote ${swFile} (firebase fully configured: ${firebaseFullyConfigured})`);
