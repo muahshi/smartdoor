@@ -69,6 +69,19 @@
   --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- Premium Accent (Phase 1 Owner OS redesign) ---
+     Brass/gold ties to the physical branded gold-on-black QR plates
+     owners already have on their door — used sparingly for "premium"
+     signal (plan badges, profile ring, elevated moments only). The
+     blue system above stays the primary "live/secure" language. */
+  --brass: #C9A24B;
+  --brass-bright: #E8C874;
+  --brass-dim: rgba(201, 162, 75, 0.14);
+  --brass-border: rgba(201, 162, 75, 0.4);
+  --shadow-brass-sm: 0 0 16px rgba(201, 162, 75, 0.25);
+
+  --shadow-elevate: 0 24px 60px rgba(0, 0, 0, 0.5), 0 2px 0 rgba(255, 255, 255, 0.05) inset;
 }
 
 /* --- Reset & Base --- */
@@ -1077,4 +1090,165 @@ body {
   .resp-grid-1 { grid-template-columns: 1fr !important; }
   .features-grid { grid-template-columns: 1fr !important; }
   .products-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ============================================
+   PHASE 1 — PREMIUM OWNER OS: Topbar, Notification
+   Center & Profile Menu (additive, non-breaking)
+   ============================================ */
+
+@keyframes sd-dropdown-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.sd-icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: #E2ECF4;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sd-icon-btn:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--dark-border-hover);
+  transform: translateY(-1px);
+}
+
+.sd-icon-btn:active { transform: translateY(0) scale(0.95); }
+
+.sd-badge-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  border: 2px solid var(--dark-bg);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+}
+
+.sd-avatar-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--brass-bright), var(--brass));
+  color: #1A1206;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: 1px solid var(--brass-border);
+  box-shadow: var(--shadow-brass-sm);
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sd-avatar-btn:hover { transform: translateY(-1px); box-shadow: 0 0 22px rgba(201,162,75,0.4); }
+
+/* Dropdown shell shared by notification center + profile menu */
+.sd-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  background: rgba(10, 20, 34, 0.98);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1px solid var(--glass-border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevate);
+  z-index: 400;
+  overflow: hidden;
+  transform-origin: top right;
+  animation: sd-dropdown-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sd-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.sd-dropdown-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #fff;
+}
+
+.sd-dropdown-body { max-height: 340px; overflow-y: auto; padding: 8px; }
+.sd-dropdown-body::-webkit-scrollbar { display: none; }
+
+.sd-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  color: #E2ECF4;
+  text-decoration: none;
+}
+
+.sd-dropdown-item:hover { background: rgba(255,255,255,0.05); }
+
+.sd-dropdown-item.danger:hover { background: rgba(239,68,68,0.1); color: #F87171; }
+
+.sd-dropdown-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+  background: var(--info-dim);
+}
+
+.sd-dropdown-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: rgba(255,255,255,0.35);
+  font-size: 0.78rem;
+}
+
+.sd-dropdown-footer {
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Small gold "premium" seal — used sparingly on plan/owner-tier moments */
+.premium-seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(232,200,116,0.18), rgba(201,162,75,0.08));
+  border: 1px solid var(--brass-border);
+  color: var(--brass-bright);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
