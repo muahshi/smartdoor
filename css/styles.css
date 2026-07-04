@@ -1252,3 +1252,167 @@ body {
   font-weight: 700;
   letter-spacing: 0.3px;
 }
+
+/* ============================================
+   PHASE 4 — PREMIUM OWNER DASHBOARD
+   Additive only. Does not modify/override any
+   existing selector above. Safe to remove this
+   block entirely to roll back Phase 4 styling.
+   ============================================ */
+
+/* --- Welcome Hero --- */
+.premium-hero {
+  position: relative;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  background: linear-gradient(160deg, rgba(18,32,50,0.95) 0%, rgba(8,19,33,0.95) 100%);
+  border: 1px solid rgba(0,162,232,0.14);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+.premium-hero::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,162,232,0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.home-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  background: rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: #4ADE80;
+}
+
+.home-status-chip .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse-dot 2s infinite;
+}
+
+.home-status-chip.chip-info {
+  background: rgba(0,162,232,0.1);
+  border-color: rgba(0,162,232,0.28);
+  color: #5FC8F5;
+}
+
+/* --- AI Insights card --- */
+.ai-insight-card {
+  position: relative;
+  border-image: none;
+  background: linear-gradient(160deg, rgba(18,32,50,0.95) 0%, rgba(11,21,34,0.95) 100%);
+  border: 1px solid rgba(168,85,247,0.18);
+}
+
+.ai-insight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(168,85,247,0.35), rgba(0,162,232,0.15), transparent 70%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.ai-insight-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(0,162,232,0.15));
+  box-shadow: 0 0 16px rgba(168,85,247,0.25);
+}
+
+/* --- Quick Actions --- */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.quick-action-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 8px;
+  min-height: 84px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: all 0.22s;
+  text-align: center;
+}
+
+.quick-action-tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0,162,232,0.3);
+  background: rgba(0,162,232,0.06);
+  box-shadow: 0 8px 20px rgba(0,162,232,0.12);
+}
+
+.quick-action-tile:active { transform: scale(0.97); }
+
+.quick-action-tile.qa-danger:hover {
+  border-color: rgba(239,68,68,0.4);
+  background: rgba(239,68,68,0.08);
+  box-shadow: 0 8px 20px rgba(239,68,68,0.15);
+}
+
+.quick-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  background: rgba(0,162,232,0.1);
+}
+
+.quick-action-label {
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.2;
+}
+
+@media (min-width: 900px) {
+  .quick-actions-grid { grid-template-columns: repeat(3, 1fr); }
+}
