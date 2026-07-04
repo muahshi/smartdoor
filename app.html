@@ -134,9 +134,10 @@
     }
 
     .tab-btn.active {
-      background: linear-gradient(135deg, rgba(0,162,232,0.15), rgba(0,120,215,0.08));
+      background: linear-gradient(135deg, rgba(0,162,232,0.16), rgba(0,120,215,0.08));
       border-color: rgba(0,162,232,0.35);
       color: #00A2E8;
+      box-shadow: 0 4px 14px rgba(0,162,232,0.12);
     }
 
     /* ── Scroll Areas ── */
@@ -148,6 +149,10 @@
     }
 
     .view-area::-webkit-scrollbar { display: none; }
+
+    @media (max-width: 380px) {
+      .hide-mobile-sm { display: none !important; }
+    }
 
     /* ── Visitor Screen ── */
     .visitor-header {
@@ -281,16 +286,19 @@
     }
 
     .dash-card {
-      background: #0E1B2A;
+      background: linear-gradient(160deg, rgba(18,32,50,0.92) 0%, rgba(11,21,34,0.92) 100%);
       border: 1px solid rgba(0,162,232,0.1);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: 16px;
+      padding: 18px;
       margin-bottom: 12px;
-      transition: border-color 0.2s;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.28), 0 1px 0 rgba(255,255,255,0.03) inset;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
     }
 
     .dash-card:hover {
-      border-color: rgba(0,162,232,0.25);
+      border-color: rgba(0,162,232,0.28);
+      transform: translateY(-1px);
+      box-shadow: 0 16px 36px rgba(0,0,0,0.34), 0 1px 0 rgba(255,255,255,0.04) inset;
     }
 
     /* ── Owner & AI Settings form fields ── */
@@ -370,7 +378,12 @@
       color: #00A2E8;
     }
 
-    .bottom-nav-item .nav-icon { font-size: 1.2rem; }
+    .bottom-nav-item.active .nav-icon {
+      transform: translateY(-1px);
+      filter: drop-shadow(0 0 8px rgba(0,162,232,0.5));
+    }
+
+    .bottom-nav-item .nav-icon { font-size: 1.2rem; transition: transform 0.2s, filter 0.2s; }
     .bottom-nav-item .nav-label { font-size: 0.6rem; font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: 0.3px; }
 
     /* ── Scroll animations ── */
@@ -526,12 +539,28 @@
     <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;background:linear-gradient(135deg,#fff,#C8E8F8,#00A2E8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">SMART DOOR</span>
   </a>
 
-  <div style="display:flex;align-items:center;gap:12px;">
+  <div style="display:flex;align-items:center;gap:14px;">
     <div class="secure-tag">
       <span style="width:6px;height:6px;border-radius:50%;background:#22C55E;animation:pulse-dot 2s infinite;"></span>
       System Active
     </div>
     <a href="index.html" style="font-size:0.82rem;color:rgba(255,255,255,0.45);text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;" onmouseover="this.style.color='#00A2E8'" onmouseout="this.style.color='rgba(255,255,255,0.45)'">← Back to Store</a>
+
+    <div style="width:1px;height:22px;background:rgba(255,255,255,0.08);"></div>
+
+    <!-- Notification Bell (desktop) -->
+    <div style="position:relative;">
+      <button class="sd-icon-btn" id="sd-bell-btn-d" aria-label="Notifications" onclick="SDHeader.toggle('d','notif')">
+        🔔<span class="sd-badge-dot" id="sd-bell-dot-d" style="display:none;"></span>
+      </button>
+      <div class="sd-dropdown" id="sd-notif-panel-d" style="display:none;"></div>
+    </div>
+
+    <!-- Profile Menu (desktop) -->
+    <div style="position:relative;">
+      <button class="sd-avatar-btn" id="sd-profile-btn-d" aria-label="Profile menu" onclick="SDHeader.toggle('d','profile')">🏠</button>
+      <div class="sd-dropdown" id="sd-profile-panel-d" style="display:none;"></div>
+    </div>
   </div>
 </div>
 
@@ -560,10 +589,24 @@
         </svg>
         <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:0.95rem;color:#fff;">SMART DOOR</span>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="secure-tag" style="font-size:0.65rem;padding:4px 10px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="secure-tag hide-mobile-sm" style="font-size:0.65rem;padding:4px 10px;">
           <span style="width:5px;height:5px;border-radius:50%;background:#22C55E;animation:pulse-dot 2s infinite;"></span>
           Secured
+        </div>
+
+        <!-- Notification Bell (mobile) -->
+        <div style="position:relative;">
+          <button class="sd-icon-btn" id="sd-bell-btn-m" aria-label="Notifications" onclick="SDHeader.toggle('m','notif')">
+            🔔<span class="sd-badge-dot" id="sd-bell-dot-m" style="display:none;"></span>
+          </button>
+          <div class="sd-dropdown" id="sd-notif-panel-m" style="display:none;"></div>
+        </div>
+
+        <!-- Profile Menu (mobile) -->
+        <div style="position:relative;">
+          <button class="sd-avatar-btn" id="sd-profile-btn-m" aria-label="Profile menu" onclick="SDHeader.toggle('m','profile')">🏠</button>
+          <div class="sd-dropdown" id="sd-profile-panel-m" style="display:none;"></div>
         </div>
       </div>
     </div>
@@ -582,7 +625,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
         <div>
           <div class="os-eyebrow" id="greeting-eyebrow">Good morning,</div>
-          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.15rem;color:#fff;margin-top:2px;" id="owner-greeting-name">…</div>
+          <div class="owner-name-display" style="font-size:1.3rem;margin-top:2px;" id="owner-greeting-name">…</div>
         </div>
         <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#00A2E8,#0078D7);display:flex;align-items:center;justify-content:center;font-size:1.2rem;box-shadow:0 4px 16px rgba(0,162,232,0.3);">🏠</div>
       </div>
@@ -965,21 +1008,21 @@
 
       <!-- Subscription card -->
       <div style="
-        padding:20px;border-radius:14px;margin-bottom:24px;
-        background:linear-gradient(135deg,rgba(0,162,232,0.12),rgba(0,120,215,0.06));
-        border:1px solid rgba(0,162,232,0.25);
+        padding:20px;border-radius:16px;margin-bottom:24px;position:relative;overflow:hidden;
+        background:linear-gradient(160deg,rgba(201,162,75,0.10),rgba(11,21,34,0.9));
+        border:1px solid var(--brass-border);box-shadow:0 14px 34px rgba(0,0,0,0.3);
       ">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;">
           <div>
-            <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Current Plan</div>
-            <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1rem;color:#fff;">AI Pro ✨</div>
-            <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-top:2px;" id="sub-renewal-line">₹799/year · Renews 14 Jan 2027</div>
+            <div style="font-size:0.7rem;color:var(--brass-bright);font-weight:600;font-family:'Space Grotesk',sans-serif;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Current Plan</div>
+            <span class="premium-seal">✨ AI Pro</span>
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-top:6px;" id="sub-renewal-line">₹799/year · Renews 14 Jan 2027</div>
           </div>
           <div style="padding:4px 10px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:6px;font-size:0.7rem;color:#22C55E;font-weight:700;font-family:'Space Grotesk',sans-serif;">ACTIVE</div>
         </div>
-        <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(0,0,0,0.15);border-radius:10px;">
+        <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:rgba(0,0,0,0.18);border-radius:10px;">
           <span style="font-size:0.75rem;color:rgba(255,255,255,0.5);">Days remaining</span>
-          <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:0.95rem;color:#00A2E8;" id="sub-days-remaining">211 days</span>
+          <span style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:0.95rem;color:var(--brass-bright);" id="sub-days-remaining">211 days</span>
         </div>
         <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px;">
           <span class="sub-feature-pill">✓ AI Receptionist</span>
@@ -1022,8 +1065,11 @@
     <!-- Owner Panel Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;">
       <div>
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.4rem;color:#fff;">Dashboard</div>
-        <div style="font-size:0.82rem;color:rgba(255,255,255,0.4);margin-top:2px;">Control. Automate. Secure.</div>
+        <div class="owner-name-display" style="font-size:1.6rem;">Dashboard</div>
+        <div style="font-size:0.82rem;color:rgba(255,255,255,0.4);margin-top:4px;display:flex;align-items:center;gap:6px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:#22C55E;animation:pulse-dot 2s infinite;"></span>
+          Control. Automate. Secure.
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#00A2E8,#0078D7);display:flex;align-items:center;justify-content:center;font-size:1.1rem;">🏠</div>
@@ -1043,7 +1089,7 @@
     </div>
 
     <!-- ═══════ INBOX (desktop) — Phase 4 Unified Messaging ═══════ -->
-    <div class="dash-section">
+    <div class="dash-section" id="desktop-inbox-anchor">
       <div class="dash-section-title" style="display:flex;align-items:center;justify-content:space-between;">
         <span>Inbox <span class="nav-badge" data-inbox-unread-badge style="display:none;position:static;margin-left:6px;"></span></span>
         <input type="text" id="inbox-search-d" class="settings-input" placeholder="🔍 Search…" style="max-width:220px;margin:0;" />
@@ -1134,7 +1180,7 @@
         </div>
 
         <!-- Owner & AI Receptionist Settings (desktop) -->
-        <div class="dash-section-title">Owner & AI Settings</div>
+        <div class="dash-section-title" id="desktop-settings-anchor">Owner & AI Settings</div>
         <div class="dash-card" style="margin-bottom:16px;">
           <div class="settings-field-group">
             <label class="settings-label">Visitor Welcome Title</label>
@@ -1535,6 +1581,204 @@
   // parsing), so we guard with typeof to avoid a ReferenceError in that
   // brief window, rather than referencing the bare identifier directly.
   window.triggerSOS = (typeof triggerSOS !== 'undefined') ? triggerSOS : function() { showModal('sos-active-modal'); };
+</script>
+
+<!-- ════════ SD HEADER: Notification Center + Profile Menu ════════
+     Additive UI only. Reuses existing data (unread inbox badge, the
+     browser Notification permission state, and services/auth.js'
+     logoutOwner) rather than introducing a parallel notification or
+     auth system. -->
+<script>
+  window.SDHeader = (function () {
+    const PANEL_IDS = ['sd-notif-panel-m', 'sd-notif-panel-d', 'sd-profile-panel-m', 'sd-profile-panel-d'];
+
+    function panelId(variant, kind) { return `sd-${kind}-panel-${variant}`; }
+
+    function closeAll(exceptId) {
+      PANEL_IDS.forEach((id) => {
+        if (id === exceptId) return;
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+    }
+
+    function getUnreadCount() {
+      // Mirrors whichever unread badge is currently populated by dashboard.js
+      const badges = document.querySelectorAll('[data-inbox-unread-badge]');
+      for (const b of badges) {
+        const n = parseInt((b.textContent || '').trim(), 10);
+        if (!isNaN(n) && n > 0) return n;
+      }
+      return 0;
+    }
+
+    function pushState() {
+      if (typeof Notification === 'undefined') return 'unsupported';
+      return Notification.permission; // 'granted' | 'denied' | 'default'
+    }
+
+    function renderNotifPanel() {
+      const unread = getUnreadCount();
+      const state = pushState();
+      let rows = '';
+
+      if (unread > 0) {
+        rows += `
+          <div class="sd-dropdown-item" onclick="SDHeader.openInbox()">
+            <div class="sd-dropdown-icon" style="background:rgba(0,162,232,0.15);">💬</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.82rem;font-weight:600;color:#fff;">${unread} unread message${unread === 1 ? '' : 's'}</div>
+              <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);">Tap to open Inbox</div>
+            </div>
+          </div>`;
+      }
+
+      const pushLabel = state === 'granted' ? 'Push notifications are on'
+        : state === 'denied' ? 'Push notifications are blocked'
+        : 'Push notifications are off';
+      const pushSub = state === 'granted' ? "You'll get alerts for visitors and bells"
+        : state === 'denied' ? 'Re-enable from your browser site settings'
+        : 'Tap to turn on visitor alerts';
+      const pushIcon = state === 'granted' ? '🔔' : '🔕';
+      const pushIconBg = state === 'granted' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)';
+
+      rows += `
+        <div class="sd-dropdown-item" onclick="SDHeader.togglePush()">
+          <div class="sd-dropdown-icon" style="background:${pushIconBg};">${pushIcon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.82rem;font-weight:600;color:#fff;">${pushLabel}</div>
+            <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);">${pushSub}</div>
+          </div>
+        </div>`;
+
+      if (unread === 0) {
+        rows += `<div class="sd-dropdown-empty">No new visitor alerts — you're all caught up 🎉</div>`;
+      }
+
+      return `
+        <div class="sd-dropdown-header">
+          <div class="sd-dropdown-title">Notifications</div>
+        </div>
+        <div class="sd-dropdown-body">${rows}</div>`;
+    }
+
+    function renderProfilePanel(variant) {
+      const nameEl = document.getElementById('owner-greeting-name') || document.getElementById('owner-panel-name');
+      const name = (nameEl && nameEl.textContent && nameEl.textContent.trim() !== '…') ? nameEl.textContent.trim() : 'Owner';
+      return `
+        <div class="sd-dropdown-header">
+          <div>
+            <div class="sd-dropdown-title">${name}</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-top:2px;">Smart Door Owner</div>
+          </div>
+        </div>
+        <div class="sd-dropdown-body">
+          <div class="sd-dropdown-item" onclick="SDHeader.openSettings('${variant}')">
+            <div class="sd-dropdown-icon">⚙️</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#fff;">Settings</div>
+          </div>
+          <div class="sd-dropdown-item" onclick="SDHeader.openSettings('${variant}')">
+            <div class="sd-dropdown-icon">👤</div>
+            <div style="font-size:0.85rem;font-weight:600;color:#fff;">My Profile</div>
+          </div>
+        </div>
+        <div class="sd-dropdown-footer">
+          <div class="sd-dropdown-item danger" onclick="SDHeader.signOut()">
+            <div class="sd-dropdown-icon" style="background:rgba(239,68,68,0.12);">🚪</div>
+            <div style="font-size:0.85rem;font-weight:600;">Sign Out</div>
+          </div>
+        </div>`;
+    }
+
+    function refreshBellDots() {
+      const unread = getUnreadCount();
+      ['sd-bell-dot-m', 'sd-bell-dot-d'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = unread > 0 ? 'block' : 'none';
+      });
+    }
+
+    function toggle(variant, kind) {
+      const id = panelId(variant, kind);
+      const el = document.getElementById(id);
+      if (!el) return;
+      const willOpen = el.style.display === 'none' || !el.style.display;
+      closeAll(willOpen ? id : null);
+      if (!willOpen) { el.style.display = 'none'; return; }
+      el.innerHTML = kind === 'notif' ? renderNotifPanel() : renderProfilePanel(variant);
+      el.style.display = 'block';
+    }
+
+    function openInbox() {
+      closeAll(null);
+      // Desktop: inbox is always visible inline — just scroll to it.
+      const desktopAnchor = document.getElementById('desktop-inbox-anchor');
+      if (desktopAnchor && desktopAnchor.offsetParent !== null) {
+        desktopAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      // Mobile: switch to the Inbox tab using the existing tab switcher.
+      if (typeof window.switchMobileTab === 'function') {
+        window.switchMobileTab(
+          'inbox',
+          document.querySelector('.tab-btn[data-tab="inbox"]'),
+          document.querySelector('.bottom-nav-item[onclick*="inbox"]')
+        );
+      }
+    }
+
+    function openSettings(variant) {
+      closeAll(null);
+      if (variant === 'd') {
+        const anchor = document.getElementById('desktop-settings-anchor');
+        if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      if (typeof window.switchMobileTab === 'function') {
+        window.switchMobileTab(
+          'settings',
+          document.querySelector('.tab-btn[data-tab="settings"]'),
+          document.querySelector('.bottom-nav-item[onclick*="settings"]')
+        );
+      }
+    }
+
+    async function togglePush() {
+      closeAll(null);
+      if (typeof Notification === 'undefined') return;
+      if (Notification.permission === 'default') {
+        // Reuse the existing push opt-in flow already wired in dashboard.js
+        // rather than starting a second subscription path.
+        const yesBtn = document.querySelector('#sd-enable-push-yes');
+        if (yesBtn) { yesBtn.click(); return; }
+        try { await Notification.requestPermission(); } catch (e) { /* no-op */ }
+      }
+    }
+
+    async function signOut() {
+      closeAll(null);
+      if (!window.confirm('Sign out of Smart Door?')) return;
+      try {
+        const { logoutOwner } = await import('./services/auth.js');
+        await logoutOwner();
+      } catch (e) {
+        console.error('[SDHeader] Sign out failed:', e);
+      }
+      window.location.href = '/login';
+    }
+
+    document.addEventListener('click', (e) => {
+      if (e.target.closest && (e.target.closest('.sd-dropdown') || e.target.closest('.sd-icon-btn') || e.target.closest('.sd-avatar-btn'))) return;
+      closeAll(null);
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(null); });
+
+    // Keep bell dots in sync as inbox unread state changes elsewhere.
+    setInterval(refreshBellDots, 4000);
+    document.addEventListener('DOMContentLoaded', refreshBellDots);
+
+    return { toggle, openInbox, openSettings, togglePush, signOut };
+  })();
 </script>
 </body>
 </html>
