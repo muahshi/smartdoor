@@ -97,6 +97,7 @@ const DashboardModule = (() => {
 
     // Render everything
     renderStats();
+    renderAIInsights();
     renderFamilyMembers();
     renderVisitorLogs();
     renderWeeklyChart();
@@ -247,6 +248,7 @@ const DashboardModule = (() => {
     renderVisitorLogs();
     renderHeatmap('qr-heatmap');
     renderHeatmap('qr-heatmap-desktop');
+    renderAIInsights();
     updateSubscriptionDays();
   }
 
@@ -642,6 +644,50 @@ const DashboardModule = (() => {
       }
       requestAnimationFrame(tick);
     });
+  }
+
+  // ────────── AI INSIGHTS (Phase 4 — Premium Dashboard) ──────────
+  // Additive only: reads data already loaded into `state` by _loadAllData().
+  // Makes no new network/Supabase calls. Safe no-op if container absent.
+  function renderAIInsights() {
+    const els = document.querySelectorAll('#ai-insights-card');
+    if (!els.length) return;
+
+    const deliveries  = (state.intentBreakdown && state.intentBreakdown['Delivery']) || 0;
+    const spamBlocked = (state.stats && state.stats.blockedSpam) || 0;
+    const totalFamily = state.familyMembers.length;
+    const activeFamily = state.familyMembers.filter(m => m.active).length;
+
+    const statusLabel = {
+      available: 'Family is available to receive visitors',
+      busy:      'Family marked as busy right now',
+      baby:      '🤫 Baby sleeping — quiet mode is on',
+      out:       'Home is currently unattended (Out of Town)',
+      parcel:    'Auto parcel drop-off is enabled',
+    }[state.currentStatus] || `Status: ${state.currentStatus || 'available'}`;
+
+    const bullets = [
+      spamBlocked > 0
+        ? `🚫 Blocked ${spamBlocked} spam/promotional visitor${spamBlocked === 1 ? '' : 's'} today`
+        : `✅ No suspicious activity detected today`,
+      `📦 ${deliveries} deliver${deliveries === 1 ? 'y' : 'ies'} logged today`,
+      `👨‍👩‍👧 ${activeFamily}/${totalFamily} family member${totalFamily === 1 ? '' : 's'} active in routing`,
+      `ℹ️ ${statusLabel}`,
+    ];
+
+    const html = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div class="ai-insight-icon">✨</div>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">AI Insights</div>
+          <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);">Generated from today's activity</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${bullets.map(b => `<div style="font-size:0.8rem;color:rgba(255,255,255,0.75);line-height:1.5;">${b}</div>`).join('')}
+      </div>
+    `;
+    els.forEach(el => { el.innerHTML = html; });
   }
 
   // ────────── FAMILY MEMBERS ──────────
@@ -1763,6 +1809,7 @@ const DashboardModule = (() => {
     init,
     addLog,
     showToast,
+    renderAIInsights,
     removeMember,
     setChartRange,
     playVoiceNote,
