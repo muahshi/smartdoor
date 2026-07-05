@@ -24,6 +24,19 @@ if ('serviceWorker' in navigator) {
       .then(reg => console.log('[SW] Registered:', reg.scope))
       .catch(err => console.log('[SW] Registration failed:', err));
   });
+
+  // PHASE 9 (launch audit): sw.js already auto-activates new versions via
+  // skipWaiting()+clients.claim(), but nothing previously reloaded an
+  // already-open tab once a new SW took over — a dashboard left open across
+  // a deploy could keep running old in-memory JS while the new SW served
+  // fresh network responses underneath it. This reloads ONCE per new
+  // controller, guarded by a sessionStorage flag so a flaky network can't
+  // cause a reload loop.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (sessionStorage.getItem('sd_sw_reloaded') === '1') return;
+    sessionStorage.setItem('sd_sw_reloaded', '1');
+    window.location.reload();
+  });
 }
 
 // ────────── APP STATE ──────────
