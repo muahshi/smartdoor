@@ -462,6 +462,15 @@
     .inbox-row .inbox-time { font-size: 0.65rem; color: rgba(255,255,255,0.35); }
     .inbox-unread-dot { background: #00A2E8; color: #fff; border-radius: 20px; font-size: 0.62rem; font-weight: 700; padding: 1px 6px; margin-top: 4px; display: inline-block; }
     .inbox-tag-pill { font-size: 0.6rem; padding: 1px 7px; border-radius: 10px; background: rgba(139,92,246,0.15); color: #C4B5FD; font-weight: 600; }
+    /* Phase 7C — Communication Center */
+    .inbox-view-toggle { display: flex; gap: 6px; background: rgba(255,255,255,0.04); border-radius: 10px; padding: 4px; margin-bottom: 14px; }
+    .inbox-view-btn { flex: 1; background: none; border: none; color: rgba(255,255,255,0.5); font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.74rem; padding: 8px 6px; border-radius: 7px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .inbox-view-btn.active { background: rgba(0,162,232,0.18); color: #4FC3F7; }
+    .comm-badge-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .comm-badge { font-size: 0.58rem; padding: 2px 7px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
+    .comm-actions-row { display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .comm-action-btn { font-size: 0.66rem; font-weight: 700; color: #4FC3F7; background: rgba(0,162,232,0.1); border: 1px solid rgba(0,162,232,0.25); border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+    .comm-action-btn:hover { background: rgba(0,162,232,0.18); }
     .inbox-bubble { max-width: 80%; padding: 9px 12px; border-radius: 14px; font-size: 0.82rem; line-height: 1.4; }
     .inbox-bubble.visitor { align-self: flex-start; background: rgba(255,255,255,0.06); color: #E2ECF4; border-bottom-left-radius: 4px; }
     .inbox-bubble.ai { align-self: flex-start; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.2); color: #E2ECF4; border-bottom-left-radius: 4px; }
@@ -747,23 +756,58 @@
         <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;">Inbox</div>
         <div style="font-size:0.72rem;color:rgba(255,255,255,0.4);" id="inbox-count-label"></div>
       </div>
-      <input type="text" id="inbox-search" class="settings-input" placeholder="🔍 Search conversations…" style="margin-bottom:10px;" />
-      <div class="inbox-chips" id="inbox-filter-chips">
-        <div class="inbox-chip active" data-filter="all">All</div>
-        <div class="inbox-chip" data-filter="unread">Unread</div>
-        <div class="inbox-chip" data-filter="pinned">📌 Pinned</div>
-        <div class="inbox-chip" data-filter="Courier">Courier</div>
-        <div class="inbox-chip" data-filter="Food Delivery">Food</div>
-        <div class="inbox-chip" data-filter="Family">Family</div>
-        <div class="inbox-chip" data-filter="Emergency">🚨 Emergency</div>
-        <div class="inbox-chip" data-filter="Unknown Visitor">Unknown</div>
-        <div class="inbox-chip" data-filter="Electrician">Electrician</div>
-        <div class="inbox-chip" data-filter="Maintenance">Maintenance</div>
-        <div class="inbox-chip" data-filter="resolved">Resolved</div>
-        <div class="inbox-chip" data-filter="archived">Archived</div>
+
+      <!-- Phase 7C: Threads / Communication Center toggle -->
+      <div class="inbox-view-toggle" id="inbox-view-toggle">
+        <button class="inbox-view-btn active" data-view="threads" onclick="DashboardModule.switchCommView('threads')">💬 Threads</button>
+        <button class="inbox-view-btn" data-view="comm" onclick="DashboardModule.switchCommView('comm')">🗂️ Communication Center</button>
       </div>
-      <div id="inbox-list"></div>
-      <div id="inbox-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.35);font-size:0.82rem;">No conversations yet. When a visitor messages or chats with your AI receptionist, it'll show up here.</div>
+
+      <div id="inbox-threads-panel">
+        <input type="text" id="inbox-search" class="settings-input" placeholder="🔍 Search conversations…" style="margin-bottom:10px;" />
+        <div class="inbox-chips" id="inbox-filter-chips">
+          <div class="inbox-chip active" data-filter="all">All</div>
+          <div class="inbox-chip" data-filter="unread">Unread</div>
+          <div class="inbox-chip" data-filter="pinned">📌 Pinned</div>
+          <div class="inbox-chip" data-filter="Courier">Courier</div>
+          <div class="inbox-chip" data-filter="Food Delivery">Food</div>
+          <div class="inbox-chip" data-filter="Family">Family</div>
+          <div class="inbox-chip" data-filter="Emergency">🚨 Emergency</div>
+          <div class="inbox-chip" data-filter="Unknown Visitor">Unknown</div>
+          <div class="inbox-chip" data-filter="Electrician">Electrician</div>
+          <div class="inbox-chip" data-filter="Maintenance">Maintenance</div>
+          <div class="inbox-chip" data-filter="resolved">Resolved</div>
+          <div class="inbox-chip" data-filter="archived">Archived</div>
+        </div>
+        <div id="inbox-list"></div>
+        <div id="inbox-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.35);font-size:0.82rem;">No conversations yet. When a visitor messages or chats with your AI receptionist, it'll show up here.</div>
+      </div>
+
+      <!-- Phase 7C: Smart Communication Center (grouped visitor view) -->
+      <div id="comm-center-panel" style="display:none;">
+        <input type="text" id="comm-search" class="settings-input" placeholder="🔍 Search by label, category, or plate…" style="margin-bottom:6px;" />
+        <div style="font-size:0.64rem;color:rgba(255,255,255,0.35);margin:0 2px 10px;line-height:1.4;">Searches owner-assigned labels, categories, and plate ID. SmartDoor never stores visitor names or phone numbers.</div>
+        <div class="os-eyebrow" style="margin-bottom:6px;">Date Range</div>
+        <div class="inbox-chips" id="comm-date-chips">
+          <div class="inbox-chip active" data-range="all">All Time</div>
+          <div class="inbox-chip" data-range="today">Today</div>
+          <div class="inbox-chip" data-range="yesterday">Yesterday</div>
+          <div class="inbox-chip" data-range="7d">Last 7 Days</div>
+          <div class="inbox-chip" data-range="30d">Last 30 Days</div>
+        </div>
+        <div class="os-eyebrow" style="margin-bottom:6px;">Group</div>
+        <div class="inbox-chips" id="comm-group-chips">
+          <div class="inbox-chip active" data-group="today">Today's Activity</div>
+          <div class="inbox-chip" data-group="missed">Missed</div>
+          <div class="inbox-chip" data-group="returned">Returned</div>
+          <div class="inbox-chip" data-group="repeat">Repeat</div>
+          <div class="inbox-chip" data-group="frequent">Frequent</div>
+          <div class="inbox-chip" data-group="priority">Priority</div>
+          <div class="inbox-chip" data-group="followup">Follow-Up</div>
+        </div>
+        <div id="comm-list"></div>
+        <div id="comm-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.35);font-size:0.82rem;">No visitors in this group yet.</div>
+      </div>
     </div>
 
     <!-- Inbox Thread — full-screen overlay (mobile) -->
@@ -1202,52 +1246,87 @@
         <span>Inbox <span class="nav-badge" data-inbox-unread-badge style="display:none;position:static;margin-left:6px;"></span></span>
         <input type="text" id="inbox-search-d" class="settings-input" placeholder="🔍 Search…" style="max-width:220px;margin:0;" />
       </div>
-      <div class="inbox-chips" id="inbox-filter-chips-d" style="margin-top:10px;">
-        <div class="inbox-chip active" data-filter="all">All</div>
-        <div class="inbox-chip" data-filter="unread">Unread</div>
-        <div class="inbox-chip" data-filter="pinned">📌 Pinned</div>
-        <div class="inbox-chip" data-filter="Courier">Courier</div>
-        <div class="inbox-chip" data-filter="Food Delivery">Food</div>
-        <div class="inbox-chip" data-filter="Family">Family</div>
-        <div class="inbox-chip" data-filter="Emergency">🚨 Emergency</div>
-        <div class="inbox-chip" data-filter="Unknown Visitor">Unknown</div>
-        <div class="inbox-chip" data-filter="Electrician">Electrician</div>
-        <div class="inbox-chip" data-filter="Maintenance">Maintenance</div>
-        <div class="inbox-chip" data-filter="resolved">Resolved</div>
-        <div class="inbox-chip" data-filter="archived">Archived</div>
+
+      <!-- Phase 7C: Threads / Communication Center toggle -->
+      <div class="inbox-view-toggle" id="inbox-view-toggle-d" style="margin-top:10px;">
+        <button class="inbox-view-btn active" data-view="threads" onclick="DashboardModule.switchCommView('threads')">💬 Threads</button>
+        <button class="inbox-view-btn" data-view="comm" onclick="DashboardModule.switchCommView('comm')">🗂️ Communication Center</button>
       </div>
-      <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;margin-top:12px;min-height:420px;">
-        <!-- Conversation list -->
-        <div style="max-height:560px;overflow-y:auto;">
-          <div id="inbox-list-d"></div>
-          <div id="inbox-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.35);font-size:0.78rem;">No conversations yet.</div>
+
+      <div id="inbox-threads-panel-d">
+        <div class="inbox-chips" id="inbox-filter-chips-d" style="margin-top:10px;">
+          <div class="inbox-chip active" data-filter="all">All</div>
+          <div class="inbox-chip" data-filter="unread">Unread</div>
+          <div class="inbox-chip" data-filter="pinned">📌 Pinned</div>
+          <div class="inbox-chip" data-filter="Courier">Courier</div>
+          <div class="inbox-chip" data-filter="Food Delivery">Food</div>
+          <div class="inbox-chip" data-filter="Family">Family</div>
+          <div class="inbox-chip" data-filter="Emergency">🚨 Emergency</div>
+          <div class="inbox-chip" data-filter="Unknown Visitor">Unknown</div>
+          <div class="inbox-chip" data-filter="Electrician">Electrician</div>
+          <div class="inbox-chip" data-filter="Maintenance">Maintenance</div>
+          <div class="inbox-chip" data-filter="resolved">Resolved</div>
+          <div class="inbox-chip" data-filter="archived">Archived</div>
         </div>
-        <!-- Thread pane -->
-        <div class="dash-card" style="display:flex;flex-direction:column;margin-bottom:0;padding:0;overflow:hidden;">
-          <div id="inbox-thread-empty-d" style="flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:0.82rem;padding:40px;">Select a conversation to view the thread</div>
-          <div id="inbox-thread-panel-d" style="display:none;flex-direction:column;flex:1;min-height:0;">
-            <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.07);">
-              <div style="flex:1;min-width:0;">
-                <div id="inbox-thread-title-d" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">Conversation</div>
-                <div id="inbox-thread-subtitle-d" style="font-size:0.68rem;color:rgba(255,255,255,0.4);"></div>
+        <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;margin-top:12px;min-height:420px;">
+          <!-- Conversation list -->
+          <div style="max-height:560px;overflow-y:auto;">
+            <div id="inbox-list-d"></div>
+            <div id="inbox-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.35);font-size:0.78rem;">No conversations yet.</div>
+          </div>
+          <!-- Thread pane -->
+          <div class="dash-card" style="display:flex;flex-direction:column;margin-bottom:0;padding:0;overflow:hidden;">
+            <div id="inbox-thread-empty-d" style="flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:0.82rem;padding:40px;">Select a conversation to view the thread</div>
+            <div id="inbox-thread-panel-d" style="display:none;flex-direction:column;flex:1;min-height:0;">
+              <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.07);">
+                <div style="flex:1;min-width:0;">
+                  <div id="inbox-thread-title-d" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">Conversation</div>
+                  <div id="inbox-thread-subtitle-d" style="font-size:0.68rem;color:rgba(255,255,255,0.4);"></div>
+                </div>
+                <button onclick="DashboardModule.togglePinActive()" id="inbox-pin-btn-d" title="Pin" style="background:none;border:none;font-size:1rem;cursor:pointer;">📌</button>
+                <button onclick="DashboardModule.generateSummaryActive()" title="AI Summary" style="background:none;border:none;font-size:1rem;cursor:pointer;">🧠</button>
+                <button onclick="DashboardModule.resolveActive()" title="Mark Resolved" style="background:none;border:none;font-size:0.95rem;cursor:pointer;">✅</button>
+                <button onclick="DashboardModule.archiveActive()" title="Archive" style="background:none;border:none;font-size:0.95rem;cursor:pointer;">🗄️</button>
+                <button onclick="DashboardModule.deleteActive()" title="Delete" style="background:none;border:none;font-size:0.95rem;cursor:pointer;">🗑️</button>
               </div>
-              <button onclick="DashboardModule.togglePinActive()" id="inbox-pin-btn-d" title="Pin" style="background:none;border:none;font-size:1rem;cursor:pointer;">📌</button>
-              <button onclick="DashboardModule.generateSummaryActive()" title="AI Summary" style="background:none;border:none;font-size:1rem;cursor:pointer;">🧠</button>
-              <button onclick="DashboardModule.resolveActive()" title="Mark Resolved" style="background:none;border:none;font-size:0.95rem;cursor:pointer;">✅</button>
-              <button onclick="DashboardModule.archiveActive()" title="Archive" style="background:none;border:none;font-size:0.95rem;cursor:pointer;">🗄️</button>
-              <button onclick="DashboardModule.deleteActive()" title="Delete" style="background:none;border:none;font-size:0.95rem;cursor:pointer;">🗑️</button>
-            </div>
-            <div id="inbox-summary-banner-d" style="display:none;margin:10px 16px 0;padding:10px 12px;background:rgba(0,162,232,0.08);border:1px solid rgba(0,162,232,0.2);border-radius:10px;font-size:0.76rem;color:#8ecdf0;"></div>
-            <div id="inbox-thread-messages-d" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;max-height:360px;"></div>
-            <div id="inbox-typing-indicator-d" style="display:none;padding:0 16px 6px;font-size:0.7rem;color:rgba(255,255,255,0.4);">Visitor is typing…</div>
-            <div id="inbox-quick-replies-d" style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;"></div>
-            <div style="display:flex;gap:8px;padding:10px 16px 16px;border-top:1px solid rgba(255,255,255,0.07);align-items:center;">
-              <button id="inbox-voice-btn-d" title="Record voice reply" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#fff;width:38px;height:38px;border-radius:10px;flex-shrink:0;cursor:pointer;">🎤</button>
-              <input type="text" id="inbox-reply-input-d" placeholder="Type a reply…" class="settings-input" style="flex:1;margin:0;" maxlength="500" />
-              <button id="inbox-reply-send-d" class="btn-primary" style="padding:10px 16px;flex-shrink:0;">Send</button>
+              <div id="inbox-summary-banner-d" style="display:none;margin:10px 16px 0;padding:10px 12px;background:rgba(0,162,232,0.08);border:1px solid rgba(0,162,232,0.2);border-radius:10px;font-size:0.76rem;color:#8ecdf0;"></div>
+              <div id="inbox-thread-messages-d" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;max-height:360px;"></div>
+              <div id="inbox-typing-indicator-d" style="display:none;padding:0 16px 6px;font-size:0.7rem;color:rgba(255,255,255,0.4);">Visitor is typing…</div>
+              <div id="inbox-quick-replies-d" style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;"></div>
+              <div style="display:flex;gap:8px;padding:10px 16px 16px;border-top:1px solid rgba(255,255,255,0.07);align-items:center;">
+                <button id="inbox-voice-btn-d" title="Record voice reply" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#fff;width:38px;height:38px;border-radius:10px;flex-shrink:0;cursor:pointer;">🎤</button>
+                <input type="text" id="inbox-reply-input-d" placeholder="Type a reply…" class="settings-input" style="flex:1;margin:0;" maxlength="500" />
+                <button id="inbox-reply-send-d" class="btn-primary" style="padding:10px 16px;flex-shrink:0;">Send</button>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Phase 7C: Smart Communication Center (grouped visitor view, desktop) -->
+      <div id="comm-center-panel-d" style="display:none;margin-top:12px;">
+        <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:4px;">
+          <input type="text" id="comm-search-d" class="settings-input" placeholder="🔍 Search by label, category, or plate…" style="max-width:320px;margin:0;" />
+          <div style="font-size:0.66rem;color:rgba(255,255,255,0.35);flex:1;min-width:220px;line-height:1.4;">Searches owner-assigned labels, categories, and plate ID. SmartDoor never stores visitor names or phone numbers.</div>
+        </div>
+        <div class="inbox-chips" id="comm-date-chips-d" style="margin-top:10px;">
+          <div class="inbox-chip active" data-range="all">All Time</div>
+          <div class="inbox-chip" data-range="today">Today</div>
+          <div class="inbox-chip" data-range="yesterday">Yesterday</div>
+          <div class="inbox-chip" data-range="7d">Last 7 Days</div>
+          <div class="inbox-chip" data-range="30d">Last 30 Days</div>
+        </div>
+        <div class="inbox-chips" id="comm-group-chips-d" style="margin-top:6px;">
+          <div class="inbox-chip active" data-group="today">Today's Activity</div>
+          <div class="inbox-chip" data-group="missed">Missed</div>
+          <div class="inbox-chip" data-group="returned">Returned</div>
+          <div class="inbox-chip" data-group="repeat">Repeat</div>
+          <div class="inbox-chip" data-group="frequent">Frequent</div>
+          <div class="inbox-chip" data-group="priority">Priority</div>
+          <div class="inbox-chip" data-group="followup">Follow-Up</div>
+        </div>
+        <div id="comm-list-d" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+        <div id="comm-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.35);font-size:0.78rem;">No visitors in this group yet.</div>
       </div>
     </div>
 
