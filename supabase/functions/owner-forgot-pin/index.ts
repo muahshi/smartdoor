@@ -172,9 +172,17 @@ serve(async (req) => {
             console.error('[owner-forgot-pin] SMS send failed:', e);
           }
         } else {
-          // Fallback: log OTP in dev mode (remove in production)
-          console.log(`[owner-forgot-pin] DEV OTP for ${pid}: ${otpCode}`);
-          sendSuccess = true;
+          // MSG91_API_KEY is not configured — there is no channel to deliver
+          // the OTP through. Previously this branch logged the raw OTP to
+          // the Edge Function logs and reported sendSuccess = true, which
+          // (a) leaked a live, usable OTP into logs, and (b) told the owner
+          // "OTP sent" when nothing was actually delivered, silently
+          // stranding them on the recovery screen. Treat it as a real
+          // send failure instead — the existing `if (!sendSuccess)` block
+          // below already invalidates the stored OTP and returns a proper
+          // error to the client.
+          console.error('[owner-forgot-pin] MSG91_API_KEY not configured — cannot send SMS OTP.');
+          sendSuccess = false;
         }
       } else {
         maskedContact = maskEmail(user.email!);
