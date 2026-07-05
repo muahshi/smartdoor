@@ -707,8 +707,8 @@ const DashboardModule = (() => {
         </div>
         <div class="priority-rank ${rankClasses[i] || 'r4'}">${i + 1}</div>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:600;font-size:0.9rem;color:#E2ECF4;">${m.name}</div>
-          <div style="font-size:0.78rem;color:rgba(255,255,255,0.4);font-family:'Space Grotesk',sans-serif;">${m.phone}</div>
+          <div style="font-weight:600;font-size:0.9rem;color:#E2ECF4;">${_esc(m.name)}</div>
+          <div style="font-size:0.78rem;color:rgba(255,255,255,0.4);font-family:'Space Grotesk',sans-serif;">${_esc(m.phone)}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
