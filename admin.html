@@ -1324,8 +1324,8 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Plate</th><th>Order</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
-          <tbody id="commissionsTable"><tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+          <thead><tr><th>Plate</th><th>Order</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="commissionsTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
         </table>
       </div>
       <p style="color:var(--muted);font-size:12px;margin-top:12px;">Commission calculation rules are not finalized yet — this ledger will populate once the calculation engine is approved.</p>
@@ -1339,9 +1339,21 @@
       <div class="metric-grid" id="franchiseMetricGrid">
         <div class="metric-card"><div class="metric-label">Region</div><div class="metric-value" id="f-region" style="font-size:18px;">—</div><div class="metric-sub">Your territory</div></div>
         <div class="metric-card"><div class="metric-label">Installers</div><div class="metric-value" id="f-installers">—</div><div class="metric-sub">On your team</div></div>
+        <div class="metric-card"><div class="metric-label">Dealers</div><div class="metric-value" id="f-dealers">—</div><div class="metric-sub">On your team</div></div>
         <div class="metric-card"><div class="metric-label">Jobs Pending</div><div class="metric-value" id="f-jobs-pending">—</div><div class="metric-sub">Awaiting installer</div></div>
         <div class="metric-card"><div class="metric-label">Jobs Completed</div><div class="metric-value" id="f-jobs-done">—</div><div class="metric-sub">All time</div></div>
         <div class="metric-card"><div class="metric-label">Open Tickets</div><div class="metric-value" id="f-tickets">—</div><div class="metric-sub">Needs attention</div></div>
+        <div class="metric-card"><div class="metric-label">Inventory Items</div><div class="metric-value" id="f-inventory-count">—</div><div class="metric-sub" id="f-inventory-low">—</div></div>
+      </div>
+
+      <div class="section-header" style="margin-top:20px">
+        <span class="section-title">🧑‍💼 Dealers in Your Region</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Region</th><th>Status</th><th>Last Login</th></tr></thead>
+          <tbody id="franchiseDealersTable"><tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
       </div>
     </div>
 
@@ -1975,6 +1987,8 @@ async function loadOrders(status) {
     <td>
       ${o.payment_status==='paid'&&['queued','in_production','packed'].includes(o.manufacturing_status)?`<button class="btn btn-ghost btn-sm" onclick="adminMarkShipped('${o.id}','${o.plate_id||''}')">🚚 Ship</button>`:''}
       ${o.manufacturing_status==='dispatched'?`<button class="btn btn-success btn-sm" onclick="adminMarkDelivered('${o.id}','${o.plate_id||''}','${o.owner_id||''}')">✅ Deliver</button>`:''}
+      ${!o.installation_status&&(hasPermission(getAdminSession(),'orders','write')||hasPermission(getAdminSession(),'installations','write'))?`<button class="btn btn-ghost btn-sm" onclick="adminRequestInstallation('${o.id}')">🔧 Request Install</button>`:''}
+      ${o.installation_status?`<span style="font-size:10px;color:var(--muted);text-transform:capitalize">Install: ${o.installation_status.replace('_',' ')}</span>`:''}
     </td>
   </tr>`).join('');
 }
@@ -2469,20 +2483,33 @@ async function loadInstallations() {
 // ── COMMISSIONS (Dealer — foundation, no calc engine yet) ──
 async function loadCommissions() {
   const tbody=document.getElementById('commissionsTable'); if(!tbody) return;
-  tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
   const res=await adminCall('commission_list');
-  if(!res.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="text">Could not load commissions</div></div></td></tr>';return;}
-  if(!res.commissions||!res.commissions.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="icon">💵</div><div class="text">No commission records yet</div></div></td></tr>';return;}
+  if(!res.success){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="text">Could not load commissions</div></div></td></tr>';return;}
+  if(!res.commissions||!res.commissions.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="icon">💵</div><div class="text">No commission records yet</div></div></td></tr>';return;}
+  const canManage=isSuperAdmin(getAdminSession());
   tbody.innerHTML=res.commissions.map(function(c){
+    var actions='';
+    if(canManage){
+      if(c.status==='pending') actions='<button class="btn btn-ghost btn-sm" onclick="adminUpdateCommission(\''+c.id+'\',\'approved\')">Approve</button>';
+      else if(c.status==='approved') actions='<button class="btn btn-success btn-sm" onclick="adminUpdateCommission(\''+c.id+'\',\'paid\')">Mark Paid</button>';
+    }
     return '<tr>'+
       '<td style="font-family:monospace;font-size:12px">'+escapeHtml(c.plate_id||'—')+'</td>'+
       '<td style="font-size:12px;color:var(--muted)">'+escapeHtml(c.order_id||'—')+'</td>'+
       '<td>₹'+Number(c.amount||0).toLocaleString('en-IN')+'</td>'+
       '<td>'+badgeHTML(c.status)+'</td>'+
       '<td style="font-size:11px;color:var(--muted)">'+fmtDate(c.created_at)+'</td>'+
+      '<td>'+actions+'</td>'+
     '</tr>';
   }).join('');
 }
+window.adminUpdateCommission = async function(commissionId, status) {
+  if(!confirm('Mark this commission as "'+status+'"?')) return;
+  const res=await adminCall('commission_update_status',{commission_id:commissionId,status:status});
+  showToast(res.success?'✅ Updated':'Error: '+res.error,res.success?'success':'error');
+  if(res.success) loadCommissions();
+};
 
 // ── REGIONAL OVERVIEW (Franchise) ──
 async function loadFranchiseOverview() {
@@ -2492,10 +2519,40 @@ async function loadFranchiseOverview() {
   const set=function(id,val){var el=document.getElementById(id); if(el) el.textContent=val;};
   set('f-region', o.region || 'Not set');
   set('f-installers', o.installerCount||0);
+  set('f-dealers', o.dealerCount||0);
   set('f-jobs-pending', o.jobsPending||0);
   set('f-jobs-done', o.jobsCompleted||0);
   set('f-tickets', o.openTickets||0);
+  set('f-inventory-count', o.inventoryItemCount||0);
+  set('f-inventory-low', (o.inventoryLowStockCount||0)+' low stock');
+  loadFranchiseDealers();
 }
+
+// ── DEALERS (Franchise) ──
+async function loadFranchiseDealers() {
+  const tbody=document.getElementById('franchiseDealersTable'); if(!tbody) return;
+  const res=await adminCall('franchise_dealers');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="text">Could not load dealers</div></div></td></tr>';return;}
+  const dealers=res.dealers||[];
+  if(!dealers.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="icon">🧑‍💼</div><div class="text">No dealers onboarded yet</div></div></td></tr>';return;}
+  tbody.innerHTML=dealers.map(function(d){
+    return '<tr>'+
+      '<td style="font-size:12px;font-weight:500">'+escapeHtml(d.full_name||'—')+'</td>'+
+      '<td style="font-size:12px;color:var(--muted)">'+escapeHtml(d.email||'—')+'</td>'+
+      '<td style="font-size:12px">'+escapeHtml(d.region||'—')+'</td>'+
+      '<td>'+(d.is_active?'<span class="badge badge-success">Active</span>':'<span class="badge badge-muted">Inactive</span>')+'</td>'+
+      '<td style="font-size:11px;color:var(--muted)">'+(d.last_login_at?fmtDate(d.last_login_at):'Never')+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+// ── REQUEST INSTALLATION (from Orders panel) ──
+window.adminRequestInstallation = async function(orderId) {
+  if(!confirm('Request an installer visit for this order?')) return;
+  const res=await adminCall('installation_request',{order_id:orderId});
+  showToast(res.success?'🔧 Installation requested':'Error: '+res.error,res.success?'success':'error');
+  if(res.success) loadOrders(_orderFilter);
+};
 
 // ── INSTALLERS (Franchise) ──
 async function loadInstallers() {
