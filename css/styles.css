@@ -1473,6 +1473,38 @@ body {
   color: #fff;
 }
 
+/* --- AI Insight Cards (Phase 7B) — additive, does not modify .op-mini-stat --- */
+.op-insight-card {
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.op-insight-card:last-child { margin-bottom: 0; }
+
+.op-insight-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.op-insight-card-icon { font-size: 0.85rem; }
+
+.op-insight-card-title {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.op-insight-card-text {
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.62);
+}
+
 /* Full-screen panels (Visitor Timeline / Notifications / Share Access) —
    same layered z-index convention as #inbox-thread-overlay so they never
    collide with existing overlays. */
