@@ -277,6 +277,7 @@ serve(async (req) => {
         customer_name: user.full_name,
         customer_phone: user.phone,
         customer_email: user.email,
+        created_by_admin_id: ctx.id,   // Phase 6 completion: lets dealer role see only their own orders
       })
       .select()
       .single();
