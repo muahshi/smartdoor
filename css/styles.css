@@ -1416,3 +1416,84 @@ body {
 @media (min-width: 900px) {
   .quick-actions-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ═══════════════════════════════════════════════════════
+   Premium Owner Experience — additive styles only
+   (Visitor Timeline / Notification Center / Share Access /
+   Smart Analytics). Does not override any existing selector.
+   ═══════════════════════════════════════════════════════ */
+
+.op-chip {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.op-chip:hover { background: rgba(255,255,255,0.08); }
+.op-chip:active { transform: scale(0.96); }
+
+.op-chip.op-chip-active {
+  background: rgba(0,162,232,0.16);
+  border-color: rgba(0,162,232,0.4);
+  color: #00A2E8;
+}
+
+.op-mini-stat {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 12px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.op-mini-stat:hover {
+  border-color: rgba(0,162,232,0.25);
+  transform: translateY(-1px);
+}
+
+.op-mini-stat-label {
+  font-size: 0.66rem;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.op-mini-stat-value {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+/* Full-screen panels (Visitor Timeline / Notifications / Share Access) —
+   same layered z-index convention as #inbox-thread-overlay so they never
+   collide with existing overlays. */
+#op-timeline-overlay, #op-notif-overlay, #op-share-overlay {
+  animation: op-fade-in 0.18s ease;
+}
+
+@keyframes op-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Mobile-first: comfortable full-width panels */
+@media (max-width: 899px) {
+  #op-timeline-overlay, #op-notif-overlay, #op-share-overlay {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
+/* General polish: smoother dash-card interaction feedback (additive,
+   does not change layout/sizing of existing .dash-card rules) */
+.dash-card { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
+.dash-card:hover { border-color: rgba(0,162,232,0.15); }
