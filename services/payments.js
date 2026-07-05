@@ -200,6 +200,27 @@ export async function getPaymentLogs(orderId) {
   return { success: true, payments: data || [] };
 }
 
+// ────────── CANCEL A PENDING ORDER (via Edge Function) ──────────
+/**
+ * Root-cause fix for the "409 on immediate retry" bug: Razorpay's checkout
+ * modal has no server-side cancel callback, so without this call the order
+ * row created by createRazorpayOrder() stayed 'pending' forever after the
+ * customer dismissed checkout, and the very next attempt got wrongly
+ * rejected as a duplicate. Fire-and-forget, best-effort — create-razorpay-order's
+ * duplicate-check window is the backstop if this call itself fails
+ * (offline, tab killed, etc.).
+ *
+ * @param {string} orderId - Our DB order UUID (from createRazorpayOrder())
+ */
+export async function cancelPendingOrder(orderId) {
+  if (!orderId) return;
+  try {
+    await supabase.functions.invoke('cancel-pending-order', { body: { orderId } });
+  } catch (err) {
+    console.warn('[Payments] cancelPendingOrder failed (non-fatal):', err);
+  }
+}
+
 // ────────── FULL CHECKOUT FLOW (convenience wrapper) ──────────
 /**
  * Ek hi function mein poora checkout:
@@ -210,12 +231,13 @@ export async function getPaymentLogs(orderId) {
  * @returns {{ success, plateId, orderNumber, error }}
  */
 export async function initiateCheckout(orderParams, customerInfo) {
+  let orderResult; // hoisted so the catch block can cancel the right order
   try {
     // 1. SDK load karo
     await loadRazorpaySDK();
 
     // 2. Server pe order banao
-    const orderResult = await createRazorpayOrder({
+    orderResult = await createRazorpayOrder({
       ...orderParams,
       customerName:  customerInfo.name,
       customerEmail: customerInfo.email,
@@ -249,6 +271,9 @@ export async function initiateCheckout(orderParams, customerInfo) {
   } catch (err) {
     // User ne modal band kiya
     if (err.message === 'Payment cancelled by user') {
+      // Root cause of the "409 on immediate retry" bug: without this call,
+      // this order stayed 'pending' forever and blocked the next attempt.
+      await cancelPendingOrder(orderResult?.orderId);
       return { success: false, cancelled: true, error: 'Payment cancelled.' };
     }
     console.error('[Payments] initiateCheckout error:', err);
