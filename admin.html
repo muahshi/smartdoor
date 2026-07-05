@@ -586,6 +586,11 @@
       .metric-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
+    /* ─── SMALL PHONES: single-column metric cards ─── */
+    @media (max-width: 480px) {
+      .metric-grid { grid-template-columns: 1fr; }
+    }
+
     /* ─── MOBILE SIDEBAR OVERLAY ─── */
     #sidebarOverlay {
       display: none;
@@ -1264,6 +1269,12 @@
         <span class="section-title">📦 Inventory</span>
         <button class="btn btn-primary btn-sm" onclick="openInventoryForm()">+ Add Item</button>
       </div>
+      <div class="metric-grid" id="mfgAnalyticsGrid" style="margin-bottom:20px;">
+        <div class="metric-card"><div class="metric-label">Batches In Progress</div><div class="metric-value" id="ma-batches-progress">—</div><div class="metric-sub" id="ma-batches-total">—</div></div>
+        <div class="metric-card"><div class="metric-label">Units Completed</div><div class="metric-value" id="ma-units-completed">—</div><div class="metric-sub" id="ma-units-planned">—</div></div>
+        <div class="metric-card"><div class="metric-label">Low Stock Items</div><div class="metric-value" id="ma-low-stock">—</div><div class="metric-sub" id="ma-inventory-total">—</div></div>
+        <div class="metric-card"><div class="metric-label">Plates With Dealers</div><div class="metric-value" id="ma-assignments-active">—</div><div class="metric-sub" id="ma-assignments-installed">—</div></div>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>On Hand</th><th>Reorder At</th><th>Actions</th></tr></thead>
@@ -1378,6 +1389,12 @@
           <button class="btn btn-ghost btn-sm" id="jobsTabPool" onclick="switchJobsTab('pool')">Available Pool</button>
           <button class="btn btn-ghost btn-sm" id="jobsTabMine" onclick="switchJobsTab('mine')">My Claimed Jobs</button>
         </div>
+      </div>
+      <div class="metric-grid" id="installerAnalyticsGrid" style="margin-bottom:20px;">
+        <div class="metric-card"><div class="metric-label">Completed</div><div class="metric-value" id="ia-completed">—</div><div class="metric-sub">All time</div></div>
+        <div class="metric-card"><div class="metric-label">In Progress</div><div class="metric-value" id="ia-in-progress">—</div><div class="metric-sub">Right now</div></div>
+        <div class="metric-card"><div class="metric-label">Claimed</div><div class="metric-value" id="ia-claimed">—</div><div class="metric-sub">Awaiting start</div></div>
+        <div class="metric-card"><div class="metric-label">Avg Turnaround</div><div class="metric-value" id="ia-avg-turnaround">—</div><div class="metric-sub">Claim → complete</div></div>
       </div>
       <div id="myJobsList"><div class="empty-state"><div class="spinner"></div></div></div>
     </div>
@@ -2356,8 +2373,26 @@ window.openAddAdminModal=function(){
 // PHASE 5 — ENTERPRISE RBAC MODULES
 // ══════════════════════════════════════════════════════════════
 
+// ── MANUFACTURING ANALYTICS (Manufacturer) ──
+async function loadManufacturingAnalytics() {
+  const grid=document.getElementById('mfgAnalyticsGrid'); if(!grid) return;
+  const res=await adminCall('manufacturing_analytics');
+  if(!res.success||!res.analytics) return;
+  const a=res.analytics;
+  const set=(id,val)=>{const el=document.getElementById(id); if(el) el.textContent=val;};
+  set('ma-batches-progress', a.batchesInProgress);
+  set('ma-batches-total', a.batchesTotal+' total batches');
+  set('ma-units-completed', a.completedUnits);
+  set('ma-units-planned', 'of '+a.plannedUnits+' planned');
+  set('ma-low-stock', a.inventoryLowStockCount);
+  set('ma-inventory-total', a.inventoryItemCount+' items tracked');
+  set('ma-assignments-active', a.plateAssignmentsActive);
+  set('ma-assignments-installed', a.plateAssignmentsInstalled+' installed');
+}
+
 // ── INVENTORY (Manufacturer) ──
 async function loadInventory() {
+  loadManufacturingAnalytics();
   const tbody=document.getElementById('inventoryTable'); if(!tbody) return;
   tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
   const res=await adminCall('inventory_list');
@@ -2399,6 +2434,7 @@ window.adjustInventory = async function(itemId){
 
 // ── BATCHES (Manufacturer) ──
 async function loadBatches() {
+  loadManufacturingAnalytics();
   const tbody=document.getElementById('batchesTable'); if(!tbody) return;
   tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
   const res=await adminCall('batch_list');
@@ -2580,7 +2616,19 @@ window.switchJobsTab = function(tab){
   var mineBtn=document.getElementById('jobsTabMine'); if(mineBtn) mineBtn.classList.toggle('active', tab==='mine');
   loadMyJobs();
 };
+async function loadInstallerAnalytics() {
+  const grid=document.getElementById('installerAnalyticsGrid'); if(!grid) return;
+  const res=await adminCall('installer_analytics');
+  if(!res.success||!res.analytics) return;
+  const a=res.analytics;
+  const set=(id,val)=>{const el=document.getElementById(id); if(el) el.textContent=val;};
+  set('ia-completed', a.completed);
+  set('ia-in-progress', a.inProgress);
+  set('ia-claimed', a.claimed);
+  set('ia-avg-turnaround', a.avgTurnaroundHrs!=null ? (a.avgTurnaroundHrs+' hrs') : '—');
+}
 async function loadMyJobs() {
+  loadInstallerAnalytics();
   const wrap=document.getElementById('myJobsList'); if(!wrap) return;
   wrap.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
   const res=await adminCall('installation_job_list', {scope:_jobsTab});
