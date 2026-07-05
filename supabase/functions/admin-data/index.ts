@@ -523,8 +523,6 @@ serve(async (req) => {
       return Response.json({ success: true, team: data || [] }, { headers });
     }
 
-    return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });
-
     // ══════════════════════════════════════════════
     // CREATE ORDER (Amazon / Flipkart / manual import)
     // ══════════════════════════════════════════════
@@ -792,6 +790,213 @@ serve(async (req) => {
       } catch (_ne) { /* non-fatal */ }
 
       return Response.json({ success: true }, { headers });
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // PHASE 5 — ENTERPRISE RBAC MODULES (Manufacturer/Dealer/Franchise/Installer)
+    // All additive. Existing types above are untouched.
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── INVENTORY (Manufacturer) ────────────────────────────────────────────
+    if (type === 'inventory_list') {
+      if (!adminCan(ctx, 'inventory', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { data } = await db.from('inventory_items').select('*').order('created_at', { ascending: false });
+      return Response.json({ success: true, items: data || [] }, { headers });
+    }
+
+    if (type === 'inventory_upsert') {
+      if (!adminCan(ctx, 'inventory', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { id: invId, sku, name, category, unit, quantity_on_hand, reorder_threshold, notes } = body as any;
+      const payload = { sku, name, category, unit, quantity_on_hand, reorder_threshold, notes, updated_at: new Date().toISOString() };
+      const { data, error } = invId
+        ? await db.from('inventory_items').update(payload).eq('id', invId).select().maybeSingle()
+        : await db.from('inventory_items').insert({ ...payload, created_by: ctx.id }).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: invId ? 'inventory_update' : 'inventory_create', resource: 'inventory', resource_id: data?.id });
+      return Response.json({ success: true, item: data }, { headers });
+    }
+
+    if (type === 'inventory_adjust') {
+      if (!adminCan(ctx, 'inventory', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { item_id: iid, change_qty: cq, reason: ireason } = body as any;
+      const { data: item } = await db.from('inventory_items').select('quantity_on_hand').eq('id', iid).maybeSingle();
+      if (!item) return Response.json({ success: false, message: 'Item not found' }, { status: 404, headers });
+      const newQty = Number(item.quantity_on_hand || 0) + Number(cq || 0);
+      await db.from('inventory_items').update({ quantity_on_hand: newQty, updated_at: new Date().toISOString() }).eq('id', iid);
+      await db.from('inventory_movements').insert({ item_id: iid, change_qty: cq, reason: ireason || 'adjustment', recorded_by: ctx.id });
+      return Response.json({ success: true, new_quantity: newQty }, { headers });
+    }
+
+    // ── BATCHES (Manufacturer) ──────────────────────────────────────────────
+    if (type === 'batch_list') {
+      if (!adminCan(ctx, 'batches', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { data } = await db.from('inventory_batches').select('*').order('created_at', { ascending: false });
+      return Response.json({ success: true, batches: data || [] }, { headers });
+    }
+
+    if (type === 'batch_create') {
+      if (!adminCan(ctx, 'batches', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { product_type: bpt, planned_qty: bpq, notes: bnotes } = body as any;
+      const { data: numRow } = await db.rpc('generate_batch_number');
+      const { data, error } = await db.from('inventory_batches').insert({
+        batch_number: numRow || `BATCH-${Date.now()}`,
+        product_type: bpt || 'acrylic',
+        planned_qty: bpq || 0,
+        notes: bnotes || null,
+        created_by: ctx.id,
+      }).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'batch_create', resource: 'batches', resource_id: data?.id });
+      return Response.json({ success: true, batch: data }, { headers });
+    }
+
+    if (type === 'batch_update') {
+      if (!adminCan(ctx, 'batches', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { id: bid, status: bstatus, completed_qty: bcq } = body as any;
+      const upd: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (bstatus) upd.status = bstatus;
+      if (bcq !== undefined) upd.completed_qty = bcq;
+      await db.from('inventory_batches').update(upd).eq('id', bid);
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'batch_update', resource: 'batches', resource_id: bid, after_data: upd });
+      return Response.json({ success: true }, { headers });
+    }
+
+    // ── DEALER ASSIGNMENT (Manufacturer → Dealer) ───────────────────────────
+    if (type === 'dealer_assignment_list') {
+      if (!adminCan(ctx, 'dealer_assignment', 'read') && !adminCan(ctx, 'installations', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      let q = db.from('plate_dealer_assignments').select('*, admin_users!plate_dealer_assignments_dealer_admin_id_fkey(full_name,email)').order('assigned_at', { ascending: false });
+      // Dealers only see their own assignments; manufacturer/super_admin see all.
+      if (ctx.role_name === 'dealer') q = q.eq('dealer_admin_id', ctx.id);
+      const { data } = await q;
+      return Response.json({ success: true, assignments: data || [] }, { headers });
+    }
+
+    if (type === 'dealer_assignment_create') {
+      if (!adminCan(ctx, 'dealer_assignment', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { plate_id: apid, dealer_admin_id: adid, notes: anotes } = body as any;
+      const { data, error } = await db.from('plate_dealer_assignments').insert({
+        plate_id: apid, dealer_admin_id: adid, assigned_by: ctx.id, notes: anotes || null,
+      }).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'dealer_assignment_create', resource: 'dealer_assignment', resource_id: data?.id, after_data: { plate_id: apid, dealer_admin_id: adid } });
+      return Response.json({ success: true, assignment: data }, { headers });
+    }
+
+    // ── INSTALLATION JOBS (Installer) ───────────────────────────────────────
+    if (type === 'installation_job_list') {
+      if (!adminCan(ctx, 'installation_jobs', 'read') && !adminCan(ctx, 'installations', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const scope = (body as any).scope; // 'pool' | 'mine'
+      let q = db.from('installation_jobs').select('*, installation_job_photos(id, photo_url, caption, created_at)').order('created_at', { ascending: false });
+      if (ctx.role_name === 'installer') {
+        q = scope === 'pool' ? q.eq('status', 'pending') : q.eq('installer_admin_id', ctx.id);
+      }
+      const { data } = await q;
+      return Response.json({ success: true, jobs: data || [] }, { headers });
+    }
+
+    // Request installer visit for an order — sets installation_status='pending',
+    // which fires trg_orders_installation_pending → auto-creates the job.
+    if (type === 'installation_request') {
+      if (!adminCan(ctx, 'orders', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { order_id: reqOid } = body as any;
+      const { error } = await db.from('orders').update({ installation_status: 'pending', updated_at: new Date().toISOString() }).eq('id', reqOid);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'installation_request', resource: 'orders', resource_id: reqOid });
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (type === 'installation_job_claim') {
+      if (!adminCan(ctx, 'installation_jobs', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { job_id: jid } = body as any;
+      // Only claim if still unclaimed — avoids two installers grabbing the same job.
+      const { data, error } = await db.from('installation_jobs')
+        .update({ status: 'claimed', installer_admin_id: ctx.id, claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('id', jid).eq('status', 'pending').select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      if (!data) return Response.json({ success: false, message: 'Job already claimed by someone else' }, { status: 409, headers });
+      await db.from('orders').update({ installation_status: 'claimed' }).eq('id', data.order_id);
+      return Response.json({ success: true, job: data }, { headers });
+    }
+
+    if (type === 'installation_job_update') {
+      if (!adminCan(ctx, 'installation_jobs', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { job_id: ujid, status: jstatus, completion_notes: jcnotes } = body as any;
+      const { data: job } = await db.from('installation_jobs').select('installer_admin_id, order_id').eq('id', ujid).maybeSingle();
+      if (!job) return Response.json({ success: false, message: 'Job not found' }, { status: 404, headers });
+      // Installers may only update their own claimed job; super_admin/franchise can override.
+      if (ctx.role_name === 'installer' && job.installer_admin_id !== ctx.id) {
+        return Response.json({ success: false, message: 'Not your job' }, { status: 403, headers });
+      }
+      const upd: Record<string, unknown> = { status: jstatus, updated_at: new Date().toISOString() };
+      if (jstatus === 'in_progress') upd.started_at = new Date().toISOString();
+      if (jstatus === 'completed') { upd.completed_at = new Date().toISOString(); upd.completion_notes = jcnotes || null; }
+      await db.from('installation_jobs').update(upd).eq('id', ujid);
+      if (job.order_id) await db.from('orders').update({ installation_status: jstatus }).eq('id', job.order_id);
+      return Response.json({ success: true }, { headers });
+    }
+
+    // Photo upload: base64 in, stored to installation-photos bucket via service_role.
+    if (type === 'installation_job_photo_add') {
+      if (!adminCan(ctx, 'installation_jobs', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { job_id: pjid, file_base64, mime_type: pmime, caption: pcaption } = body as any;
+      if (!file_base64) return Response.json({ success: false, message: 'file_base64 required' }, { status: 400, headers });
+      const ext = (pmime || 'image/jpeg').includes('png') ? 'png' : (pmime || '').includes('webp') ? 'webp' : 'jpg';
+      const path = `${pjid}/${crypto.randomUUID()}.${ext}`;
+      const bytes = Uint8Array.from(atob(file_base64), c => c.charCodeAt(0));
+      const { error: upErr } = await db.storage.from('installation-photos').upload(path, bytes, { contentType: pmime || 'image/jpeg' });
+      if (upErr) return Response.json({ success: false, message: upErr.message }, { status: 400, headers });
+      const { data: signed } = await db.storage.from('installation-photos').createSignedUrl(path, 60 * 60 * 24 * 7);
+      const { data: photoRow } = await db.from('installation_job_photos').insert({
+        job_id: pjid, photo_url: signed?.signedUrl || path, caption: pcaption || null, uploaded_by: ctx.id,
+      }).select().maybeSingle();
+      return Response.json({ success: true, photo: photoRow }, { headers });
+    }
+
+    // ── FRANCHISE ────────────────────────────────────────────────────────────
+    if (type === 'franchise_installers') {
+      if (!adminCan(ctx, 'installers', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      // Franchise sees installers they onboarded (parent_admin_id = them). Super_admin sees all.
+      let q = db.from('admin_users').select('id, email, full_name, is_active, last_login_at, region, role_id, admin_roles(name,label,color)').order('created_at', { ascending: false });
+      if (ctx.role_name === 'franchise') q = q.eq('parent_admin_id', ctx.id);
+      const { data } = await q;
+      const installers = (data || []).filter((a: any) => a.admin_roles?.name === 'installer');
+      return Response.json({ success: true, installers }, { headers });
+    }
+
+    if (type === 'franchise_overview') {
+      if (!adminCan(ctx, 'franchise_overview', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      // Lightweight region-scoped counts. If no region set on this franchise account yet,
+      // returns org-wide counts (documented default — franchise onboarding should set `region`).
+      const { data: fAdmin } = await db.from('admin_users').select('region').eq('id', ctx.id).maybeSingle();
+      const region = fAdmin?.region || null;
+      const [installersRes, jobsRes, ticketsRes] = await Promise.all([
+        db.from('admin_users').select('id', { count: 'exact', head: true }).eq('parent_admin_id', ctx.id),
+        db.from('installation_jobs').select('id, status', { count: 'exact', head: false }),
+        db.from('support_tickets').select('id, status', { count: 'exact', head: false }),
+      ]);
+      return Response.json({
+        success: true,
+        overview: {
+          region,
+          installerCount: installersRes.count || 0,
+          jobsPending: (jobsRes.data || []).filter((j: any) => j.status === 'pending').length,
+          jobsCompleted: (jobsRes.data || []).filter((j: any) => j.status === 'completed').length,
+          openTickets: (ticketsRes.data || []).filter((t: any) => t.status === 'open').length,
+        },
+      }, { headers });
+    }
+
+    // ── DEALER COMMISSIONS (foundation — read-only, no calc engine yet) ─────
+    if (type === 'commission_list') {
+      if (!adminCan(ctx, 'commissions', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      let q = db.from('dealer_commissions').select('*').order('created_at', { ascending: false });
+      if (ctx.role_name === 'dealer') q = q.eq('dealer_admin_id', ctx.id);
+      const { data } = await q;
+      return Response.json({ success: true, commissions: data || [] }, { headers });
     }
 
     return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });
