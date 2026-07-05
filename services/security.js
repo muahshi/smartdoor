@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabase.js';
+import { sanitize } from './sanitize.js';
 
 // ────────── GET SECURITY RULES ──────────
 export async function getSecurityRules(ownerId) {
@@ -96,7 +97,7 @@ export async function addFamilyMember(ownerId, { name, phone, relationship = 'fa
 
   const { data, error } = await supabase
     .from('family_members')
-    .insert({ owner_id: ownerId, name, phone, relationship, priority: nextPriority })
+    .insert({ owner_id: ownerId, name: sanitize.text(name, 60), phone, relationship, priority: nextPriority })
     .select()
     .single();
 

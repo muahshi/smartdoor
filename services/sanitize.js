@@ -15,6 +15,26 @@
 export const sanitize = {
 
   /**
+   * Escape text for safe insertion into innerHTML.
+   * Unlike sanitize.text() (which strips characters for storage), this
+   * PRESERVES the original text but converts HTML-significant characters
+   * to entities, so it is safe to place inside a template-literal that is
+   * assigned to .innerHTML / insertAdjacentHTML.
+   * Use this at RENDER time for any value that originated from user input
+   * (names, messages, labels, addresses, ticket subjects, etc.) and is not
+   * already being inserted via .textContent.
+   */
+  escapeHtml(raw) {
+    if (raw == null) return '';
+    return String(raw)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  },
+
+  /**
    * Strip HTML tags and dangerous characters from any text.
    * Use for: names, house names, messages, comments.
    */
@@ -211,4 +231,6 @@ export function validateFamilyMember(raw) {
   return { ok: errors.length === 0, errors, clean };
 }
 
-export default { sanitize, validate, validateCheckoutBody, validateFamilyMember };
+export const escapeHtml = sanitize.escapeHtml;
+
+export default { sanitize, validate, validateCheckoutBody, validateFamilyMember, escapeHtml };
