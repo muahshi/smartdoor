@@ -868,6 +868,39 @@ serve(async (req) => {
       return Response.json({ success: true }, { headers });
     }
 
+    // ── MANUFACTURING ANALYTICS (Manufacturer) ──────────────────────────────
+    // Read-only aggregation over tables that already exist (inventory_items,
+    // inventory_batches, plate_dealer_assignments). No new tables, no new
+    // financial logic — pure counts/sums for a dashboard summary row.
+    if (type === 'manufacturing_analytics') {
+      if (!adminCan(ctx, 'batches', 'read') && !adminCan(ctx, 'inventory', 'read') && !adminCan(ctx, 'manufacturing', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const [batchesRes, inventoryRes, assignmentsRes] = await Promise.all([
+        db.from('inventory_batches').select('status, planned_qty, completed_qty'),
+        db.from('inventory_items').select('quantity_on_hand, reorder_threshold'),
+        db.from('plate_dealer_assignments').select('status'),
+      ]);
+      const batches = batchesRes.data || [];
+      const inventory = inventoryRes.data || [];
+      const assignments = assignmentsRes.data || [];
+      const sum = (arr: any[], key: string) => arr.reduce((t, r) => t + Number(r[key] || 0), 0);
+      return Response.json({
+        success: true,
+        analytics: {
+          batchesTotal: batches.length,
+          batchesInProgress: batches.filter((b: any) => b.status === 'in_progress').length,
+          batchesCompleted: batches.filter((b: any) => b.status === 'completed').length,
+          plannedUnits: sum(batches, 'planned_qty'),
+          completedUnits: sum(batches, 'completed_qty'),
+          inventoryItemCount: inventory.length,
+          inventoryLowStockCount: inventory.filter((i: any) => Number(i.quantity_on_hand) <= Number(i.reorder_threshold || 0)).length,
+          plateAssignmentsActive: assignments.filter((a: any) => a.status === 'assigned').length,
+          plateAssignmentsInstalled: assignments.filter((a: any) => a.status === 'installed').length,
+        },
+      }, { headers });
+    }
+
     // ── DEALER ASSIGNMENT (Manufacturer → Dealer) ───────────────────────────
     if (type === 'dealer_assignment_list') {
       if (!adminCan(ctx, 'dealer_assignment', 'read') && !adminCan(ctx, 'installations', 'read')) {
@@ -966,6 +999,38 @@ serve(async (req) => {
         job_id: pjid, photo_url: signed?.signedUrl || path, caption: pcaption || null, uploaded_by: ctx.id,
       }).select().maybeSingle();
       return Response.json({ success: true, photo: photoRow }, { headers });
+    }
+
+    // ── INSTALLER ANALYTICS (Installer's own history) ───────────────────────
+    // Read-only aggregation over installation_jobs. Installer sees only their
+    // own numbers; franchise/super_admin see the org-wide (or region-wide,
+    // once per-region job tagging exists) picture. Reuses installation_jobs —
+    // no new table.
+    if (type === 'installer_analytics') {
+      if (!adminCan(ctx, 'installation_jobs', 'read') && !adminCan(ctx, 'installations', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      let q = db.from('installation_jobs').select('status, claimed_at, completed_at');
+      if (ctx.role_name === 'installer') q = q.eq('installer_admin_id', ctx.id);
+      const { data } = await q;
+      const jobs = data || [];
+      const completedJobs = jobs.filter((j: any) => j.status === 'completed' && j.claimed_at && j.completed_at);
+      const avgTurnaroundHrs = completedJobs.length
+        ? completedJobs.reduce((total: number, j: any) => {
+            const hrs = (new Date(j.completed_at).getTime() - new Date(j.claimed_at).getTime()) / 36e5;
+            return total + hrs;
+          }, 0) / completedJobs.length
+        : null;
+      return Response.json({
+        success: true,
+        analytics: {
+          completed: jobs.filter((j: any) => j.status === 'completed').length,
+          inProgress: jobs.filter((j: any) => j.status === 'in_progress').length,
+          claimed: jobs.filter((j: any) => j.status === 'claimed').length,
+          pendingPool: jobs.filter((j: any) => j.status === 'pending').length,
+          avgTurnaroundHrs: avgTurnaroundHrs !== null ? Math.round(avgTurnaroundHrs * 10) / 10 : null,
+        },
+      }, { headers });
     }
 
     // ── FRANCHISE ────────────────────────────────────────────────────────────
