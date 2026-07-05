@@ -656,6 +656,34 @@
   </div>
 
   <div class="sidebar-section">
+    <div class="sidebar-section-label">Enterprise</div>
+    <div class="nav-item" data-panel="inventory" data-resource="inventory" onclick="switchPanel('inventory', this)">
+      <span class="nav-icon">📦</span> Inventory
+    </div>
+    <div class="nav-item" data-panel="batches" data-resource="batches" onclick="switchPanel('batches', this)">
+      <span class="nav-icon">🧱</span> Batches
+    </div>
+    <div class="nav-item" data-panel="dealerAssignment" data-resource="dealer_assignment" onclick="switchPanel('dealerAssignment', this)">
+      <span class="nav-icon">🔗</span> Dealer Assignment
+    </div>
+    <div class="nav-item" data-panel="installations" data-resource="installations" onclick="switchPanel('installations', this)">
+      <span class="nav-icon">🛠️</span> Installations
+    </div>
+    <div class="nav-item" data-panel="commissions" data-resource="commissions" onclick="switchPanel('commissions', this)">
+      <span class="nav-icon">💵</span> Commissions
+    </div>
+    <div class="nav-item" data-panel="franchiseOverview" data-resource="franchise_overview" onclick="switchPanel('franchiseOverview', this)">
+      <span class="nav-icon">🗺️</span> Regional Overview
+    </div>
+    <div class="nav-item" data-panel="installers" data-resource="installers" onclick="switchPanel('installers', this)">
+      <span class="nav-icon">👷</span> Installers
+    </div>
+    <div class="nav-item" data-panel="myJobs" data-resource="installation_jobs" onclick="switchPanel('myJobs', this)">
+      <span class="nav-icon">✅</span> My Jobs
+    </div>
+  </div>
+
+  <div class="sidebar-section">
     <div class="sidebar-section-label">Support</div>
     <div class="nav-item" data-panel="support" data-resource="support" onclick="switchPanel('support', this)">
       <span class="nav-icon">🎫</span> Support Center
@@ -1230,6 +1258,118 @@
       </div>
     </div>
 
+    <!-- ══════════ PHASE 5: INVENTORY (Manufacturer) ══════════ -->
+    <div class="panel" id="panel-inventory">
+      <div class="section-header">
+        <span class="section-title">📦 Inventory</span>
+        <button class="btn btn-primary btn-sm" onclick="openInventoryForm()">+ Add Item</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>On Hand</th><th>Reorder At</th><th>Actions</th></tr></thead>
+          <tbody id="inventoryTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 5: BATCHES (Manufacturer) ══════════ -->
+    <div class="panel" id="panel-batches">
+      <div class="section-header">
+        <span class="section-title">🧱 Production Batches</span>
+        <button class="btn btn-primary btn-sm" onclick="createBatch()">+ New Batch</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Batch #</th><th>Product</th><th>Planned</th><th>Completed</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="batchesTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 5: DEALER ASSIGNMENT (Manufacturer → Dealer) ══════════ -->
+    <div class="panel" id="panel-dealerAssignment">
+      <div class="section-header">
+        <span class="section-title">🔗 Dealer Assignment</span>
+      </div>
+      <div class="form-group" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <input type="text" id="da-plate" placeholder="Plate ID (SD-XXXXXX)" style="flex:1;min-width:160px;">
+        <input type="text" id="da-dealer" placeholder="Dealer admin_users UUID" style="flex:1;min-width:220px;">
+        <button class="btn btn-primary btn-sm" onclick="assignPlateToDealer()">Assign</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plate ID</th><th>Dealer</th><th>Status</th><th>Assigned At</th></tr></thead>
+          <tbody id="dealerAssignmentTable"><tr><td colspan="4"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 5: INSTALLATIONS (Dealer view) ══════════ -->
+    <div class="panel" id="panel-installations">
+      <div class="section-header">
+        <span class="section-title">🛠️ Installations</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Installer</th><th>Updated</th></tr></thead>
+          <tbody id="installationsTable"><tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 5: COMMISSIONS (Dealer — foundation, no calc engine yet) ══════════ -->
+    <div class="panel" id="panel-commissions">
+      <div class="section-header">
+        <span class="section-title">💵 Commissions</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plate</th><th>Order</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="commissionsTable"><tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-top:12px;">Commission calculation rules are not finalized yet — this ledger will populate once the calculation engine is approved.</p>
+    </div>
+
+    <!-- ══════════ PHASE 5: REGIONAL OVERVIEW (Franchise) ══════════ -->
+    <div class="panel" id="panel-franchiseOverview">
+      <div class="section-header">
+        <span class="section-title">🗺️ Regional Overview</span>
+      </div>
+      <div class="metric-grid" id="franchiseMetricGrid">
+        <div class="metric-card"><div class="metric-label">Region</div><div class="metric-value" id="f-region" style="font-size:18px;">—</div><div class="metric-sub">Your territory</div></div>
+        <div class="metric-card"><div class="metric-label">Installers</div><div class="metric-value" id="f-installers">—</div><div class="metric-sub">On your team</div></div>
+        <div class="metric-card"><div class="metric-label">Jobs Pending</div><div class="metric-value" id="f-jobs-pending">—</div><div class="metric-sub">Awaiting installer</div></div>
+        <div class="metric-card"><div class="metric-label">Jobs Completed</div><div class="metric-value" id="f-jobs-done">—</div><div class="metric-sub">All time</div></div>
+        <div class="metric-card"><div class="metric-label">Open Tickets</div><div class="metric-value" id="f-tickets">—</div><div class="metric-sub">Needs attention</div></div>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 5: INSTALLERS (Franchise) ══════════ -->
+    <div class="panel" id="panel-installers">
+      <div class="section-header">
+        <span class="section-title">👷 Installers</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Region</th><th>Status</th><th>Last Login</th></tr></thead>
+          <tbody id="installersTable"><tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 5: MY JOBS (Installer) ══════════ -->
+    <div class="panel" id="panel-myJobs">
+      <div class="section-header">
+        <span class="section-title">✅ My Jobs</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost btn-sm" id="jobsTabPool" onclick="switchJobsTab('pool')">Available Pool</button>
+          <button class="btn btn-ghost btn-sm" id="jobsTabMine" onclick="switchJobsTab('mine')">My Claimed Jobs</button>
+        </div>
+      </div>
+      <div id="myJobsList"><div class="empty-state"><div class="spinner"></div></div></div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1444,8 +1584,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const mb = el('menuBtn');
     if (mb) mb.style.display = 'flex';
   }
-  // Boot
-  loadPanel('dashboard');
+  // Boot — land on the role's designated home panel (Phase 5). Falls back to
+  // the existing 'dashboard' behavior for every role not in ROLE_LANDING_PANEL
+  // (super_admin, ops_manager, support, analyst) — zero change for them.
+  const landingPanel = ROLE_LANDING_PANEL[session.role] || 'dashboard';
+  if (landingPanel !== 'dashboard' && isPanelAllowed(landingPanel, session)) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const landingNav = document.querySelector(`[data-panel="${landingPanel}"]`);
+    if (landingNav) landingNav.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    const landingPanelEl = document.getElementById('panel-' + landingPanel);
+    if (landingPanelEl) {
+      landingPanelEl.classList.add('active');
+      currentPanel = landingPanel;
+      const t = { inventory:['Inventory','Raw Materials & Stock'], batches:['Batches','Production Batch Management'],
+        installations:['Installations','Installation Job Tracking'], franchiseOverview:['Regional Overview','Franchise Territory Snapshot'],
+        myJobs:['My Jobs','Assigned Installations'] }[landingPanel];
+      if (t) { const ht=el('headerTitle'); if(ht) ht.textContent=t[0]; const hs=el('headerSub'); if(hs) hs.textContent=t[1]; }
+      loadPanel(landingPanel);
+    } else {
+      loadPanel('dashboard'); // panel markup missing safety fallback — never blank-screen a role
+    }
+  } else {
+    loadPanel('dashboard');
+  }
 });
 
 // ── UTILS ──
@@ -1528,6 +1690,25 @@ const PANEL_RBAC = {
   system:        { resource: 'system' },
   team:          { resource: 'team', action: 'manage' },
   // dashboard has no entry — every authenticated admin role may see it.
+
+  // ── Phase 5: Enterprise RBAC modules ──
+  inventory:        { resource: 'inventory' },
+  batches:          { resource: 'batches' },
+  dealerAssignment: { resource: 'dealer_assignment' },
+  installations:    { resource: 'installations' },
+  commissions:      { resource: 'commissions' },
+  franchiseOverview:{ resource: 'franchise_overview' },
+  installers:       { resource: 'installers' },
+  myJobs:           { resource: 'installation_jobs' },
+};
+
+// Per-role landing panel — where each role lands right after login.
+// Roles not listed here keep the existing default ('dashboard') — unchanged behavior.
+const ROLE_LANDING_PANEL = {
+  manufacturing: 'batches',
+  dealer:        'installations',
+  franchise:     'franchiseOverview',
+  installer:     'myJobs',
 };
 function isPanelAllowed(panelId, session) {
   const rule = PANEL_RBAC[panelId];
@@ -1559,6 +1740,10 @@ window.switchPanel = function(panelId, navEl) {
     communication:['Communication','Calls, Voice Notes & Events'], analytics:['Analytics','Charts & Insights'],
     financial:['Financial','Revenue & Metrics'], audit:['Audit Logs','System Activity'],
     system:['System Health','Services & Usage'], team:['Admin Team','RBAC & User Management'],
+    inventory:['Inventory','Raw Materials & Stock'], batches:['Batches','Production Batch Management'],
+    dealerAssignment:['Dealer Assignment','Plate → Dealer Routing'], installations:['Installations','Installation Job Tracking'],
+    commissions:['Commissions','Dealer Commission Ledger'], franchiseOverview:['Regional Overview','Franchise Territory Snapshot'],
+    installers:['Installers','Field Technicians'], myJobs:['My Jobs','Assigned Installations'],
   };
   const t = titles[panelId] || [panelId, ''];
   const ht = document.getElementById('headerTitle'); if(ht) ht.textContent = t[0];
@@ -1606,6 +1791,14 @@ async function loadPanel(panelId) {
     case 'audit':         await loadAuditLogs(); break;
     case 'system':        await loadSystemHealth(); break;
     case 'team':          await loadTeam(); break;
+    case 'inventory':        await loadInventory(); break;
+    case 'batches':           await loadBatches(); break;
+    case 'dealerAssignment':  await loadDealerAssignment(); break;
+    case 'installations':     await loadInstallations(); break;
+    case 'commissions':       await loadCommissions(); break;
+    case 'franchiseOverview': await loadFranchiseOverview(); break;
+    case 'installers':        await loadInstallers(); break;
+    case 'myJobs':            await loadMyJobs(); break;
   }
 }
 
@@ -2143,6 +2336,253 @@ async function loadTeam() {
 window.openAddAdminModal=function(){
   if (!isSuperAdmin(getAdminSession())) { showToast("You don't have access to that action.", 'error'); return; }
   showToast('Add admin coming soon','info');
+};
+
+// ══════════════════════════════════════════════════════════════
+// PHASE 5 — ENTERPRISE RBAC MODULES
+// ══════════════════════════════════════════════════════════════
+
+// ── INVENTORY (Manufacturer) ──
+async function loadInventory() {
+  const tbody=document.getElementById('inventoryTable'); if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res=await adminCall('inventory_list');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="text">Could not load inventory</div></div></td></tr>';return;}
+  if(!res.items||!res.items.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="icon">📦</div><div class="text">No inventory items yet</div></div></td></tr>';return;}
+  tbody.innerHTML=res.items.map(function(i){
+    var low = Number(i.quantity_on_hand) <= Number(i.reorder_threshold||0);
+    return '<tr>'+
+      '<td style="font-family:monospace;font-size:12px">'+escapeHtml(i.sku||'—')+'</td>'+
+      '<td>'+escapeHtml(i.name||'—')+'</td>'+
+      '<td><span class="badge badge-muted">'+escapeHtml(i.category||'—')+'</span></td>'+
+      '<td>'+(low?'<span class="badge badge-danger">':'')+i.quantity_on_hand+' '+escapeHtml(i.unit||'')+(low?'</span>':'')+'</td>'+
+      '<td>'+(i.reorder_threshold!=null?i.reorder_threshold:'—')+'</td>'+
+      '<td><button class="btn btn-ghost btn-sm" onclick="adjustInventory(\''+i.id+'\')">± Adjust</button></td>'+
+    '</tr>';
+  }).join('');
+}
+window.openInventoryForm = async function(){
+  if(!hasPermission(session,'inventory','write')){showToast('Your role cannot add inventory.','error');return;}
+  var sku=prompt('SKU (e.g. RM-ACRYLIC-SHEET)'); if(!sku) return;
+  var name=prompt('Item name'); if(!name) return;
+  var category=prompt('Category (raw_material / component / packaging / finished_good)','raw_material')||'raw_material';
+  var unit=prompt('Unit (pcs / kg / m / l)','pcs')||'pcs';
+  var qty=parseFloat(prompt('Starting quantity on hand','0')||'0');
+  var reorder=parseFloat(prompt('Reorder threshold','0')||'0');
+  var res=await adminCall('inventory_upsert',{sku:sku,name:name,category:category,unit:unit,quantity_on_hand:qty,reorder_threshold:reorder});
+  if(!res.success){showToast('Error: '+(res.message||'Could not save item'),'error');return;}
+  showToast('✅ Inventory item added','success'); loadInventory();
+};
+window.adjustInventory = async function(itemId){
+  if(!hasPermission(session,'inventory','write')){showToast('Your role cannot adjust inventory.','error');return;}
+  var delta=parseFloat(prompt('Quantity change (use negative to deduct)','0')||'0');
+  if(!delta){return;}
+  var reason=prompt('Reason (restock / production_use / adjustment / wastage)','adjustment')||'adjustment';
+  var res=await adminCall('inventory_adjust',{item_id:itemId,change_qty:delta,reason:reason});
+  if(!res.success){showToast('Error: '+(res.message||'Could not adjust'),'error');return;}
+  showToast('✅ Stock updated','success'); loadInventory();
+};
+
+// ── BATCHES (Manufacturer) ──
+async function loadBatches() {
+  const tbody=document.getElementById('batchesTable'); if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res=await adminCall('batch_list');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="text">Could not load batches</div></div></td></tr>';return;}
+  if(!res.batches||!res.batches.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="icon">🧱</div><div class="text">No batches yet</div></div></td></tr>';return;}
+  tbody.innerHTML=res.batches.map(function(b){
+    var canAdvance = hasPermission(session,'batches','write') && b.status!=='completed';
+    return '<tr>'+
+      '<td style="font-family:monospace;font-size:12px">'+escapeHtml(b.batch_number)+'</td>'+
+      '<td><span class="badge badge-muted">'+escapeHtml(b.product_type)+'</span></td>'+
+      '<td>'+b.planned_qty+'</td>'+
+      '<td>'+b.completed_qty+'</td>'+
+      '<td>'+badgeHTML(b.status)+'</td>'+
+      '<td>'+(canAdvance?('<button class="btn btn-ghost btn-sm" onclick="advanceBatch(\''+b.id+'\',\''+b.status+'\')">Advance</button>'):'')+'</td>'+
+    '</tr>';
+  }).join('');
+}
+window.createBatch = async function(){
+  if(!hasPermission(session,'batches','write')){showToast('Your role cannot create batches.','error');return;}
+  var productType=prompt('Product type (acrylic / stainless / teakwood)','acrylic')||'acrylic';
+  var plannedQty=parseInt(prompt('Planned quantity','1')||'1',10);
+  var notes=prompt('Notes (optional)')||null;
+  var res=await adminCall('batch_create',{product_type:productType,planned_qty:plannedQty,notes:notes});
+  if(!res.success){showToast('Error: '+(res.message||'Could not create batch'),'error');return;}
+  showToast('✅ Batch '+(res.batch&&res.batch.batch_number)+' created','success'); loadBatches();
+};
+window.advanceBatch = async function(batchId, currentStatus){
+  var flow = {planned:'in_progress', in_progress:'completed'};
+  var next = flow[currentStatus]; if(!next) return;
+  var res=await adminCall('batch_update',{id:batchId,status:next});
+  if(!res.success){showToast('Error advancing batch','error');return;}
+  showToast('✅ Batch moved to '+next,'success'); loadBatches();
+};
+
+// ── DEALER ASSIGNMENT (Manufacturer → Dealer) ──
+async function loadDealerAssignment() {
+  const tbody=document.getElementById('dealerAssignmentTable'); if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="4"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res=await adminCall('dealer_assignment_list');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="4"><div class="empty-state"><div class="text">Could not load assignments</div></div></td></tr>';return;}
+  if(!res.assignments||!res.assignments.length){tbody.innerHTML='<tr><td colspan="4"><div class="empty-state"><div class="icon">🔗</div><div class="text">No assignments yet</div></div></td></tr>';return;}
+  tbody.innerHTML=res.assignments.map(function(a){
+    var dealerName = (a.admin_users&&a.admin_users.full_name) || a.dealer_admin_id;
+    return '<tr>'+
+      '<td style="font-family:monospace;font-size:12px">'+escapeHtml(a.plate_id)+'</td>'+
+      '<td>'+escapeHtml(dealerName)+'</td>'+
+      '<td>'+badgeHTML(a.status)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted)">'+fmtDate(a.assigned_at)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+window.assignPlateToDealer = async function(){
+  if(!hasPermission(session,'dealer_assignment','write')){showToast('Your role cannot assign dealers.','error');return;}
+  var plateId=document.getElementById('da-plate')?document.getElementById('da-plate').value.trim():'';
+  var dealerId=document.getElementById('da-dealer')?document.getElementById('da-dealer').value.trim():'';
+  if(!plateId||!dealerId){showToast('Enter both plate ID and dealer UUID.','error');return;}
+  var res=await adminCall('dealer_assignment_create',{plate_id:plateId,dealer_admin_id:dealerId});
+  if(!res.success){showToast('Error: '+(res.message||'Could not assign'),'error');return;}
+  showToast('✅ Plate assigned to dealer','success');
+  document.getElementById('da-plate').value=''; document.getElementById('da-dealer').value='';
+  loadDealerAssignment();
+};
+
+// ── INSTALLATIONS (Dealer view) ──
+async function loadInstallations() {
+  const tbody=document.getElementById('installationsTable'); if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res=await adminCall('installation_job_list');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="text">Could not load installations</div></div></td></tr>';return;}
+  if(!res.jobs||!res.jobs.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="icon">🛠️</div><div class="text">No installation jobs yet</div></div></td></tr>';return;}
+  tbody.innerHTML=res.jobs.map(function(j){
+    return '<tr>'+
+      '<td style="font-family:monospace;font-size:12px">'+escapeHtml(j.plate_id||j.order_id)+'</td>'+
+      '<td>'+escapeHtml(j.customer_name||'—')+'</td>'+
+      '<td>'+badgeHTML(j.status)+'</td>'+
+      '<td style="font-size:12px;color:var(--muted)">'+(j.installer_admin_id?'Assigned':'Unassigned')+'</td>'+
+      '<td style="font-size:11px;color:var(--muted)">'+fmtDate(j.updated_at)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+// ── COMMISSIONS (Dealer — foundation, no calc engine yet) ──
+async function loadCommissions() {
+  const tbody=document.getElementById('commissionsTable'); if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res=await adminCall('commission_list');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="text">Could not load commissions</div></div></td></tr>';return;}
+  if(!res.commissions||!res.commissions.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="icon">💵</div><div class="text">No commission records yet</div></div></td></tr>';return;}
+  tbody.innerHTML=res.commissions.map(function(c){
+    return '<tr>'+
+      '<td style="font-family:monospace;font-size:12px">'+escapeHtml(c.plate_id||'—')+'</td>'+
+      '<td style="font-size:12px;color:var(--muted)">'+escapeHtml(c.order_id||'—')+'</td>'+
+      '<td>₹'+Number(c.amount||0).toLocaleString('en-IN')+'</td>'+
+      '<td>'+badgeHTML(c.status)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted)">'+fmtDate(c.created_at)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+// ── REGIONAL OVERVIEW (Franchise) ──
+async function loadFranchiseOverview() {
+  const res=await adminCall('franchise_overview');
+  if(!res.success) return;
+  const o=res.overview||{};
+  const set=function(id,val){var el=document.getElementById(id); if(el) el.textContent=val;};
+  set('f-region', o.region || 'Not set');
+  set('f-installers', o.installerCount||0);
+  set('f-jobs-pending', o.jobsPending||0);
+  set('f-jobs-done', o.jobsCompleted||0);
+  set('f-tickets', o.openTickets||0);
+}
+
+// ── INSTALLERS (Franchise) ──
+async function loadInstallers() {
+  const tbody=document.getElementById('installersTable'); if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res=await adminCall('franchise_installers');
+  if(!res.success){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="text">Could not load installers</div></div></td></tr>';return;}
+  if(!res.installers||!res.installers.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><div class="icon">👷</div><div class="text">No installers assigned to you yet — ask Super Admin to link them.</div></div></td></tr>';return;}
+  tbody.innerHTML=res.installers.map(function(i){
+    return '<tr>'+
+      '<td>'+escapeHtml(i.full_name||'—')+'</td>'+
+      '<td style="font-size:12px;color:var(--muted)">'+escapeHtml(i.email||'—')+'</td>'+
+      '<td>'+escapeHtml(i.region||'—')+'</td>'+
+      '<td>'+badgeHTML(i.is_active?'active':'inactive')+'</td>'+
+      '<td style="font-size:11px;color:var(--muted)">'+fmtDate(i.last_login_at)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+// ── MY JOBS (Installer) ──
+var _jobsTab = 'pool';
+window.switchJobsTab = function(tab){
+  _jobsTab = tab;
+  var poolBtn=document.getElementById('jobsTabPool'); if(poolBtn) poolBtn.classList.toggle('active', tab==='pool');
+  var mineBtn=document.getElementById('jobsTabMine'); if(mineBtn) mineBtn.classList.toggle('active', tab==='mine');
+  loadMyJobs();
+};
+async function loadMyJobs() {
+  const wrap=document.getElementById('myJobsList'); if(!wrap) return;
+  wrap.innerHTML='<div class="empty-state"><div class="spinner"></div></div>';
+  const res=await adminCall('installation_job_list', {scope:_jobsTab});
+  if(!res.success){wrap.innerHTML='<div class="empty-state"><div class="text">Could not load jobs</div></div>';return;}
+  if(!res.jobs||!res.jobs.length){wrap.innerHTML='<div class="empty-state"><div class="icon">✅</div><div class="text">'+(_jobsTab==='pool'?'No jobs waiting right now':'You have not claimed any jobs yet')+'</div></div>';return;}
+  wrap.innerHTML = res.jobs.map(function(j){
+    var photos=(j.installation_job_photos||[]).map(function(p){return '<img src="'+p.photo_url+'" style="width:56px;height:56px;object-fit:cover;border-radius:6px;margin-right:6px;" alt="job photo">';}).join('');
+    var actions='';
+    if(_jobsTab==='pool' && j.status==='pending'){
+      actions = '<button class="btn btn-primary btn-sm" onclick="claimInstallJob(\''+j.id+'\')">Claim Job</button>';
+    } else if(_jobsTab==='mine'){
+      if(j.status==='claimed') actions += '<button class="btn btn-ghost btn-sm" onclick="updateInstallJob(\''+j.id+'\',\'in_progress\')">Start</button>';
+      if(j.status==='in_progress') actions += '<button class="btn btn-success btn-sm" onclick="completeInstallJob(\''+j.id+'\')">Mark Complete</button>';
+      actions += ' <button class="btn btn-ghost btn-sm" onclick="uploadJobPhotoPrompt(\''+j.id+'\')">📷 Add Photo</button>';
+    }
+    return '<div class="metric-card" style="margin-bottom:10px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">'+
+        '<div>'+
+          '<div style="font-weight:600;font-size:14px">'+escapeHtml(j.customer_name||'Customer')+' — '+escapeHtml(j.plate_id||'')+'</div>'+
+          '<div style="font-size:12px;color:var(--muted)">'+escapeHtml(j.customer_phone||'No phone on file')+'</div>'+
+          '<div style="margin-top:6px;">'+badgeHTML(j.status)+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+actions+'</div>'+
+      '</div>'+
+      (photos ? ('<div style="margin-top:10px;">'+photos+'</div>') : '')+
+    '</div>';
+  }).join('');
+}
+window.claimInstallJob = async function(jobId){
+  var res=await adminCall('installation_job_claim',{job_id:jobId});
+  if(!res.success){showToast(res.message||'Could not claim job — someone may have already taken it','error');loadMyJobs();return;}
+  showToast('✅ Job claimed','success'); switchJobsTab('mine');
+};
+window.updateInstallJob = async function(jobId, status){
+  var res=await adminCall('installation_job_update',{job_id:jobId,status:status});
+  if(!res.success){showToast(res.message||'Could not update job','error');return;}
+  showToast('✅ Job updated','success'); loadMyJobs();
+};
+window.completeInstallJob = async function(jobId){
+  var notes=prompt('Completion notes (optional)')||'';
+  var res=await adminCall('installation_job_update',{job_id:jobId,status:'completed',completion_notes:notes});
+  if(!res.success){showToast(res.message||'Could not complete job','error');return;}
+  showToast('✅ Job marked complete','success'); loadMyJobs();
+};
+window.uploadJobPhotoPrompt = function(jobId){
+  var input=document.createElement('input');
+  input.type='file'; input.accept='image/png,image/jpeg,image/webp';
+  input.onchange = function(){
+    var file=input.files&&input.files[0]; if(!file) return;
+    var reader=new FileReader();
+    reader.onload = async function(){
+      var base64 = reader.result.split(',')[1];
+      var res = await adminCall('installation_job_photo_add', { job_id: jobId, file_base64: base64, mime_type: file.type, caption: null });
+      if(!res.success){ showToast(res.message||'Photo upload failed','error'); return; }
+      showToast('✅ Photo uploaded','success'); loadMyJobs();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 };
 
 // ── PROVISIONING ──
