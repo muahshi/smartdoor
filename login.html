@@ -188,7 +188,7 @@
 <script src="config/env.generated.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
 
-<div class="login-card">
+<div class="login-card" id="login-view-card">
   <div class="logo">
     <div class="logo-icon">🚪</div>
     <span class="logo-text">Smart Door</span>
@@ -223,6 +223,17 @@
   </button>
 
   <div class="error-msg" id="error-msg"></div>
+
+  <div style="text-align:center; margin-top:18px;">
+    <span id="forgot-pin-link" style="font-size:0.82rem; color:rgba(255,255,255,0.45); cursor:pointer; text-decoration:underline;">Forgot PIN?</span>
+  </div>
+</div>
+
+<!-- Forgot PIN card — hidden until "Forgot PIN?" is clicked. Reuses the
+     existing js/forgotPin.js widget as-is (not modified); only lazy-loaded
+     on demand so normal login has zero extra weight. -->
+<div class="login-card" id="forgot-pin-card" style="display:none;">
+  <div id="forgot-pin-container"></div>
 </div>
 
 <script type="module">
@@ -233,6 +244,25 @@
   const loginBtn    = document.getElementById('login-btn');
   const errorMsg    = document.getElementById('error-msg');
   const rememberChk = document.getElementById('remember-device');
+  const loginCard      = document.getElementById('login-view-card');
+  const forgotPinCard  = document.getElementById('forgot-pin-card');
+  const forgotPinLink  = document.getElementById('forgot-pin-link');
+  let forgotPinMounted = false;
+
+  forgotPinLink.addEventListener('click', async () => {
+    loginCard.style.display     = 'none';
+    forgotPinCard.style.display = '';
+    if (!forgotPinMounted) {
+      forgotPinMounted = true;
+      const { ForgotPin } = await import('./js/forgotPin.js');
+      ForgotPin.mount(document.getElementById('forgot-pin-container'), {
+        onBack: () => {
+          forgotPinCard.style.display = 'none';
+          loginCard.style.display     = '';
+        },
+      });
+    }
+  });
 
   // ── Auto-uppercase plate ID
   plateInput.addEventListener('input', () => {
