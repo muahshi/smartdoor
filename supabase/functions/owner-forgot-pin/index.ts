@@ -153,35 +153,49 @@ serve(async (req) => {
       if (ch === 'phone') {
         maskedContact = maskPhone(user.phone);
         // Send via MSG91 SMS
-        const msg91Key = Deno.env.get('MSG91_API_KEY');
-        const msg91Sender = Deno.env.get('MSG91_SENDER_ID') || 'SMRTDR';
-        if (msg91Key) {
+        const msg91Key      = Deno.env.get('MSG91_API_KEY');
+        const msg91Sender   = Deno.env.get('MSG91_SENDER_ID') || 'SMRTDR';
+        const msg91Template = Deno.env.get('MSG91_OTP_TEMPLATE_ID');
+        if (msg91Key && msg91Template) {
           try {
             const smsRes = await fetch('https://api.msg91.com/api/v5/otp', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', authkey: msg91Key },
               body: JSON.stringify({
-                template_id: Deno.env.get('MSG91_OTP_TEMPLATE_ID') || '',
+                template_id: msg91Template,
                 mobile: `91${user.phone}`,
                 otp: otpCode,
                 sender: msg91Sender,
               }),
             });
-            sendSuccess = smsRes.ok;
+            // MSG91's OTP API can return HTTP 200 with an error in the JSON
+            // body (e.g. "Template Id Missing" / DLT rejection) — it does
+            // NOT always use a non-2xx status for a failed send. Checking
+            // only smsRes.ok let requests silently "succeed" over the API
+            // call while no SMS ever reached the phone, exactly what was
+            // reported in production. type === 'success' is MSG91's actual
+            // send-result field.
+            let smsBody: { type?: string; message?: string } = {};
+            try { smsBody = await smsRes.json(); } catch { /* non-JSON body — treat as failure below */ }
+            sendSuccess = smsRes.ok && smsBody?.type === 'success';
+            if (!sendSuccess) {
+              console.error('[owner-forgot-pin] MSG91 did not confirm delivery:', smsRes.status, smsBody?.message || smsBody);
+            }
           } catch (e) {
             console.error('[owner-forgot-pin] SMS send failed:', e);
           }
         } else {
-          // MSG91_API_KEY is not configured — there is no channel to deliver
-          // the OTP through. Previously this branch logged the raw OTP to
-          // the Edge Function logs and reported sendSuccess = true, which
-          // (a) leaked a live, usable OTP into logs, and (b) told the owner
+          // MSG91_API_KEY or MSG91_OTP_TEMPLATE_ID is not configured — there
+          // is no channel to deliver the OTP through. Previously this branch
+          // logged the raw OTP to the Edge Function logs and reported
+          // sendSuccess = true, which (a) leaked a live, usable OTP into
+          // logs, and (b) told the owner
           // "OTP sent" when nothing was actually delivered, silently
           // stranding them on the recovery screen. Treat it as a real
           // send failure instead — the existing `if (!sendSuccess)` block
           // below already invalidates the stored OTP and returns a proper
           // error to the client.
-          console.error('[owner-forgot-pin] MSG91_API_KEY not configured — cannot send SMS OTP.');
+          console.error('[owner-forgot-pin] MSG91_API_KEY or MSG91_OTP_TEMPLATE_ID not configured — cannot send SMS OTP.');
           sendSuccess = false;
         }
       } else {
