@@ -1913,14 +1913,14 @@ async function loadDashboard() {
     const ro = document.getElementById('dashRecentOrders');
     if (ro) {
       const rec = orders.slice(0,5);
-      ro.innerHTML = rec.length ? rec.map(o=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:11px;color:var(--muted);min-width:130px">${o.order_number}</span><span style="flex:1;font-size:12px;font-weight:500">${o.customer_name||'—'}</span><span style="font-size:12px;font-weight:600">${fmtMoney(o.total_amount)}</span>${badgeHTML(o.payment_status)}</div>`).join('') : '<div class="empty-state"><div class="text">No orders yet</div></div>';
+      ro.innerHTML = rec.length ? rec.map(o=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:11px;color:var(--muted);min-width:130px">${escapeHtml(o.order_number)}</span><span style="flex:1;font-size:12px;font-weight:500">${escapeHtml(o.customer_name||'—')}</span><span style="font-size:12px;font-weight:600">${fmtMoney(o.total_amount)}</span>${badgeHTML(o.payment_status)}</div>`).join('') : '<div class="empty-state"><div class="text">No orders yet</div></div>';
     }
   }
   const tRes = await adminCall('ticket_list', {status:'open',limit:5});
   const te = document.getElementById('dashOpenTickets');
   if (te) {
     if (!tRes.success || !tRes.tickets?.length) { te.innerHTML='<div class="empty-state"><div class="text">No open tickets 🎉</div></div>'; }
-    else te.innerHTML = tRes.tickets.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:11px;color:var(--muted);min-width:120px">${t.ticket_number}</span><span style="flex:1;font-size:12px;font-weight:500">${t.subject}</span>${priorityBadge(t.priority)}</div>`).join('');
+    else te.innerHTML = tRes.tickets.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:monospace;font-size:11px;color:var(--muted);min-width:120px">${escapeHtml(t.ticket_number)}</span><span style="flex:1;font-size:12px;font-weight:500">${escapeHtml(t.subject||'')}</span>${priorityBadge(t.priority)}</div>`).join('');
   }
 }
 
@@ -1938,9 +1938,9 @@ async function loadCustomers() {
   tbody.innerHTML = res.customers.map(c => {
     const sub = c.subscriptions?.[0];
     return `<tr>
-      <td><div style="font-weight:600;font-size:13px">${c.full_name}</div><div style="font-size:11px;color:var(--muted)">${c.email||'—'}</div></td>
-      <td><span style="font-family:monospace;font-size:12px">${c.plate_id||'—'}</span></td>
-      <td>${c.phone}</td>
+      <td><div style="font-weight:600;font-size:13px">${escapeHtml(c.full_name||'')}</div><div style="font-size:11px;color:var(--muted)">${escapeHtml(c.email||'—')}</div></td>
+      <td><span style="font-family:monospace;font-size:12px">${escapeHtml(c.plate_id||'—')}</span></td>
+      <td>${escapeHtml(c.phone||'')}</td>
       <td>${sub?planBadge(sub.plan):'<span style="color:var(--muted);font-size:11px">None</span>'}</td>
       <td>${sub?badgeHTML(sub.status):'—'}</td>
       <td style="text-align:center;font-weight:600">${(c.orders||[]).length}</td>
@@ -1976,8 +1976,8 @@ window.openCustomerProfile = async function(customerId) {
   }
   if (mb) mb.innerHTML = `
     <div class="profile-header">
-      <div class="profile-avatar">${(user.full_name||'?')[0]}</div>
-      <div><div class="profile-name">${user.full_name}</div><div class="profile-meta">${user.email||''} · ${user.phone}</div></div>
+      <div class="profile-avatar">${escapeHtml((user.full_name||'?')[0])}</div>
+      <div><div class="profile-name">${escapeHtml(user.full_name||'')}</div><div class="profile-meta">${escapeHtml(user.email||'')} · ${escapeHtml(user.phone||'')}</div></div>
     </div>
     <div class="grid-3" style="margin-bottom:16px">
       <div class="stat-pill"><div class="stat-pill-value">${(orders||[]).length}</div><div class="stat-pill-label">Orders</div></div>
@@ -2027,8 +2027,8 @@ async function loadOrders(status) {
   const orders=res.orders||[];
   if(!orders.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="icon">🛒</div><div class="text">No orders</div></div></td></tr>';return;}
   tbody.innerHTML=orders.map(o=>`<tr>
-    <td><span style="font-family:monospace;font-size:11px">${o.order_number}</span></td>
-    <td><div style="font-weight:500;font-size:12px">${o.customer_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${o.customer_phone||''}</div></td>
+    <td><span style="font-family:monospace;font-size:11px">${escapeHtml(o.order_number)}</span></td>
+    <td><div style="font-weight:500;font-size:12px">${escapeHtml(o.customer_name||'—')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(o.customer_phone||'')}</div></td>
     <td style="font-size:12px;text-transform:capitalize">${o.product_type}</td>
     <td style="font-weight:600">${fmtMoney(o.total_amount)}</td>
     <td>${badgeHTML(o.payment_status)}</td>
@@ -2087,11 +2087,11 @@ async function loadManufacturing(status) {
   const items=qRes.queue||[];
   if(!items.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="icon">🏭</div><div class="text">Queue empty</div></div></td></tr>';return;}
   tbody.innerHTML=items.map(item=>`<tr>
-    <td><span style="font-family:monospace;font-weight:600;font-size:12px">${item.plate_id}</span></td>
-    <td><div style="font-size:12px;font-weight:500">${item.plate_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${item.house_number||'—'}</div></td>
-    <td style="font-size:12px;text-transform:capitalize">${item.product_type}</td>
-    <td><span style="font-family:monospace;font-size:10px;color:var(--muted)">${item.orders?.order_number||'—'}</span></td>
-    <td><div style="font-size:12px">${item.orders?.customer_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${item.orders?.customer_phone||''}</div></td>
+    <td><span style="font-family:monospace;font-weight:600;font-size:12px">${escapeHtml(item.plate_id)}</span></td>
+    <td><div style="font-size:12px;font-weight:500">${escapeHtml(item.plate_name||'—')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(item.house_number||'—')}</div></td>
+    <td style="font-size:12px;text-transform:capitalize">${escapeHtml(item.product_type)}</td>
+    <td><span style="font-family:monospace;font-size:10px;color:var(--muted)">${escapeHtml(item.orders?.order_number||'—')}</span></td>
+    <td><div style="font-size:12px">${escapeHtml(item.orders?.customer_name||'—')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(item.orders?.customer_phone||'')}</div></td>
     <td>${mfgBadge(item.production_status)}</td>
     <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="downloadQR('${item.plate_id}','png')">↓PNG</button></div></td>
     <td><select class="form-select" style="font-size:11px;padding:4px 8px;height:28px" onchange="updateMfgStatus('${item.id}',this.value)"><option value="">Update…</option><option value="queued">Queued</option><option value="printing">In Production</option><option value="quality_check">QC Check</option><option value="packed">Packed</option><option value="ready">Ready</option></select></td>
@@ -2140,10 +2140,10 @@ window.searchQR = async function() {
   const res=await adminCall('qr_search',{plate_id:q});
   if(!res.success||!res.results?.length){re.innerHTML=`<div class="empty-state"><div class="icon">📱</div><div class="text">No QR records for: ${escapeHtml(q)}</div></div>`;return;}
   re.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Plate ID</th><th>Order #</th><th>Customer</th><th>Product</th><th>Status</th><th>Actions</th></tr></thead><tbody>${res.results.map(item=>`<tr>
-    <td><span style="font-family:monospace;font-weight:600">${item.plate_id}</span></td>
-    <td><span style="font-family:monospace;font-size:11px;color:var(--muted)">${item.orders?.order_number||'—'}</span></td>
-    <td>${item.orders?.customer_name||'—'}</td>
-    <td style="text-transform:capitalize">${item.product_type}</td>
+    <td><span style="font-family:monospace;font-weight:600">${escapeHtml(item.plate_id)}</span></td>
+    <td><span style="font-family:monospace;font-size:11px;color:var(--muted)">${escapeHtml(item.orders?.order_number||'—')}</span></td>
+    <td>${escapeHtml(item.orders?.customer_name||'—')}</td>
+    <td style="text-transform:capitalize">${escapeHtml(item.product_type)}</td>
     <td>${mfgBadge(item.production_status)}</td>
     <td><button class="btn btn-ghost btn-sm" onclick="openQRActions('${item.plate_id}')">⚙️</button></td>
   </tr>`).join('')}</tbody></table></div>`;
@@ -2180,8 +2180,8 @@ async function loadSubscriptions(statusFilter) {
     const exp=new Date(s.expiry_date); const dl=Math.ceil((exp-Date.now())/(86400000));
     const ec=dl<=7?'#EF4444':dl<=30?'#F59E0B':'#10B981';
     return `<tr>
-      <td><div style="font-weight:500;font-size:12px">${s.users?.full_name||'—'}</div><div style="font-size:10px;color:var(--muted)">${s.users?.phone||''}</div></td>
-      <td><span style="font-family:monospace;font-size:11px">${s.users?.plate_id||'—'}</span></td>
+      <td><div style="font-weight:500;font-size:12px">${escapeHtml(s.users?.full_name||'—')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(s.users?.phone||'')}</div></td>
+      <td><span style="font-family:monospace;font-size:11px">${escapeHtml(s.users?.plate_id||'—')}</span></td>
       <td>${planBadge(s.plan)}</td>
       <td>${badgeHTML(s.status)}</td>
       <td><div style="font-size:12px">${fmtDate(s.expiry_date)}</div><div style="font-size:10px;color:${ec}">${dl>0?dl+'d left':'Expired'}</div></td>
@@ -2227,12 +2227,12 @@ async function loadSupport() {
   const el=document.getElementById('ticketsList'); if(!el) return;
   if(!tRes.success||!tRes.tickets?.length){el.innerHTML='<div class="empty-state"><div class="icon">🎫</div><div class="text">No tickets</div></div>';return;}
   el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>Ticket #</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Date</th><th>Action</th></tr></thead><tbody>${tRes.tickets.map(t=>`<tr>
-    <td><span style="font-family:monospace;font-size:11px">${t.ticket_number}</span></td>
-    <td><div style="font-size:12px;font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.subject}</div><div style="font-size:10px;color:var(--muted)">${t.customer_name||''}</div></td>
-    <td style="font-size:11px;text-transform:capitalize">${t.category}</td>
+    <td><span style="font-family:monospace;font-size:11px">${escapeHtml(t.ticket_number)}</span></td>
+    <td><div style="font-size:12px;font-weight:500;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.subject||'')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(t.customer_name||'')}</div></td>
+    <td style="font-size:11px;text-transform:capitalize">${escapeHtml(t.category||'')}</td>
     <td>${priorityBadge(t.priority)}</td>
     <td>${ticketBadge(t.status)}</td>
-    <td style="font-size:11px;color:var(--muted)">${t.admin_users?.full_name||'Unassigned'}</td>
+    <td style="font-size:11px;color:var(--muted)">${escapeHtml(t.admin_users?.full_name||'Unassigned')}</td>
     <td style="font-size:11px;color:var(--muted)">${fmtDate(t.created_at)}</td>
     <td><button class="btn btn-ghost btn-sm" onclick="openTicketDetail('${t.id}')">View</button></td>
   </tr>`).join('')}</tbody></table></div>`;
@@ -2251,9 +2251,9 @@ window.openTicketDetail = async function(ticketId) {
   const tt=document.getElementById('ticketModalTitle'); if(tt) tt.textContent=t.ticket_number;
   document.getElementById('ticketModal')._tid=t.id;
   if(mb) mb.innerHTML=`
-    <div style="font-size:14px;font-weight:600;margin-bottom:6px">${t.subject}</div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px">${escapeHtml(t.subject||'')}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${ticketBadge(t.status)} ${priorityBadge(t.priority)}</div>
-    <div style="font-size:12px;color:var(--muted);background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:12px">${t.description||'No description'}</div>
+    <div style="font-size:12px;color:var(--muted);background:var(--surface2);border-radius:8px;padding:10px;margin-bottom:12px">${escapeHtml(t.description||'No description')}</div>
     <div class="grid-2" style="margin-bottom:12px">
       <div class="form-group" style="margin:0"><label class="form-label">Status</label>
         <select class="form-select" id="ticketStatusEdit">${['open','pending','resolved','closed'].map(s=>`<option value="${s}"${t.status===s?' selected':''}>${s}</option>`).join('')}</select></div>
@@ -2265,7 +2265,7 @@ window.openTicketDetail = async function(ticketId) {
       <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addNote('${t.id}')">Add Note</button>
     </div>
     <div><div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Comments (${(res.comments||[]).length})</div>
-      ${(res.comments||[]).map(c=>`<div style="padding:8px;background:var(--surface2);border-radius:8px;margin-bottom:6px"><div style="font-size:11px;color:var(--muted);margin-bottom:3px">${c.admin_users?.full_name||'Admin'} · ${fmtDate(c.created_at)}${c.is_internal?' · 🔒':''}</div><div style="font-size:12px">${c.content}</div></div>`).join('')||'<div style="color:var(--muted);font-size:12px">No comments yet</div>'}
+      ${(res.comments||[]).map(c=>`<div style="padding:8px;background:var(--surface2);border-radius:8px;margin-bottom:6px"><div style="font-size:11px;color:var(--muted);margin-bottom:3px">${escapeHtml(c.admin_users?.full_name||'Admin')} · ${fmtDate(c.created_at)}${c.is_internal?' · 🔒':''}</div><div style="font-size:12px">${escapeHtml(c.content||'')}</div></div>`).join('')||'<div style="color:var(--muted);font-size:12px">No comments yet</div>'}
     </div>`;
 };
 window.saveTicketChanges = async function() {
@@ -2301,9 +2301,9 @@ async function loadCommunication() {
   if(!res.success||!res.logs?.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><div class="icon">📞</div><div class="text">No records</div></div></td></tr>';return;}
   tbody.innerHTML=res.logs.map(log=>`<tr>
     <td style="font-size:11px;color:var(--muted)">${fmtDate(log.created_at)}</td>
-    <td><span style="font-family:monospace;font-size:12px">${log.plate_id||'—'}</span></td>
-    <td><span class="badge badge-info">${(log.event_type||'').replace(/_/g,' ')}</span></td>
-    <td style="font-size:12px">${log.customer_name||'—'}</td>
+    <td><span style="font-family:monospace;font-size:12px">${escapeHtml(log.plate_id||'—')}</span></td>
+    <td><span class="badge badge-info">${escapeHtml((log.event_type||'').replace(/_/g,' '))}</span></td>
+    <td style="font-size:12px">${escapeHtml(log.customer_name||'—')}</td>
     <td style="font-size:12px">${log.duration_seconds?log.duration_seconds+'s':'—'}</td>
     <td style="font-size:11px;color:var(--muted)">${log.ai_intent||'—'}</td>
     <td style="font-size:11px;color:var(--muted)">${log.status||'—'}</td>
@@ -2355,7 +2355,7 @@ async function loadAuditLogs() {
   el.innerHTML=res.logs.map(log=>`<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
     <div style="width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${log.action?.includes('error')?'#EF4444':'#10B981'}"></div>
     <div style="font-family:monospace;font-size:10px;color:var(--muted);white-space:nowrap;min-width:90px">${fmtDate(log.created_at)}</div>
-    <div><div style="font-size:12px;font-weight:600">${log.action||'—'} · ${log.resource||'—'}</div><div style="font-size:11px;color:var(--muted)">${log.admin_users?.full_name||'System'} — ${log.resource_id||''}</div></div>
+    <div><div style="font-size:12px;font-weight:600">${escapeHtml(log.action||'—')} · ${escapeHtml(log.resource||'—')}</div><div style="font-size:11px;color:var(--muted)">${escapeHtml(log.admin_users?.full_name||'System')} — ${escapeHtml(log.resource_id||'')}</div></div>
   </div>`).join('');
 }
 window.exportAuditLogs=function(){showToast('Export coming soon','info');};
@@ -2389,9 +2389,9 @@ async function loadTeam() {
   const res=await adminCall('admin_team');
   if(!res.success||!res.admins?.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><div class="icon">🛡️</div><div class="text">No admin users</div></div></td></tr>';return;}
   tbody.innerHTML=res.admins.map(a=>`<tr>
-    <td><div style="font-weight:600;font-size:13px">${a.full_name||'—'}</div></td>
-    <td style="font-size:12px;color:var(--muted)">${a.email||'—'}</td>
-    <td><span class="badge badge-purple">${a.role_label||a.role_name||'—'}</span></td>
+    <td><div style="font-weight:600;font-size:13px">${escapeHtml(a.full_name||'—')}</div></td>
+    <td style="font-size:12px;color:var(--muted)">${escapeHtml(a.email||'—')}</td>
+    <td><span class="badge badge-purple">${escapeHtml(a.role_label||a.role_name||'—')}</span></td>
     <td style="font-size:11px;color:var(--muted)">${fmtDate(a.last_login)}</td>
     <td>${badgeHTML(a.is_active?'active':'inactive')}</td>
     <td><button class="btn btn-ghost btn-sm" onclick="showToast('Role: ${a.role_name||'—'}','info')">Details</button></td>
@@ -2747,10 +2747,10 @@ window.submitCreateCustomer = async function() {
   if(pr) {
     pr.innerHTML=`<div id="new-cust-qr-wrap" style="text-align:center;margin-bottom:16px"><div style="width:200px;height:200px;background:#0B0B0B;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto;color:#D4AF37;font-size:12px">⏳ Generating QR...</div></div>
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:2">
-      <div><b>Plate ID:</b> <span style="font-family:monospace;color:var(--accent2)">${c.plate_id}</span></div>
-      <div><b>Name:</b> ${c.full_name}</div><div><b>Phone:</b> ${c.phone}</div><div><b>Product:</b> ${c.product_type}</div>
-      <div><b>Source:</b> ${c.order_source||orderSource}</div>
-      ${c.order_number?`<div><b>Order #:</b> ${c.order_number}</div>`:''}
+      <div><b>Plate ID:</b> <span style="font-family:monospace;color:var(--accent2)">${escapeHtml(c.plate_id||'')}</span></div>
+      <div><b>Name:</b> ${escapeHtml(c.full_name||'')}</div><div><b>Phone:</b> ${escapeHtml(c.phone||'')}</div><div><b>Product:</b> ${escapeHtml(c.product_type||'')}</div>
+      <div><b>Source:</b> ${escapeHtml(c.order_source||orderSource||'')}</div>
+      ${c.order_number?`<div><b>Order #:</b> ${escapeHtml(c.order_number)}</div>`:''}
       ${extOrderId?`<div><b>Ext Order ID:</b> ${extOrderId}</div>`:''}
       ${c.subscription?`<div><b>Plan:</b> ${c.subscription.plan}</div>`:''}
     </div>

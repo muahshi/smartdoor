@@ -452,6 +452,7 @@ import {
 } from '/services/guardPanel.js';
 import { findUnitByNumber, resolveRoutingForUnit } from '/services/propertyManagement.js';
 import { lookupPassByCode } from '/services/visitorPass.js';
+import { escapeHtml } from '/services/sanitize.js';
 
 // ── STATE ──
 let _guard = null;
@@ -539,7 +540,7 @@ window.searchUnit = function(val) {
     const result = await findUnitByNumber(_property.id, val);
     const el = document.getElementById('unit-result');
     if (!result.success || !result.units.length) {
-      el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:6px 0;">No unit found for "${val}"</div>`;
+      el.innerHTML = `<div style="color:var(--muted);font-size:12px;padding:6px 0;">No unit found for "${escapeHtml(val)}"</div>`;
       _selectedUnitId = null; return;
     }
     const unit = result.units[0];
@@ -547,16 +548,16 @@ window.searchUnit = function(val) {
     _selectedUnitId = unit.id;
     el.innerHTML = `
       <div class="search-result">
-        <span class="unit-number">${unit.towers?.name || ''} – ${unit.unit_number}</span>
+        <span class="unit-number">${escapeHtml(unit.towers?.name || '')} – ${escapeHtml(unit.unit_number)}</span>
         <div class="resident-list">
           ${residents.sort((a,b)=>a.routing_priority-b.routing_priority).map(r=>`
             <div class="resident-row">
               <div>
-                <span class="resident-priority">${r.routing_priority}</span>
-                <span style="font-size:13px; font-weight:600; margin-left:8px;">${r.full_name}</span>
-                <span style="font-size:11px; color:var(--muted); margin-left:6px;">${r.resident_type}</span>
+                <span class="resident-priority">${escapeHtml(r.routing_priority)}</span>
+                <span style="font-size:13px; font-weight:600; margin-left:8px;">${escapeHtml(r.full_name)}</span>
+                <span style="font-size:11px; color:var(--muted); margin-left:6px;">${escapeHtml(r.resident_type)}</span>
               </div>
-              <span style="font-size:12px; color:var(--muted);">${r.phone}</span>
+              <span style="font-size:12px; color:var(--muted);">${escapeHtml(r.phone)}</span>
             </div>
           `).join('')}
         </div>
@@ -624,12 +625,12 @@ async function loadTodayDeliveries() {
     <div class="checkin-item">
       <div class="checkin-info">
         <div class="visitor-name">
-          <span class="partner-tag partner-${d.partner}">${d.partner.toUpperCase()}</span>
-          ${d.delivery_person_name ? `· ${d.delivery_person_name}` : ''}
+          <span class="partner-tag partner-${escapeHtml(d.partner)}">${escapeHtml((d.partner||'').toUpperCase())}</span>
+          ${d.delivery_person_name ? `· ${escapeHtml(d.delivery_person_name)}` : ''}
         </div>
-        <div class="visitor-meta">Unit ${d.units?.unit_number || '?'} · ${_timeAgo(d.arrived_at)}</div>
+        <div class="visitor-meta">Unit ${escapeHtml(d.units?.unit_number || '?')} · ${escapeHtml(_timeAgo(d.arrived_at))}</div>
       </div>
-      <span class="status-badge ${d.status==='delivered'?'status-approved':'status-pending'}">${d.status}</span>
+      <span class="status-badge ${d.status==='delivered'?'status-approved':'status-pending'}">${escapeHtml(d.status)}</span>
     </div>
   `).join('');
 }
@@ -646,10 +647,10 @@ async function loadTodayLog() {
   else logEl.innerHTML = items.map(c=>`
     <div class="checkin-item">
       <div class="checkin-info">
-        <div class="visitor-name">${c.visitor_name}</div>
-        <div class="visitor-meta">${c.units?.unit_number||'?'} · ${c.purpose||''} · ${_timeAgo(c.checked_in_at)}</div>
+        <div class="visitor-name">${escapeHtml(c.visitor_name)}</div>
+        <div class="visitor-meta">${escapeHtml(c.units?.unit_number||'?')} · ${escapeHtml(c.purpose||'')} · ${escapeHtml(_timeAgo(c.checked_in_at))}</div>
       </div>
-      <span class="status-badge status-${c.approval_status==='auto_approved'?'auto':c.approval_status}">${c.approval_status.replace('_',' ')}</span>
+      <span class="status-badge status-${c.approval_status==='auto_approved'?'auto':escapeHtml(c.approval_status)}">${escapeHtml((c.approval_status||'').replace('_',' '))}</span>
     </div>
   `).join('');
 
@@ -659,8 +660,8 @@ async function loadTodayLog() {
   else pendingEl.innerHTML = pendingItems.map(c=>`
     <div class="checkin-item">
       <div class="checkin-info">
-        <div class="visitor-name">${c.visitor_name}</div>
-        <div class="visitor-meta">Flat ${c.units?.unit_number||'?'} · ${_timeAgo(c.checked_in_at)}</div>
+        <div class="visitor-name">${escapeHtml(c.visitor_name)}</div>
+        <div class="visitor-meta">Flat ${escapeHtml(c.units?.unit_number||'?')} · ${escapeHtml(_timeAgo(c.checked_in_at))}</div>
       </div>
       <div>
         <button class="btn btn-success btn-sm" onclick="approveCheckin('${c.id}')">✓</button>
@@ -681,7 +682,7 @@ window.triggerEmergency = async function(type) {
   _activeEmergencyId = result.event.id;
   document.getElementById('active-emergency-card').style.display='';
   document.getElementById('active-emergency-info').innerHTML=`
-    <div style="font-size:16px;font-weight:700;color:var(--red);">🚨 ${type.toUpperCase()} ALERT ACTIVE</div>
+    <div style="font-size:16px;font-weight:700;color:var(--red);">🚨 ${escapeHtml((type||'').toUpperCase())} ALERT ACTIVE</div>
     <div style="font-size:13px;color:var(--muted);margin-top:4px;">Triggered at ${new Date().toLocaleTimeString('en-IN')}</div>
   `;
   toast('🚨 Emergency alert broadcast!');
@@ -711,15 +712,15 @@ window.verifyPass = async function() {
       <div class="search-result" style="border-color:var(--green);">
         <div style="color:var(--green);font-size:14px;font-weight:700;">✓ Valid Pass</div>
         <div style="margin-top:8px;">
-          <div><b>${result.pass.visitor_name}</b></div>
-          <div style="font-size:12px;color:var(--muted);">Unit ${result.pass.unit_number} · ${result.pass.pass_type} · ${result.pass.purpose||''}</div>
+          <div><b>${escapeHtml(result.pass.visitor_name)}</b></div>
+          <div style="font-size:12px;color:var(--muted);">Unit ${escapeHtml(result.pass.unit_number)} · ${escapeHtml(result.pass.pass_type)} · ${escapeHtml(result.pass.purpose||'')}</div>
         </div>
       </div>`;
   } else {
     el.innerHTML=`
       <div class="search-result" style="border-color:var(--red);">
         <div style="color:var(--red);font-size:14px;font-weight:700;">✗ Invalid Pass</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${result.error || 'Pass not found'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${escapeHtml(result.error || 'Pass not found')}</div>
       </div>`;
   }
 };
@@ -735,9 +736,9 @@ window.searchResident = async function(val) {
     }
     el.innerHTML = result.units.map(u=>`
       <div class="search-result" style="margin-bottom:8px;">
-        <span class="unit-number">${u.towers?.name||''} ${u.unit_number}</span>
+        <span class="unit-number">${escapeHtml(u.towers?.name||'')} ${escapeHtml(u.unit_number)}</span>
         ${(u.residents||[]).map(r=>`
-          <div style="font-size:13px;margin-top:6px;">${r.full_name} <span style="color:var(--muted);font-size:11px;">${r.phone}</span></div>
+          <div style="font-size:13px;margin-top:6px;">${escapeHtml(r.full_name)} <span style="color:var(--muted);font-size:11px;">${escapeHtml(r.phone)}</span></div>
         `).join('')}
       </div>
     `).join('');
