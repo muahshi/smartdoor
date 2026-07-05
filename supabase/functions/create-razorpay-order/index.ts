@@ -61,19 +61,37 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     // ── Duplicate order check (replay prevention) ──
-    // Same email + same day mein ek hi pending order allowed
+    // Same email + a pending order created very recently → likely a genuine
+    // double-submit (double click, double tab), so still blocked.
+    //
+    // FIX (Phase 11 — 409 root cause): this used to match ANY 'pending'
+    // order from the whole calendar day. Razorpay checkout has no
+    // server-side "cancelled" callback — when a customer opens checkout,
+    // then dismisses the Razorpay modal, the order row this function just
+    // inserted stays 'pending' forever (nothing ever flips it away from
+    // that status). The very next retry, seconds later, matched that same
+    // stale 'pending' row from the whole day and was wrongly rejected with
+    // 409, and verify-razorpay-payment was never reached.
+    //
+    // Client-side (services/payments.js) now proactively marks an order
+    // 'failed' the moment the user dismisses the checkout modal (see
+    // cancel-pending-order), which is the real fix for the common case.
+    // This narrowed time window is the defense-in-depth backstop for when
+    // that call doesn't land (offline, tab killed, etc.) — a 'pending' row
+    // older than a couple minutes is essentially never a live in-progress
+    // checkout, so it should no longer block a genuine retry.
     if (customerEmail) {
-      const today = new Date().toISOString().split("T")[0];
+      const recentWindowStart = new Date(Date.now() - 3 * 60 * 1000).toISOString();
       const { data: dupes } = await supabase
         .from("orders")
         .select("id")
         .eq("customer_email", customerEmail)
         .eq("payment_status", "pending")
-        .gte("created_at", today + "T00:00:00Z")
+        .gte("created_at", recentWindowStart)
         .limit(1);
 
       if (dupes && dupes.length > 0) {
-        return Response.json({ success: false, message: "A pending order already exists. Complete or cancel it first." }, { status: 409, headers: corsHeaders });
+        return Response.json({ success: false, message: "A payment for this email is already in progress. Please wait a moment and try again." }, { status: 409, headers: corsHeaders });
       }
     }
 
