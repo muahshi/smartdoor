@@ -32,6 +32,7 @@ import {
   sendOwnerReply, sendOwnerVoiceReply, STATIC_QUICK_REPLIES, getAISuggestedReplies,
   generateAISummary, getInboxUnreadCount, subscribeToTyping, sendTypingSignal,
 } from '../services/messaging.js';
+import { getCommunicationCenterData } from '../services/communicationCenter.js';
 
 const DashboardModule = (() => {
   // ────────── STATE ──────────
@@ -54,6 +55,8 @@ const DashboardModule = (() => {
     orderSummary: null,          // Phase 6: latest order tracking
     onboarding: null,            // Setup checklist progress
     inbox: { conversations: [], activeId: null, activeConversation: null, filter: 'all', search: '', quickReplies: STATIC_QUICK_REPLIES.slice(0, 3) },
+    // Phase 7C — Smart Communication Center (read-only, additive; reuses inbox.conversations data source via services/communicationCenter.js)
+    commCenter: { view: 'threads', group: 'today', dateRange: 'all', search: '', items: [], groups: {} },
     _realtimeUnsubs: [],
   };
 
@@ -1477,6 +1480,145 @@ const DashboardModule = (() => {
     }
 
     refreshInbox();
+    setupCommCenter();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // PHASE 7C — SMART COMMUNICATION CENTER
+  // Read-only, additive. Reuses listConversations() (same call the
+  // Threads view above makes) + visitor_memory via
+  // services/communicationCenter.js. No new tables, no new RLS,
+  // no changes to auth/RBAC/push/QR/visitor flow.
+  // ══════════════════════════════════════════════════════════════
+  function switchCommView(view) {
+    state.commCenter.view = view;
+    ['inbox-view-toggle', 'inbox-view-toggle-d'].forEach((id) => {
+      document.getElementById(id)?.querySelectorAll('.inbox-view-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+      });
+    });
+    const showThreads = view === 'threads';
+    const el = (id) => document.getElementById(id);
+    if (el('inbox-threads-panel')) el('inbox-threads-panel').style.display = showThreads ? 'block' : 'none';
+    if (el('inbox-threads-panel-d')) el('inbox-threads-panel-d').style.display = showThreads ? 'block' : 'none';
+    if (el('comm-center-panel')) el('comm-center-panel').style.display = showThreads ? 'none' : 'block';
+    if (el('comm-center-panel-d')) el('comm-center-panel-d').style.display = showThreads ? 'none' : 'block';
+    if (!showThreads) refreshCommCenter();
+  }
+
+  function setupCommCenter() {
+    // Search
+    ['comm-search', 'comm-search-d'].forEach((id) => {
+      const inputEl = document.getElementById(id);
+      inputEl?.addEventListener('input', _debounce(() => {
+        state.commCenter.search = inputEl.value;
+        refreshCommCenter();
+      }, 300));
+    });
+
+    // Date-range chips
+    ['comm-date-chips', 'comm-date-chips-d'].forEach((containerId) => {
+      const container = document.getElementById(containerId);
+      container?.querySelectorAll('.inbox-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          container.querySelectorAll('.inbox-chip').forEach((c) => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.commCenter.dateRange = chip.dataset.range;
+          refreshCommCenter();
+        });
+      });
+    });
+
+    // Group chips
+    ['comm-group-chips', 'comm-group-chips-d'].forEach((containerId) => {
+      const container = document.getElementById(containerId);
+      container?.querySelectorAll('.inbox-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          container.querySelectorAll('.inbox-chip').forEach((c) => c.classList.remove('active'));
+          chip.classList.add('active');
+          state.commCenter.group = chip.dataset.group;
+          renderCommCenterList();
+        });
+      });
+    });
+  }
+
+  async function refreshCommCenter() {
+    if (!state.owner?.id) return;
+    const res = await getCommunicationCenterData(state.owner.id, {
+      dateRange: state.commCenter.dateRange,
+      search: state.commCenter.search,
+    });
+    state.commCenter.items = res.items || [];
+    state.commCenter.groups = res.groups || {};
+    renderCommCenterList();
+  }
+
+  function _commBadgeHTML(badges) {
+    if (!badges?.length) return '';
+    return `<div class="comm-badge-row">${badges.map((b) =>
+      `<span class="comm-badge" style="background:${b.color}22;color:${b.color};">${_esc(b.text)}</span>`
+    ).join('')}</div>`;
+  }
+
+  function renderCommCenterList() {
+    const group = state.commCenter.group;
+    const list = state.commCenter.groups[group] || [];
+
+    const cards = list.map((item) => {
+      const time = _formatRelativeTime(item.lastMessageAt);
+      const nameLine = item.visitorLabel
+        ? `${_esc(item.visitorLabel)} <span style="color:rgba(255,255,255,0.35);font-weight:500;">(${_esc(item.plateId)})</span>`
+        : `<span style="color:rgba(255,255,255,0.6);">Unlabeled visitor</span> <span style="color:rgba(255,255,255,0.35);font-weight:500;">(${_esc(item.plateId)})</span>`;
+      const categoryPill = item.category ? `<span class="inbox-tag-pill">${_esc(item.category)}</span>` : '';
+      const followUpPill = item.followUpReason ? `<span class="inbox-tag-pill" style="background:rgba(239,68,68,0.15);color:#F87171;">Follow-up: ${_esc(item.followUpReason)}</span>` : '';
+      const avatar = item.tags.includes('Emergency') ? '🚨' : item.isMissed ? '📵' : item.visitCount >= 5 ? '🔁' : '💬';
+
+      // Quick actions: only ones backed by a real capability.
+      // "Open Conversation" always works (conversationId always exists here).
+      // "View Full Visitor Log" opens the existing global timeline — it is
+      // NOT scoped to this one visitor (no such filter exists in
+      // services/logs.js), so it is labeled honestly rather than pretending
+      // to filter data it can't actually filter.
+      // Call / WhatsApp are never rendered — see services/communicationCenter.js
+      // header note on why no callable contact exists for a walk-in visitor.
+      const actions = `
+        <div class="comm-actions-row">
+          <button class="comm-action-btn" data-open-conv="${item.conversationId}">Open Conversation</button>
+          <button class="comm-action-btn" data-open-log="1">View Full Visitor Log</button>
+        </div>`;
+
+      return `
+        <div class="inbox-row" style="cursor:default;flex-direction:column;align-items:stretch;">
+          <div style="display:flex;gap:10px;">
+            <div class="inbox-avatar">${avatar}</div>
+            <div class="inbox-meta">
+              <div class="inbox-name">${item.pinned ? '📌 ' : ''}${nameLine} ${categoryPill} ${followUpPill}</div>
+              <div class="inbox-preview">${_esc(item.lastMessagePreview || 'No messages yet')}</div>
+            </div>
+            <div class="inbox-right"><div class="inbox-time">${time}</div></div>
+          </div>
+          ${_commBadgeHTML(item.badges)}
+          ${actions}
+        </div>`;
+    }).join('');
+
+    const empty = !list.length;
+    ['comm-list', 'comm-list-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = cards;
+    });
+    ['comm-empty', 'comm-empty-d'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = empty ? 'block' : 'none';
+    });
+
+    document.querySelectorAll('[data-open-conv]').forEach((btn) => {
+      btn.addEventListener('click', () => openThread(btn.dataset.openConv));
+    });
+    document.querySelectorAll('[data-open-log]').forEach((btn) => {
+      btn.addEventListener('click', () => window.OwnerPremium?.openTimeline?.());
+    });
   }
 
   async function refreshInbox() {
@@ -1822,6 +1964,8 @@ const DashboardModule = (() => {
     archiveActive,
     deleteActive,
     generateSummaryActive,
+    switchCommView,
+    refreshCommCenter,
     getState: () => ({ ...state }),
   };
 })();
