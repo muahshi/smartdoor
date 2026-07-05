@@ -28,11 +28,21 @@
  *   - Smart Analytics       (peak visit hour, busiest day, 30-day total,
  *                           spam blocked — computed client-side from logs
  *                           already fetched via getLogs())
+ *   - AI Insight Cards      (PHASE 7B — peak visiting window, visitor
+ *                           trend, courier trend, repeat-visitor insight,
+ *                           security observation, weekly summary, smart
+ *                           recommendation. Rule-based, computed by
+ *                           services/aiInsights.js from data already in
+ *                           visitor_logs / visitor_memory / message_logs.
+ *                           No LLM call, no schema change. Renders into
+ *                           #ai-insights-card, a new container id that
+ *                           previously did not exist.)
  * ────────────────────────────────────────────────────────────────────────
  */
 
 import { getLogs, formatLogForDisplay } from '../services/logs.js';
 import { getNotifications, markNotificationRead } from '../services/notifications.js';
+import { getAIInsights } from '../services/aiInsights.js';
 
 const OwnerPremium = (() => {
   let ownerId = null;
@@ -369,6 +379,44 @@ const OwnerPremium = (() => {
     cards.forEach((c) => { c.innerHTML = html; });
   }
 
+  // ────────── AI Insight Cards (Phase 7B) ──────────
+
+  const _TONE_COLOR = {
+    positive:   '#22C55E',
+    warning:    '#F59E0B',
+    info:       '#00A2E8',
+    neutral:    'rgba(255,255,255,0.5)',
+    suggestion: '#C9A24B', // brass — matches owner-OS accent for "recommendation" surfaces
+  };
+
+  function _renderInsightCard(insight) {
+    const color = _TONE_COLOR[insight.tone] || _TONE_COLOR.info;
+    return `
+      <div class="op-insight-card" style="border-left:3px solid ${color};">
+        <div class="op-insight-card-head">
+          <span class="op-insight-card-icon">${insight.icon}</span>
+          <span class="op-insight-card-title">${_esc(insight.title)}</span>
+        </div>
+        <div class="op-insight-card-text">${_esc(insight.text)}</div>
+      </div>
+    `;
+  }
+
+  async function refreshAIInsights() {
+    const oid = _ownerId();
+    const cards = document.querySelectorAll('#ai-insights-card');
+    if (!oid || !cards.length) return;
+
+    const res = await getAIInsights(oid);
+    const insights = res.success ? (res.insights || []) : [];
+
+    const html = insights.length
+      ? insights.map(_renderInsightCard).join('')
+      : `<div style="font-size:0.72rem;color:rgba(255,255,255,0.35);text-align:center;padding:10px 0;">Not enough activity yet to generate insights. Check back after a few visitor scans.</div>`;
+
+    cards.forEach((c) => { c.innerHTML = html; });
+  }
+
   // ────────── init ──────────
 
   function init() {
@@ -383,6 +431,7 @@ const OwnerPremium = (() => {
       if (s?.owner?.id) {
         ownerId = s.owner.id;
         refreshSmartAnalytics();
+        refreshAIInsights();
       } else if (attempts < 40) {
         setTimeout(tryInit, 500);
       }
@@ -397,6 +446,7 @@ const OwnerPremium = (() => {
     openNotifications, closeNotifications, setNotifFilter, markRead,
     openShareAccess, closeShareAccess, _shareLinkFor,
     refreshSmartAnalytics,
+    refreshAIInsights,
   };
 })();
 
