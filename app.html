@@ -660,15 +660,15 @@
           <div class="quick-action-icon">👨‍👩‍👧</div>
           <div class="quick-action-label">Family</div>
         </div>
-        <div class="quick-action-tile" onclick="document.getElementById('visitor-logs')?.scrollIntoView({behavior:'smooth',block:'start'})">
+        <div class="quick-action-tile" onclick="OwnerPremium.openTimeline()">
           <div class="quick-action-icon">📋</div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
-        <div class="quick-action-tile" onclick="document.getElementById('sd-bell-btn-m')?.click()">
+        <div class="quick-action-tile" onclick="OwnerPremium.openNotifications()">
           <div class="quick-action-icon">🔔</div>
           <div class="quick-action-label">Notifications</div>
         </div>
-        <div class="quick-action-tile" onclick="window.DashboardModule?.showToast?.('Share Access — coming soon!', 'info')">
+        <div class="quick-action-tile" onclick="OwnerPremium.openShareAccess()">
           <div class="quick-action-icon">🔗</div>
           <div class="quick-action-label">Share Access</div>
         </div>
@@ -722,10 +722,14 @@
       <div class="dash-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Live Visitor Logs</div>
-          <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;cursor:pointer;">View All</div>
+          <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;cursor:pointer;" onclick="OwnerPremium.openTimeline()">View All</div>
         </div>
         <div id="visitor-logs"></div>
       </div>
+
+      <!-- Smart Analytics (Premium Owner Experience) -->
+      <div class="os-eyebrow" style="margin-top:14px;margin-bottom:8px;">Smart Analytics</div>
+      <div class="dash-card" id="smart-analytics-card"></div>
     </div>
     <!-- END DASHBOARD TAB -->
 
@@ -1158,15 +1162,15 @@
           <div class="quick-action-icon">👨‍👩‍👧</div>
           <div class="quick-action-label">Family</div>
         </div>
-        <div class="quick-action-tile" onclick="document.getElementById('visitor-logs')?.scrollIntoView({behavior:'smooth',block:'start'})">
+        <div class="quick-action-tile" onclick="OwnerPremium.openTimeline()">
           <div class="quick-action-icon">📋</div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
-        <div class="quick-action-tile" onclick="document.getElementById('sd-bell-btn-d')?.click()">
+        <div class="quick-action-tile" onclick="OwnerPremium.openNotifications()">
           <div class="quick-action-icon">🔔</div>
           <div class="quick-action-label">Notifications</div>
         </div>
-        <div class="quick-action-tile" onclick="window.DashboardModule?.showToast?.('Share Access — coming soon!', 'info')">
+        <div class="quick-action-tile" onclick="OwnerPremium.openShareAccess()">
           <div class="quick-action-icon">🔗</div>
           <div class="quick-action-label">Share Access</div>
         </div>
@@ -1462,9 +1466,13 @@
         <div class="dash-card" style="margin-bottom:16px;">
           <div id="visitor-logs"></div>
           <div style="margin-top:10px;text-align:center;">
-            <button style="font-size:0.72rem;color:#00A2E8;background:none;border:none;cursor:pointer;font-weight:600;">View All Logs →</button>
+            <button style="font-size:0.72rem;color:#00A2E8;background:none;border:none;cursor:pointer;font-weight:600;" onclick="OwnerPremium.openTimeline()">View All Logs →</button>
           </div>
         </div>
+
+        <!-- Smart Analytics (Premium Owner Experience) -->
+        <div class="dash-section-title">Smart Analytics</div>
+        <div class="dash-card" id="smart-analytics-card" style="margin-bottom:16px;"></div>
 
         <!-- Weekly/Monthly Chart -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -1591,6 +1599,8 @@
 <script src="js/groq.js"></script>
 <script type="module" src="js/dashboard.js"></script>
 <script type="module" src="js/app.js"></script>
+<!-- Premium Owner Experience (additive only — reads DashboardModule.getState(), never modifies dashboard.js) -->
+<script type="module" src="js/ownerPremium.js"></script>
 
 <script>
   // ── Mobile tab switcher ──
