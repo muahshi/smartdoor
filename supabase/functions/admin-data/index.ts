@@ -298,6 +298,12 @@ serve(async (req) => {
         qb = qb.eq('payment_status', status_filter);
       }
 
+      // Phase 6 completion: dealers only ever see orders they personally provisioned/created —
+      // every other role with orders:read keeps seeing the full org-wide list (unchanged).
+      if (ctx.role_name === 'dealer') {
+        qb = qb.eq('created_by_admin_id', ctx.id);
+      }
+
       const { data, error, count } = await qb;
       if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
 
@@ -570,6 +576,7 @@ serve(async (req) => {
         customer_email: customer_email || null,
         shipping_address: shipping_address || {},
         notes: notes || null,
+        created_by_admin_id: ctx.id,   // Phase 6 completion: lets dealer role see only their own orders
       }).select().single();
 
       if (orderErr) {
@@ -901,7 +908,12 @@ serve(async (req) => {
     // Request installer visit for an order — sets installation_status='pending',
     // which fires trg_orders_installation_pending → auto-creates the job.
     if (type === 'installation_request') {
-      if (!adminCan(ctx, 'orders', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      // Dealer gets this via 'installations':'write' (Phase 6 completion) without
+      // needing full 'orders':'write' (payment/manufacturing edit rights).
+      // Anyone with orders:write (support/super_admin/manufacturing) keeps working as before.
+      if (!adminCan(ctx, 'orders', 'write') && !adminCan(ctx, 'installations', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { order_id: reqOid } = body as any;
       const { error } = await db.from('orders').update({ installation_status: 'pending', updated_at: new Date().toISOString() }).eq('id', reqOid);
       if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
@@ -967,25 +979,44 @@ serve(async (req) => {
       return Response.json({ success: true, installers }, { headers });
     }
 
+    if (type === 'franchise_dealers') {
+      if (!adminCan(ctx, 'dealers', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      // Franchise sees dealers they onboarded (parent_admin_id = them). Super_admin sees all.
+      // Mirrors franchise_installers exactly, filtered to the 'dealer' role instead.
+      let q = db.from('admin_users').select('id, email, full_name, is_active, last_login_at, region, role_id, admin_roles(name,label,color)').order('created_at', { ascending: false });
+      if (ctx.role_name === 'franchise') q = q.eq('parent_admin_id', ctx.id);
+      const { data } = await q;
+      const dealers = (data || []).filter((a: any) => a.admin_roles?.name === 'dealer');
+      return Response.json({ success: true, dealers }, { headers });
+    }
+
     if (type === 'franchise_overview') {
       if (!adminCan(ctx, 'franchise_overview', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       // Lightweight region-scoped counts. If no region set on this franchise account yet,
       // returns org-wide counts (documented default — franchise onboarding should set `region`).
       const { data: fAdmin } = await db.from('admin_users').select('region').eq('id', ctx.id).maybeSingle();
       const region = fAdmin?.region || null;
-      const [installersRes, jobsRes, ticketsRes] = await Promise.all([
+      const [installersRes, dealersRes, jobsRes, ticketsRes, inventoryRes] = await Promise.all([
         db.from('admin_users').select('id', { count: 'exact', head: true }).eq('parent_admin_id', ctx.id),
+        db.from('admin_users').select('id, admin_roles(name)').eq('parent_admin_id', ctx.id),
         db.from('installation_jobs').select('id, status', { count: 'exact', head: false }),
         db.from('support_tickets').select('id, status', { count: 'exact', head: false }),
+        db.from('inventory_items').select('id, quantity_on_hand, reorder_threshold', { count: 'exact', head: false }),
       ]);
+      const dealerCount = (dealersRes.data || []).filter((a: any) => a.admin_roles?.name === 'dealer').length;
+      const inventoryRows = inventoryRes.data || [];
       return Response.json({
         success: true,
         overview: {
           region,
           installerCount: installersRes.count || 0,
+          dealerCount,
           jobsPending: (jobsRes.data || []).filter((j: any) => j.status === 'pending').length,
           jobsCompleted: (jobsRes.data || []).filter((j: any) => j.status === 'completed').length,
           openTickets: (ticketsRes.data || []).filter((t: any) => t.status === 'open').length,
+          // Additive: regional inventory snapshot (org-wide until per-region inventory tagging exists)
+          inventoryItemCount: inventoryRows.length,
+          inventoryLowStockCount: inventoryRows.filter((i: any) => Number(i.quantity_on_hand) <= Number(i.reorder_threshold || 0)).length,
         },
       }, { headers });
     }
@@ -997,6 +1028,29 @@ serve(async (req) => {
       if (ctx.role_name === 'dealer') q = q.eq('dealer_admin_id', ctx.id);
       const { data } = await q;
       return Response.json({ success: true, commissions: data || [] }, { headers });
+    }
+
+    // Manual status transition only (pending -> approved -> paid). Deliberately does NOT
+    // calculate or modify `amount` — no commission formula exists yet per the Phase 6 brief
+    // ("if business rules are not available, create placeholders only, do not invent
+    // financial logic"). Gated on commissions:write, which today only super_admin holds
+    // via the '*' wildcard — dealers keep read-only visibility into their own ledger.
+    if (type === 'commission_update_status') {
+      if (!adminCan(ctx, 'commissions', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { commission_id: cid, status: newStatus } = body as any;
+      const VALID_COMMISSION_STATUSES = ['pending', 'approved', 'paid'];
+      if (!cid || !VALID_COMMISSION_STATUSES.includes(String(newStatus))) {
+        return Response.json({ success: false, message: 'commission_id and a valid status are required' }, { status: 400, headers });
+      }
+      const { data, error } = await db.from('dealer_commissions')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', cid).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'commission_update_status',
+        resource: 'commissions', resource_id: cid, after_data: { status: newStatus },
+      });
+      return Response.json({ success: true, commission: data }, { headers });
     }
 
     return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });
