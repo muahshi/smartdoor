@@ -1539,6 +1539,33 @@ function canAccessRevenue(s) { return !REVENUE_RESTRICTED_ROLES.includes(s?.role
 // ── EDGE CALL ──
 let _authFailCount = 0;
 const _AUTH_FAIL_THRESHOLD = 3; // require 3 consecutive 401s before redirecting
+
+// Fetch with a hard timeout so a hung network request can't leave the admin
+// panel stuck on a loading state forever. One transient-network retry
+// (timeout or fetch-level failure only — never retried on a real HTTP
+// response, since re-sending a completed write like provisionCall could
+// double-submit) before giving up.
+const _FETCH_TIMEOUT_MS = 15000;
+async function _fetchWithTimeout(url, options, timeoutMs = _FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function _fetchWithRetry(url, options, retries = 1) {
+  try {
+    return await _fetchWithTimeout(url, options);
+  } catch (e) {
+    if (retries > 0 && e?.name !== 'AbortError') {
+      return _fetchWithTimeout(url, options);
+    }
+    throw e;
+  }
+}
+
 async function adminCall(type, extra = {}) {
   const s = getAdminSession();
   if (!s) { window.location.href = '/admin-login.html'; return { success: false }; }
@@ -1550,7 +1577,7 @@ async function adminCall(type, extra = {}) {
     return { success: false, error: 'config_missing' };
   }
   try {
-    const res = await fetch(edgeBase + '/admin-data', {
+    const res = await _fetchWithRetry(edgeBase + '/admin-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s.token}` },
       body: JSON.stringify({ type, ...extra }),
@@ -1567,19 +1594,25 @@ async function adminCall(type, extra = {}) {
     _authFailCount = 0; // reset on any successful response
     const data = await res.json();
     return data?.success ? data : { success: false, error: data?.message || 'Failed' };
-  } catch (e) { return { success: false, error: 'Connection error' }; }
+  } catch (e) {
+    const timedOut = e?.name === 'AbortError';
+    return { success: false, error: timedOut ? 'Request timed out. Check your connection and try again.' : 'Connection error' };
+  }
 }
 async function provisionCall(fn, body) {
   const s = getAdminSession();
   if (!s) return { success: false };
   try {
-    const res = await fetch(EDGE() + '/' + fn, {
+    const res = await _fetchWithTimeout(EDGE() + '/' + fn, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s.token}` },
       body: JSON.stringify(body),
     });
     return await res.json();
-  } catch (e) { return { success: false, error: e.message }; }
+  } catch (e) {
+    const timedOut = e?.name === 'AbortError';
+    return { success: false, error: timedOut ? 'Request timed out. Please check your connection and try again.' : e.message };
+  }
 }
 
 // ── INIT + AUTH GUARD ──
