@@ -634,15 +634,16 @@
     if (!plateSlug) { renderNotFound(); return; }
 
     try {
-      // Direct fetch — no isPlateActive gate, no activation check
-      // Visitor always sees experience if plate + owner_id exists in DB
+      // Fetch owner_id + status. Status is now checked (see renderSuspended
+      // below) — previously this deliberately skipped the check, which meant
+      // a suspended plate's QR still showed the full visitor experience.
       // Try qr_slug first, fallback to plate_id
       let plate = null;
       let plateErr = null;
 
       const res1 = await supabase
         .from('plates')
-        .select('id, plate_id, qr_slug, product_type, owner_id')
+        .select('id, plate_id, qr_slug, product_type, owner_id, status')
         .eq('qr_slug', plateSlug)
         .maybeSingle();
 
@@ -651,7 +652,7 @@
       } else {
         const res2 = await supabase
           .from('plates')
-          .select('id, plate_id, qr_slug, product_type, owner_id')
+          .select('id, plate_id, qr_slug, product_type, owner_id, status')
           .eq('plate_id', plateSlug)
           .maybeSingle();
         plate = res2.data;
@@ -660,6 +661,11 @@
 
       if (plateErr || !plate || !plate.owner_id) {
         renderNotFound();
+        return;
+      }
+
+      if (plate.status === 'suspended') {
+        renderSuspended();
         return;
       }
 
@@ -748,6 +754,16 @@
         <div class="pending-icon">🚪</div>
         <div class="pending-title" style="color:#f87171;">Plate Not Found</div>
         <div class="pending-sub">This Smart Door plate doesn't exist. Please check the QR code or contact support.</div>
+        <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
+      </div>`;
+  }
+
+  function renderSuspended() {
+    shell.innerHTML = `
+      <div class="pending-wrap">
+        <div class="pending-icon">⏸️</div>
+        <div class="pending-title" style="color:#f59e0b;">Temporarily Suspended</div>
+        <div class="pending-sub">This Smart Door plate has been temporarily suspended. Contact my Smart Door for more information.</div>
         <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
       </div>`;
   }
