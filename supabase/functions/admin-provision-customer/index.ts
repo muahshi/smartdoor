@@ -25,10 +25,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import bcryptjs from 'npm:bcryptjs@2.4.3';
-// @ts-ignore — esm.sh resolves at runtime
-import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { restrictedCors } from '../_shared/cors.ts';
 import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from '../_shared/adminAuth.ts';
+// G2 FIX: branded QR renderer (was: plain `qrcode` lib output — see premiumQr.ts header)
+import { buildPremiumQrSvg, buildPremiumQrPngDataUrl } from '../_shared/premiumQr.ts';
 
 const APP_URL   = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
 const QR_BUCKET = 'qr-codes';
@@ -163,46 +163,24 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Failed to create plate record.' }, { status: 500, headers });
     }
 
-    // ── Center lock icon inject karo SVG mein ──
-    function injectCenterLogo(svgString: string): string {
-      const whMatch = svgString.match(/width="([0-9.]+)"[^>]*height="([0-9.]+)"/);
-      const vbMatch = svgString.match(/viewBox="([0-9. ]+)"/);
-      let w = 400, h = 400;
-      if (whMatch) { w = parseFloat(whMatch[1]); h = parseFloat(whMatch[2]); }
-      else if (vbMatch) { const p = vbMatch[1].split(' '); w = parseFloat(p[2]); h = parseFloat(p[3]); }
-      const cx = w/2, cy = h/2;
-      const logoR = Math.min(w,h) * 0.11;
-      const iconScale = logoR * 1.1 / 12;
-      const tx = cx - 12*iconScale, ty = cy - 12*iconScale;
-      let svg = svgString;
-      if (!vbMatch) svg = svg.replace('<svg ', `<svg viewBox="0 0 ${w} ${h}" `);
-      const overlay = `
-  <circle cx="${cx}" cy="${cy}" r="${logoR+2}" fill="white"/>
-  <circle cx="${cx}" cy="${cy}" r="${logoR}" fill="white" stroke="#000" stroke-width="${logoR*0.06}"/>
-  <g transform="translate(${tx},${ty}) scale(${iconScale})">
-    <path d="M12 2L3 6v6c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V6L12 2z" fill="#111"/>
-    <rect x="9" y="11" width="6" height="5" rx="1" fill="white"/>
-    <path d="M10 11V9a2 2 0 1 1 4 0v2" stroke="white" stroke-width="1.4" fill="none" stroke-linecap="round"/>
-    <circle cx="12" cy="13.5" r="0.8" fill="#111"/>
-    <rect x="11.6" y="13.5" width="0.8" height="1.2" rx="0.3" fill="#111"/>
-  </g>`;
-      return svg.replace('</svg>', overlay + '\n</svg>');
-    }
-
     // ── Generate + upload QR (PNG + SVG) ──
+    // G2 FIX: was plain `qrcode` output + a generic lock-icon overlay that did
+    // not match the premium gold-on-black shield-logo design used elsewhere
+    // (services/qr.js, generate-qr, admin-plate-status). Now uses the same
+    // shared branded renderer so newly provisioned plates match the design
+    // from the moment they're created.
     const qrTargetUrl = `${APP_URL}/p/${plateId}`;
     let qrImageUrl: string | null = null;
     let qrSvgUrl: string | null = null;
 
     try {
-      const pngDataUrl: string = await QRCode.toDataURL(qrTargetUrl, { width: 800, margin: 2, errorCorrectionLevel: 'H' });
+      const pngDataUrl: string = await buildPremiumQrPngDataUrl(qrTargetUrl, { width: 800, margin: 2 });
       const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
       const pngBlob = new Blob([pngBytes], { type: 'image/png' });
       const { error: pngErr } = await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.png`, pngBlob, { contentType: 'image/png', upsert: true });
       if (!pngErr) qrImageUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.png`).data?.publicUrl || null;
 
-      const svgRaw: string = await QRCode.toString(qrTargetUrl, { type: 'svg', width: 400, margin: 2, errorCorrectionLevel: 'H' });
-      const svgStyled = injectCenterLogo(svgRaw);
+      const svgStyled = await buildPremiumQrSvg(supabaseAdmin, qrTargetUrl);
       const svgBlob = new Blob([svgStyled], { type: 'image/svg+xml' });
       const { error: svgErr } = await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.svg`, svgBlob, { contentType: 'image/svg+xml', upsert: true });
       if (!svgErr) qrSvgUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.svg`).data?.publicUrl || null;
