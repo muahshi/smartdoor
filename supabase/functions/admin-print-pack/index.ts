@@ -17,10 +17,10 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-// @ts-ignore
-import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { restrictedCors } from '../_shared/cors.ts';
 import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from '../_shared/adminAuth.ts';
+// G2 FIX: branded QR renderer (was: plain `qrcode` lib output — see premiumQr.ts header)
+import { buildPremiumQrPngDataUrl } from '../_shared/premiumQr.ts';
 
 const APP_URL = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
 const MAX_LABELS = 200; // 50 A4 pages max per batch
@@ -320,8 +320,12 @@ serve(async (req) => {
       const pin = pinMap[pid] || '****'; // masked if not provided
 
       // Generate fresh QR PNG
+      // G2 FIX: was plain black-on-white `qrcode` output — the manufacturing
+      // print pack now uses the same gold/black brand colors as every other
+      // QR surface. PNG byte format/dimensions are unchanged, so the
+      // embedding logic below (PDF XObject + PNG header parsing) is untouched.
       const qrUrl = `${APP_URL}/p/${pid}`;
-      const pngDataUrl: string = await QRCode.toDataURL(qrUrl, { width: 200, margin: 2, errorCorrectionLevel: 'H' });
+      const pngDataUrl: string = await buildPremiumQrPngDataUrl(qrUrl, { width: 200, margin: 2 });
       const base64 = pngDataUrl.split(',')[1];
 
       // Get dimensions (PNG header at bytes 16-24)
