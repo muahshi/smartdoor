@@ -25,10 +25,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import bcryptjs from 'npm:bcryptjs@2.4.3';
-// @ts-ignore
-import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { restrictedCors } from '../_shared/cors.ts';
 import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from '../_shared/adminAuth.ts';
+// G2 FIX: branded QR renderer (was: plain `qrcode` lib output — see premiumQr.ts header)
+import { buildPremiumQrSvg, buildPremiumQrPngDataUrl } from '../_shared/premiumQr.ts';
 
 const APP_URL   = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
 const QR_BUCKET = 'qr-codes';
@@ -51,14 +51,17 @@ async function generateUniquePlateId(supabaseAdmin: ReturnType<typeof getService
   return null;
 }
 
+// G2 FIX: was plain `qrcode` output (ECL 'M', no color) — now uses the same
+// shared branded renderer as admin-provision-customer so bulk-created plates
+// match the premium gold-on-black shield-logo design.
 async function uploadQr(supabaseAdmin: ReturnType<typeof getServiceClient>, plateId: string) {
   const url = `${APP_URL}/p/${plateId}`;
-  const pngDataUrl: string = await QRCode.toDataURL(url, { width: 400, margin: 4, errorCorrectionLevel: 'M' });
+  const pngDataUrl: string = await buildPremiumQrPngDataUrl(url, { width: 400, margin: 4 });
   const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
   await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.png`, new Blob([pngBytes], { type: 'image/png' }), { upsert: true });
   const qrImageUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.png`).data?.publicUrl || null;
 
-  const svgString: string = await QRCode.toString(url, { type: 'svg', width: 400, margin: 4, errorCorrectionLevel: 'M' });
+  const svgString: string = await buildPremiumQrSvg(supabaseAdmin, url);
   await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.svg`, new Blob([svgString], { type: 'image/svg+xml' }), { upsert: true });
   const qrSvgUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.svg`).data?.publicUrl || null;
 
