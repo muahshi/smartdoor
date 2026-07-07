@@ -484,8 +484,21 @@
   import { subscribeToStatusChanges } from './services/plates.js';
   import { isNightModeActive } from './services/security.js';
   import { getOrCreateConversation, sendMessage as sendConvMessage, sendVoiceMessage as sendConvVoiceMessage, getConversationMessages, subscribeToConversation, sendTypingSignal } from './services/messaging.js';
+  import { attemptTapToTalk } from './services/webrtcCall.js';
 
   const shell = document.getElementById('shell');
+
+  // Phase 2 — WebRTC Tap to Talk. Hidden <audio> element for the owner's
+  // remote voice stream when a WebRTC call connects. Created once, up
+  // front, so it exists regardless of which branch of bindActions()
+  // later runs. Not rendered by the shell template — additive only,
+  // doesn't touch any existing markup.
+  const rtcRemoteAudio = document.createElement('audio');
+  rtcRemoteAudio.id = 'rtc-remote-audio';
+  rtcRemoteAudio.autoplay = true;
+  rtcRemoteAudio.setAttribute('playsinline', '');
+  rtcRemoteAudio.style.display = 'none';
+  document.body.appendChild(rtcRemoteAudio);
 
   // Extract plate slug from BOTH sources:
   // 1. Query param: visitor.html?plate=SD-UMBAU4 (direct URL)
@@ -1521,11 +1534,24 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
     const ownerId = s.owner.id;
     const plateId = s.plate.plateId;
 
-    // CALL — masked calling with visitor log
+    // CALL — Tap to Talk (WebRTC) with automatic masked-call fallback
     const btnCall = document.getElementById('btn-call');
     let cachedPhone = null;
+    let activeRtcCall = null; // { endCall } while a WebRTC call is live
     btnCall?.addEventListener('click', async () => {
       if (btnCall.disabled) return;
+
+      // If a WebRTC call is already connected, this tap ends it — mirrors
+      // the existing masked-call button's single "Call" affordance rather
+      // than adding a second button just for Phase 2.
+      if (activeRtcCall) {
+        activeRtcCall.endCall();
+        activeRtcCall = null;
+        document.getElementById('call-sub').textContent = 'Connect with the family';
+        btnCall.disabled = !s.access?.allowCall;
+        return;
+      }
+
       let vPhone = cachedPhone;
       if (!vPhone) {
         const raw = window.prompt('Apna phone number darj karein (Aapka number surakshit rahega):');
@@ -1537,6 +1563,38 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       btnCall.disabled = true;
       document.getElementById('call-sub').textContent = 'Connecting…';
       _logVisitorEvent(ownerId, plateId, 'call_attempt');
+
+      // Try WebRTC Tap to Talk first. attemptTapToTalk() is fully guarded —
+      // it resolves { attempted: false } immediately (no mic prompt, no
+      // channel) unless this owner is explicitly opted into WebRTC and
+      // currently online, so this is a no-op path for every owner today.
+      const rtc = await attemptTapToTalk({
+        ownerId,
+        plateId,
+        remoteAudioEl: rtcRemoteAudio,
+        onStatus: (status) => {
+          if (status === 'connecting') document.getElementById('call-sub').textContent = 'Connecting…';
+          if (status === 'ringing') document.getElementById('call-sub').textContent = 'Ringing resident…';
+          if (status === 'ended') {
+            activeRtcCall = null;
+            document.getElementById('call-sub').textContent = 'Connect with the family';
+            btnCall.disabled = !s.access?.allowCall;
+          }
+        },
+      });
+
+      if (rtc.attempted && rtc.connected) {
+        activeRtcCall = { endCall: rtc.endCall };
+        document.getElementById('call-sub').textContent = 'Connected — tap again to end';
+        showToast('🔊 Connected via SmartDoor Voice', 'success');
+        if (voiceEnabled) speak('Aap resident se seedhe jud gaye hain.', 'hi-IN');
+        btnCall.disabled = false;
+        return;
+      }
+
+      // WebRTC wasn't attempted (flag off / owner offline / mic denied) or
+      // it failed/timed out/was rejected — automatically fall back to the
+      // existing, unmodified masked-calling flow. No user action needed.
       const r = await initiateMaskedCall({ plateId, ownerId, visitorPhone: vPhone });
       if (r.success) {
         document.getElementById('call-sub').textContent = 'Connected — your number is hidden';
