@@ -30,7 +30,12 @@
 
 import { getOwnerPresenceSnapshot } from './presence.js';
 import { isWebRTCEnabledForOwner } from './featureFlags.js';
-import { getIceServers, WEBRTC_CONNECT_TIMEOUT_MS, RTC_MONITORING_EVENTS } from '../config/rtcConfig.js';
+import {
+  getIceServers,
+  WEBRTC_CONNECT_TIMEOUT_MS,
+  RTC_RECONNECT_GRACE_MS,
+  RTC_MONITORING_EVENTS,
+} from '../config/rtcConfig.js';
 import {
   ringChannelName,
   callChannelName,
@@ -106,16 +111,28 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
   let callChannel = null;
   let settled = false;
   let timeoutTimer = null;
+  let reconnectGraceTimer = null;
   let connected = false;
+  let torndown = false; // PRODUCTION HARDENING: guarantees cleanup runs exactly once on any exit path
 
+  // PRODUCTION HARDENING (Fix 2): idempotent, always-releases-the-mic
+  // cleanup. Every termination path (timeout, reject, ICE failure, user
+  // hangup, or a post-connect permanent disconnect) funnels through this
+  // single function so the microphone is never left open and the peer
+  // connection/channel are never left dangling — regardless of which path
+  // triggered the end of the call.
   const cleanup = ({ stopLocalTracks = true } = {}) => {
+    if (torndown) return;
+    torndown = true;
     clearTimeout(timeoutTimer);
+    clearTimeout(reconnectGraceTimer);
     leaveChannel(callChannel);
     callChannel = null;
     try { pc.close(); } catch {}
     if (stopLocalTracks) {
       localStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
     }
+    window.removeEventListener('pagehide', _releaseOnUnload);
   };
 
   const endCall = () => {
@@ -123,6 +140,11 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
     cleanup();
     onStatus('ended');
   };
+
+  // PRODUCTION HARDENING: release the mic even if the visitor closes/
+  // refreshes the tab mid-call instead of tapping "end call".
+  const _releaseOnUnload = () => cleanup();
+  window.addEventListener('pagehide', _releaseOnUnload, { once: true });
 
   return new Promise(async (resolve) => {
     const finish = async (result) => {
@@ -150,15 +172,57 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
       }
     };
 
+    // PRODUCTION HARDENING (Fix 2 + Fix 4): once `finish()` has already
+    // resolved the outer promise as connected, this handler is the ONLY
+    // thing watching the live call. It must (a) tolerate a transient ICE
+    // disconnect without tearing the call down immediately, and (b)
+    // guarantee full cleanup — including releasing the microphone — the
+    // moment the disconnect turns out to be permanent, so the visitor UI
+    // never gets stuck in a "connected" state that's actually dead.
     pc.onconnectionstatechange = () => {
-      if (settled) return;
+      if (!settled) {
+        // Pre-connect phase — unchanged behavior.
+        if (pc.connectionState === 'connected') {
+          connected = true;
+          onStatus('connected');
+          finish({ connected: true, outcome: RTC_MONITORING_EVENTS.RTC_CONNECTED });
+        } else if (pc.connectionState === 'failed') {
+          finish({ connected: false, reason: 'ice_failed', outcome: RTC_MONITORING_EVENTS.RTC_ICE_FAILED });
+        }
+        return;
+      }
+
+      // Post-connect phase (settled === true, connected === true).
+      if (!connected || torndown) return;
+
       if (pc.connectionState === 'connected') {
-        connected = true;
-        onStatus('connected');
-        finish({ connected: true, outcome: RTC_MONITORING_EVENTS.RTC_CONNECTED });
-      } else if (pc.connectionState === 'failed') {
-        finish({ connected: false, reason: 'ice_failed', outcome: RTC_MONITORING_EVENTS.RTC_ICE_FAILED });
-      } else if ((pc.connectionState === 'disconnected' || pc.connectionState === 'closed') && connected) {
+        // Recovered — cancel any pending grace-window teardown.
+        if (reconnectGraceTimer) {
+          clearTimeout(reconnectGraceTimer);
+          reconnectGraceTimer = null;
+          onStatus('connected'); // RTC_RECONNECTED — back to a live call
+        }
+        return;
+      }
+
+      if (pc.connectionState === 'disconnected') {
+        // Transient — start (or leave running) a grace window instead of
+        // tearing down immediately. Most 'disconnected' states self-heal
+        // within a few seconds as ICE renegotiates.
+        if (!reconnectGraceTimer) {
+          onStatus('reconnecting');
+          reconnectGraceTimer = setTimeout(() => {
+            reconnectGraceTimer = null;
+            cleanup();
+            onStatus('ended');
+          }, RTC_RECONNECT_GRACE_MS);
+        }
+        return;
+      }
+
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        // Permanent — clean up immediately, don't wait out the grace window.
+        cleanup();
         onStatus('ended');
       }
     };

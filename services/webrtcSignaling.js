@@ -29,6 +29,27 @@
  * webrtcCall.js (visitor) and services/webrtcOwnerCall.js (owner). This
  * file is purely the transport layer, kept separate so both sides share
  * one implementation of "how a message gets from A to B."
+ *
+ * PRODUCTION HARDENING (Fix 1 — Secure Realtime Broadcast authorization):
+ * Both channel factories below now open with `{ private: true }`, which
+ * makes Supabase Realtime evaluate the RLS policies added in
+ * sql/40_webrtc_phase2_hardening.sql (`rtc_ring_receive_owner_only`,
+ * `rtc_ring_send_visitor_and_owner`, `rtc_call_channel_participants`)
+ * before allowing a client to join. Without `private: true` a channel is
+ * PUBLIC and bypasses RLS entirely — that was the gap. This flag change
+ * affects ONLY these two channel names; every other channel in the
+ * codebase (services/communication.js, services/logs.js, services/
+ * presence.js, etc.) is untouched and stays exactly as public as it is
+ * today, since Realtime only RLS-checks a channel when the client itself
+ * asks for `private: true` on that specific channel.
+ *
+ * For an authenticated owner session, Realtime Authorization checks
+ * policies against the caller's current JWT (auth.uid()). supabase-js v2
+ * keeps `supabase.realtime`'s auth token in sync automatically on
+ * sign-in/token-refresh — `_ensureRealtimeAuth()` below is a defensive
+ * belt-and-suspenders call (cheap, idempotent) to guarantee the very
+ * first channel join of a session already carries the current token
+ * rather than racing that internal sync on a cold page load.
  */
 
 import { supabase } from './supabase.js';
@@ -41,16 +62,31 @@ export function callChannelName(callId) {
   return `rtc:call:${callId}`;
 }
 
+async function _ensureRealtimeAuth() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    if (token) supabase.realtime.setAuth(token);
+  } catch {
+    // No session (visitor/anon) or a transient auth read failure — fine,
+    // the anon-role RLS policies still apply for anon channel joins.
+  }
+}
+
 /**
  * Joins a broadcast channel and resolves once SUBSCRIBED (or rejects on
  * timeout), so callers never broadcast into a channel that isn't ready
  * yet — a broadcast sent before SUBSCRIBED is silently dropped by
- * Supabase Realtime.
+ * Supabase Realtime. Private by default (see file header) — pass
+ * `{ private: false }` explicitly if a future caller ever needs a public
+ * signaling channel (no current caller does).
  */
-export function joinBroadcastChannel(channelName, { timeoutMs = 5000 } = {}) {
+export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, private: isPrivate = true } = {}) {
+  if (isPrivate) await _ensureRealtimeAuth();
+
   return new Promise((resolve, reject) => {
     const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: false, ack: false } },
+      config: { broadcast: { self: false, ack: false }, private: isPrivate },
     });
 
     const timer = setTimeout(() => {
@@ -58,14 +94,14 @@ export function joinBroadcastChannel(channelName, { timeoutMs = 5000 } = {}) {
       reject(new Error('Signaling channel join timed out'));
     }, timeoutMs);
 
-    channel.subscribe((status) => {
+    channel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') {
         clearTimeout(timer);
         resolve(channel);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timer);
         try { supabase.removeChannel(channel); } catch {}
-        reject(new Error(`Signaling channel failed: ${status}`));
+        reject(new Error(`Signaling channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
       }
     });
   });
@@ -98,3 +134,4 @@ export default {
   sendSignal,
   leaveChannel,
 };
+
