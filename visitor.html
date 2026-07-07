@@ -1575,6 +1575,11 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         onStatus: (status) => {
           if (status === 'connecting') document.getElementById('call-sub').textContent = 'Connecting…';
           if (status === 'ringing') document.getElementById('call-sub').textContent = 'Ringing resident…';
+          // PRODUCTION HARDENING (Fix 2 + Fix 4): a temporary ICE drop
+          // after the call was already connected. The peer connection is
+          // still open — this is UI feedback only, no state reset.
+          if (status === 'reconnecting') document.getElementById('call-sub').textContent = 'Reconnecting…';
+          if (status === 'connected' && activeRtcCall) document.getElementById('call-sub').textContent = 'Connected — tap again to end';
           if (status === 'ended') {
             activeRtcCall = null;
             document.getElementById('call-sub').textContent = 'Connect with the family';
