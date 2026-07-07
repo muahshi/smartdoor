@@ -125,31 +125,11 @@ export async function joinOwnerPresence(ownerId) {
       // not here, to avoid double-logging on every teammate device join.
     });
 
-    // FIX (review finding — disconnect attribution): this used to log
-    // `deviceId` (this local device's own key) as the device that
-    // disconnected, which is always wrong — if THIS device were the one
-    // disconnecting, its own channel would already be dead and this
-    // callback would never fire locally. `key` from the leave payload is
-    // the presence key that actually left; that's the correct value to
-    // log.
-    //
-    // FIX (review finding — duplicate rows): every surviving device on
-    // the channel receives this same 'leave' event, so logging
-    // unconditionally here wrote one duplicate row per survivor for a
-    // single real disconnect. To keep exactly one row per disconnect
-    // without a server-side dedup mechanism, survivors deterministically
-    // elect the lexicographically-lowest remaining presence key as the
-    // sole logger. All survivors compute this off the same
-    // (already-updated) presenceState(), so they agree on the same
-    // elected device without any coordination between them.
-    channel.on('presence', { event: 'leave' }, ({ key }) => {
-      // Supabase Presence has already removed the leaving key from
-      // presenceState() by the time this fires — no separate "stale"
-      // check needed.
-      const remainingKeys = Object.keys(channel.presenceState() || {}).sort();
-      const isElectedLogger = remainingKeys.length === 0 || remainingKeys[0] === deviceId;
-      if (!isElectedLogger) return;
-      _logPresenceEvent(ownerId, 'disconnect', remainingKeys.length, key).catch(() => {});
+    channel.on('presence', { event: 'leave' }, () => {
+      // A device (this one or another of the owner's) disconnected.
+      // Supabase Presence has already removed it from presenceState()
+      // by the time this fires — no separate "stale" check needed.
+      _logPresenceEvent(ownerId, 'disconnect', _deviceCount(), deviceId).catch(() => {});
     });
 
     channel.subscribe(async (status) => {
