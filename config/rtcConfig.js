@@ -101,6 +101,20 @@ export const RTC_CONFIG_DEFAULTS = {
 export const WEBRTC_CONNECT_TIMEOUT_MS = 15000;
 
 /**
+ * Production hardening (Fix 2 + Fix 4): once a call has successfully
+ * connected, a transient ICE hiccup (connectionState briefly goes to
+ * 'disconnected') should NOT immediately tear down the call — WebRTC/ICE
+ * routinely recovers from short network blips on its own. This is the
+ * grace window both webrtcCall.js (visitor) and webrtcOwnerCall.js (owner)
+ * wait for `connectionState` to return to 'connected' before treating the
+ * disconnect as permanent and running full cleanup (close peer connection,
+ * stop mic tracks, leave signaling channel, reset UI). A hard 'failed' or
+ * 'closed' state is always treated as permanent immediately, without
+ * waiting out this window.
+ */
+export const RTC_RECONNECT_GRACE_MS = 12000;
+
+/**
  * ── MONITORING EVENT NAME CONSTANTS (Phase 0/1 hook) ───────────────────
  * Canonical event-type strings for future RTC metrics, so Phase 1's
  * presence events and later phases' connection events use one shared
@@ -129,6 +143,13 @@ export const RTC_MONITORING_EVENTS = Object.freeze({
   // Added — Phase 2 (Tap to Talk). Additive only; nothing above this line
   // is renamed or removed.
   RTC_OWNER_REJECTED: 'rtc_owner_rejected',
+
+  // Added — Phase 2 Production Hardening. Additive only; nothing above
+  // this line is renamed or removed.
+  RTC_RECONNECTING: 'rtc_reconnecting',           // transient disconnect, grace window started
+  RTC_RECONNECTED: 'rtc_reconnected',             // recovered within the grace window
+  RTC_POST_CONNECT_DISCONNECT: 'rtc_post_connect_disconnect', // permanent teardown after a live call
+  RTC_CALL_CLAIMED_ELSEWHERE: 'rtc_call_claimed_elsewhere',   // another owner tab/device answered first
 });
 
 export default {
