@@ -104,6 +104,19 @@ function _setConnected() {
   `;
 }
 
+// PRODUCTION HARDENING (Fix 4): shown during a transient post-connect ICE
+// drop instead of leaving the "Connected" label up (misleading) or
+// hiding the overlay (which would orphan the still-open peer
+// connection/mic). The End Call button stays available throughout.
+function _setReconnecting() {
+  _overlayEl.querySelector('#sd-rtc-icon').textContent = '🔄';
+  _overlayEl.querySelector('#sd-rtc-title').textContent = 'Reconnecting…';
+  _overlayEl.querySelector('#sd-rtc-sub').textContent = 'Call may recover automatically';
+  _overlayEl.querySelector('#sd-rtc-actions').innerHTML = `
+    <button type="button" class="sd-rtc-btn" id="sd-rtc-hangup">End Call</button>
+  `;
+}
+
 function _setConnecting() {
   _overlayEl.querySelector('#sd-rtc-icon').textContent = '⏳';
   _overlayEl.querySelector('#sd-rtc-title').textContent = 'Connecting…';
@@ -121,8 +134,35 @@ function _setConnecting() {
  * @returns {Promise<() => void>}
  */
 export async function initOwnerCallUI(ownerId) {
+  // PRODUCTION HARDENING (Fix 3): tracks the callId currently shown in
+  // the overlay so an onCallClaimedElsewhere() for a DIFFERENT (stale)
+  // callId is correctly ignored, and a matching one dismisses this tab's
+  // overlay cleanly.
+  let _currentCallId = null;
+  // PRODUCTION HARDENING (Fix 2): the real hang-up control for whatever
+  // call is currently connected on this tab — set once onConnected()
+  // fires, cleared on end. Replaces the old handler that only hid the
+  // overlay without closing the peer connection or releasing the mic.
+  let _activeHangUp = null;
+
+  // PRODUCTION HARDENING (Fix 2): the button now actually ends the call
+  // — sends the hangup signal, closes the peer connection, and releases
+  // the microphone — instead of only hiding the overlay while the call/
+  // mic stayed open underneath it. Shared by both the "connected" and
+  // "reconnecting" states since #sd-rtc-actions' markup (and therefore
+  // the button element) is replaced each time either renders.
+  const _wireHangupButton = () => {
+    document.getElementById('sd-rtc-hangup')?.addEventListener('click', () => {
+      _activeHangUp?.();
+      _activeHangUp = null;
+      _currentCallId = null;
+      _hide();
+    }, { once: true });
+  };
+
   const unsubscribe = await listenForIncomingCalls(ownerId, {
-    onIncomingCall: ({ plateId, accept, reject }) => {
+    onIncomingCall: ({ callId, plateId, accept, reject }) => {
+      _currentCallId = callId;
       _ensureDom();
       _setRinging(plateId);
       _show();
@@ -136,26 +176,50 @@ export async function initOwnerCallUI(ownerId) {
       };
       const onReject = () => {
         reject();
+        _currentCallId = null;
         _hide();
       };
 
       acceptBtn?.addEventListener('click', onAccept, { once: true });
       rejectBtn?.addEventListener('click', onReject, { once: true });
     },
-    onConnected: (remoteStream) => {
+
+    // PRODUCTION HARDENING (Fix 3): another tab/device of this owner
+    // answered first. If this tab is still showing the ringing overlay
+    // for the SAME call, dismiss it quietly — no error, just "handled
+    // elsewhere." If this tab shows a different/older call, ignore.
+    onCallClaimedElsewhere: (callId) => {
+      if (callId !== _currentCallId) return;
+      _currentCallId = null;
+      _hide();
+    },
+
+    onConnected: (remoteStream, { hangUp } = {}) => {
       _ensureDom();
       _remoteAudioEl.srcObject = remoteStream;
       _remoteAudioEl.play().catch(() => {});
       _setConnected();
-
-      const rewire = () => {
-        document.getElementById('sd-rtc-hangup')?.addEventListener('click', () => {
-          _hide();
-        }, { once: true });
-      };
-      rewire();
+      _activeHangUp = hangUp || null;
+      _wireHangupButton();
     },
+
+    // PRODUCTION HARDENING (Fix 4): transient post-connect ICE drop —
+    // update the label but keep the overlay (and the working hangup
+    // button) up; do not treat this as the call ending.
+    onStatus: (status) => {
+      _ensureDom();
+      if (status === 'reconnecting') {
+        _setReconnecting();
+        _wireHangupButton();
+      } else if (status === 'connected') {
+        _setConnected();
+        _wireHangupButton();
+      }
+    },
+
     onEnded: () => {
+      _activeHangUp = null;
+      _currentCallId = null;
       _hide();
     },
   });
