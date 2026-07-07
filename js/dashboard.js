@@ -23,6 +23,7 @@ import { getSubscription, getRenewalInfo } from '../services/subscriptions.js';
 import { getOnboardingProgress, markOnboardingStep } from '../services/customerSuccess.js';
 import { getOrderSummary, subscribeToOrderTracking } from '../services/orders.js';
 import { getCommunicationLogs, subscribeToCommunicationLogs } from '../services/communication.js';
+import { joinOwnerPresence } from '../services/presence.js';
 import { getVoiceNoteUrl } from '../services/voiceNotes.js';
 import { VoiceRecorder } from '../services/voiceNotes.js';
 import { supabase } from '../services/supabase.js';
@@ -504,6 +505,18 @@ const DashboardModule = (() => {
         _refreshUnreadBadge(ownerId);
       }
     });
+
+    // Phase 1 — WebRTC owner presence (infra validation only, no calling
+    // logic exists yet). joinOwnerPresence() internally checks the
+    // webrtc_global_enabled / webrtc_kill_switch / per-owner
+    // security_rules.webrtc_calling_enabled flags (services/
+    // featureFlags.js) and is a complete no-op — no channel opened, no
+    // row written — for every owner until all three are explicitly
+    // turned on. Safe to always call; does not change any existing
+    // dashboard behavior today.
+    joinOwnerPresence(ownerId).then((unsubPresence) => {
+      state._realtimeUnsubs.push(unsubPresence);
+    }).catch(() => {});
 
     state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
 
