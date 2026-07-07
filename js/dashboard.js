@@ -24,6 +24,7 @@ import { getOnboardingProgress, markOnboardingStep } from '../services/customerS
 import { getOrderSummary, subscribeToOrderTracking } from '../services/orders.js';
 import { getCommunicationLogs, subscribeToCommunicationLogs } from '../services/communication.js';
 import { joinOwnerPresence } from '../services/presence.js';
+import { initOwnerCallUI } from './webrtcCallUI.js';
 import { getVoiceNoteUrl } from '../services/voiceNotes.js';
 import { VoiceRecorder } from '../services/voiceNotes.js';
 import { supabase } from '../services/supabase.js';
@@ -516,6 +517,16 @@ const DashboardModule = (() => {
     // dashboard behavior today.
     joinOwnerPresence(ownerId).then((unsubPresence) => {
       state._realtimeUnsubs.push(unsubPresence);
+    }).catch(() => {});
+
+    // Phase 2 — WebRTC Tap to Talk, owner side. Same guard model as
+    // joinOwnerPresence() above: listenForIncomingCalls() (services/
+    // webrtcOwnerCall.js) resolves to a no-op and injects no DOM/overlay
+    // for any owner until webrtc_global_enabled + this owner's
+    // security_rules.webrtc_calling_enabled are both explicitly turned
+    // on and webrtc_kill_switch is off. Zero behavior change otherwise.
+    initOwnerCallUI(ownerId).then((unsubCallUI) => {
+      state._realtimeUnsubs.push(unsubCallUI);
     }).catch(() => {});
 
     state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
