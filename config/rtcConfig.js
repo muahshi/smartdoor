@@ -125,6 +125,10 @@ export const RTC_MONITORING_EVENTS = Object.freeze({
   RTC_TIMEOUT_FALLBACK: 'rtc_timeout_fallback',
   RTC_OWNER_OFFLINE_SKIP: 'rtc_owner_offline_skip',
   RTC_VISITOR_CANCELLED: 'rtc_visitor_cancelled',
+
+  // Added — Phase 2 (Tap to Talk). Additive only; nothing above this line
+  // is renamed or removed.
+  RTC_OWNER_REJECTED: 'rtc_owner_rejected',
 });
 
 export default {
