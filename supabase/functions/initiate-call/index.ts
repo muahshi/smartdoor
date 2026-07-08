@@ -102,6 +102,12 @@ serve(async (req) => {
     const result = await providerModule.placeCall({ visitorPhone, ownerPhone: owner.phone, callbackUrl });
 
     if (!result.success) {
+      // DIAGNOSTIC FIX: this path previously returned 502 with no server-side
+      // log line, so the real provider failure reason (bad credentials,
+      // rejected phone format, trial-account restriction, etc.) was visible
+      // nowhere — not in Supabase Function logs, not in the client. Logging
+      // it here does not change any response, status code, or behavior.
+      console.error(`[initiate-call] Provider "${provider}" failed for callLog ${callLog.id}:`, result.error || 'Call provider failed');
       await supabaseAdmin.from('call_logs').update({ call_status: 'failed' }).eq('id', callLog.id);
       return Response.json({ success: false, message: result.error || 'Call provider failed' }, { status: 502, headers: corsHeaders });
     }
