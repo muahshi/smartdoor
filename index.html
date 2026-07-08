@@ -393,6 +393,7 @@
 <!-- CONFIG: Generated at Vercel build time by scripts/build-env.js -->
 <script src="config/env.generated.js"></script>
 <!-- Web analytics: GA4 / Clarity / Plausible — config-driven, no-op if unset -->
+<script src="js/productCatalog.js"></script>
 <script src="js/analytics-web.js"></script>
 
 
@@ -565,38 +566,9 @@
       <h2 class="lp-h2">Premium Nameplates.<br/><span class="accent">Infinite Protection.</span></h2>
       <p class="lp-body" style="margin:0 auto;">Each nameplate ships with 1 year of Smart Door Privacy subscription included — completely free.</p>
     </div>
-    <div class="products-grid" data-animate>
-      <div class="pcard product-card" data-product="acrylic" data-price="1499" onclick="selectProduct(this)">
-        <div class="pcard-img-wrap"><img src="images/acrylic-front.webp" alt="Minimalist Acrylic Smart Door" id="acrylic-main-img" /><button class="pcard-gallery-btn" onclick="event.stopPropagation();openGallery('acrylic','Minimalist Acrylic')">📸 View Gallery</button></div>
-        <div class="pcard-body">
-          <div class="pcard-tag" style="background:rgba(212,175,55,0.1);border:1px solid rgba(212,175,55,0.25);color:#D4AF37;">HIGH GLOSS</div>
-          <div class="pcard-name">Minimalist Acrylic</div>
-          <div class="pcard-desc">High-gloss black acrylic with gold laser-cut lettering. Sleek, modern, weather-resistant. The purist's choice.</div>
-          <div class="pcard-feats"><span class="pcard-feat">✓ High-Gloss Acrylic</span><span class="pcard-feat">✓ Gold Letters</span><span class="pcard-feat">✓ Weatherproof</span><span class="pcard-feat">✓ 1 Yr Privacy</span></div>
-          <div class="pcard-footer"><div><div class="pcard-price">₹1,499</div><div style="font-size:0.7rem;color:#22C55E;margin-top:2px;">FREE Shipping</div></div><button class="pcard-select" onclick="event.stopPropagation();selectProduct(this.closest('.pcard'))">SELECT</button></div>
-        </div>
-      </div>
-      <div class="pcard best product-card" data-product="wood" data-price="2499" onclick="selectProduct(this)">
-        <div class="pcard-best-badge">⭐ BEST SELLER</div>
-        <div class="pcard-img-wrap img-contain"><img src="images/teakwood-front.webp" alt="Royal Teakwood Smart Door" id="teakwood-main-img" /><button class="pcard-gallery-btn" onclick="event.stopPropagation();openGallery('teakwood','Royal Teakwood')">📸 View Gallery</button></div>
-        <div class="pcard-body">
-          <div class="pcard-tag" style="background:rgba(181,147,82,0.1);border:1px solid rgba(181,147,82,0.25);color:#B5935C;">PREMIUM WOOD</div>
-          <div class="pcard-name">Royal Teakwood</div>
-          <div class="pcard-desc">Waterproof polished teak with laser-cut brass digital fonts. A statement of timeless luxury at your gate.</div>
-          <div class="pcard-feats"><span class="pcard-feat">✓ Premium Teakwood</span><span class="pcard-feat">✓ Brass Letters</span><span class="pcard-feat">✓ Waterproof</span><span class="pcard-feat">✓ 1 Yr Privacy</span></div>
-          <div class="pcard-footer"><div><div class="pcard-price">₹2,499</div><div style="font-size:0.7rem;color:#22C55E;margin-top:2px;">FREE Shipping</div></div><button class="pcard-select" onclick="event.stopPropagation();selectProduct(this.closest('.pcard'))">SELECT</button></div>
-        </div>
-      </div>
-      <div class="pcard product-card" data-product="steel" data-price="2999" onclick="selectProduct(this)">
-        <div class="pcard-img-wrap"><img src="images/stainless-front.webp" alt="Stainless Matte Smart Door" id="stainless-main-img" /><button class="pcard-gallery-btn" onclick="event.stopPropagation();openGallery('stainless','Stainless Matte')">📸 View Gallery</button></div>
-        <div class="pcard-body">
-          <div class="pcard-tag" style="background:rgba(150,170,190,0.1);border:1px solid rgba(150,170,190,0.25);color:#96AABE;">INDUSTRIAL</div>
-          <div class="pcard-name">Stainless Matte</div>
-          <div class="pcard-desc">Rust-proof industrial matte silver steel. Scratch-resistant. Lifetime durability guaranteed. Built for forever.</div>
-          <div class="pcard-feats"><span class="pcard-feat">✓ Stainless Steel</span><span class="pcard-feat">✓ Matte Finish</span><span class="pcard-feat">✓ Rust-Proof</span><span class="pcard-feat">✓ 1 Yr Privacy</span></div>
-          <div class="pcard-footer"><div><div class="pcard-price">₹2,999</div><div style="font-size:0.7rem;color:#22C55E;margin-top:2px;">FREE Shipping</div></div><button class="pcard-select" onclick="event.stopPropagation();selectProduct(this.closest('.pcard'))">SELECT</button></div>
-        </div>
-      </div>
+    <div class="products-grid" data-animate id="products-grid">
+      <!-- Rendered dynamically by js/productCatalog.js (SD_Catalog.renderProductGrid).
+           Do NOT hardcode product cards here — add new products to SD_PRODUCTS instead. -->
     </div>
     <div class="selection-bar" id="selection-summary">
       <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
@@ -978,9 +950,11 @@
     const m = document.getElementById('mob-menu');
     m.style.display = m.style.display === 'block' ? 'none' : 'block';
   }
-  const productNames = { acrylic:'Minimalist Acrylic', wood:'Royal Teakwood', steel:'Stainless Matte' };
+  // Product data now lives in js/productCatalog.js (SD_Catalog) — single source of truth.
+  const productNames = SD_Catalog.buildProductNames();
   let selectedProduct = { name:'Royal Teakwood', price:2499 };
   document.addEventListener('DOMContentLoaded', () => {
+    SD_Catalog.renderProductGrid('products-grid');
     const woodCard = document.querySelector('[data-product="wood"]');
     if (woodCard) selectProduct(woodCard);
   });
@@ -1007,7 +981,7 @@
     document.getElementById('step-ind-2').classList.add('active');
   }
   // ── Product type mapping: UI key → Edge Function key ──
-  const PRODUCT_TYPE_MAP = { acrylic: 'acrylic', wood: 'teakwood', steel: 'stainless' };
+  const PRODUCT_TYPE_MAP = SD_Catalog.buildProductTypeMap();
   let _currentProductKey = 'wood'; // default matches selectedProduct
 
   // Track selected product key alongside selectProduct()
@@ -1159,11 +1133,7 @@
       submitBtn.textContent = origText;
     }
   }
-  const galleryImages = {
-    acrylic:[{src:'images/acrylic-front.webp',label:'Front View'},{src:'images/acrylic-angle.webp',label:'Angle View'},{src:'images/acrylic-wall-mounted.webp',label:'Wall Mounted'},{src:'images/acrylic-qr-closeup.webp',label:'QR Close-up'}],
-    teakwood:[{src:'images/teakwood-front.webp',label:'Front View'},{src:'images/teakwood-angle.webp',label:'Angle View'},{src:'images/teakwood-wall-mounted.webp',label:'Wall Mounted'},{src:'images/teakwood-qr-closeup.webp',label:'QR Close-up'}],
-    stainless:[{src:'images/stainless-front.webp',label:'Front View'},{src:'images/stainless-angle.webp',label:'Angle View'},{src:'images/stainless-wall-mounted.webp',label:'Wall Mounted'},{src:'images/stainless-qr-closeup.webp',label:'QR Close-up'}],
-  };
+  const galleryImages = SD_Catalog.buildGalleryImages();
   function openGallery(product, title) {
     const modal = document.getElementById('gallery-modal');
     const mainImg = document.getElementById('gallery-main');
