@@ -41,6 +41,24 @@
    * @property {GalleryImage[]} gallery - Gallery modal images
    */
 
+  /**
+   * ------------------------------------------------------------------
+   * PHASE 2 ADDITION — Product Configurator schema
+   * ------------------------------------------------------------------
+   * Every product may carry an optional `configurator` object describing
+   * the variant axes (sizes/colors/finishes) available for THAT product.
+   * The Configurator UI (js/productConfigurator.js) reads this schema at
+   * runtime and renders controls automatically — nothing here is wired
+   * to product-specific code. A future product simply declares its own
+   * `configurator` block (or omits axes it doesn't support) and the UI,
+   * pricing and live preview all pick it up with zero code changes.
+   *
+   * `previewBg` / `previewTextColor` drive the Phase 3 live preview
+   * mockup (a CSS-only stand-in nameplate, not a photo) so any future
+   * material renders a sensible plate preview automatically.
+   * ------------------------------------------------------------------
+   */
+
   /** @type {SDProduct[]} */
   const SD_PRODUCTS = [
     {
@@ -62,7 +80,24 @@
         { src: 'images/acrylic-angle.webp', label: 'Angle View' },
         { src: 'images/acrylic-wall-mounted.webp', label: 'Wall Mounted' },
         { src: 'images/acrylic-qr-closeup.webp', label: 'QR Close-up' }
-      ]
+      ],
+      previewBg: 'linear-gradient(155deg,#0c0c0c 0%,#1c1c1c 45%,#0a0a0a 100%)',
+      previewTextColor: '#D4AF37',
+      configurator: {
+        sizes: [
+          { key: 'standard', label: 'Standard · 12×8 in', priceDelta: 0 },
+          { key: 'large', label: 'Large · 16×10 in', priceDelta: 400 }
+        ],
+        colors: [
+          { key: 'gold', label: 'Gold', hex: '#D4AF37' },
+          { key: 'silver', label: 'Silver', hex: '#C8D6E0' },
+          { key: 'white', label: 'White', hex: '#F5F5F5' }
+        ],
+        finishes: [
+          { key: 'high-gloss', label: 'High Gloss', priceDelta: 0 },
+          { key: 'matte', label: 'Matte', priceDelta: 150 }
+        ]
+      }
     },
     {
       key: 'wood',
@@ -83,7 +118,24 @@
         { src: 'images/teakwood-angle.webp', label: 'Angle View' },
         { src: 'images/teakwood-wall-mounted.webp', label: 'Wall Mounted' },
         { src: 'images/teakwood-qr-closeup.webp', label: 'QR Close-up' }
-      ]
+      ],
+      previewBg: 'linear-gradient(155deg,#3b2413 0%,#5a3820 45%,#2a1a0d 100%)',
+      previewTextColor: '#D9B26A',
+      configurator: {
+        sizes: [
+          { key: 'standard', label: 'Standard · 12×8 in', priceDelta: 0 },
+          { key: 'large', label: 'Large · 16×10 in', priceDelta: 500 }
+        ],
+        colors: [
+          { key: 'brass', label: 'Brass', hex: '#B5935C' },
+          { key: 'gold', label: 'Gold', hex: '#D4AF37' },
+          { key: 'copper', label: 'Copper', hex: '#B87333' }
+        ],
+        finishes: [
+          { key: 'polished', label: 'Polished Teak', priceDelta: 0 },
+          { key: 'natural', label: 'Natural Grain', priceDelta: 0 }
+        ]
+      }
     },
     {
       key: 'steel',
@@ -104,9 +156,88 @@
         { src: 'images/stainless-angle.webp', label: 'Angle View' },
         { src: 'images/stainless-wall-mounted.webp', label: 'Wall Mounted' },
         { src: 'images/stainless-qr-closeup.webp', label: 'QR Close-up' }
-      ]
+      ],
+      previewBg: 'linear-gradient(155deg,#3a4550 0%,#8291a0 45%,#2b333c 100%)',
+      previewTextColor: '#0B1525',
+      configurator: {
+        sizes: [
+          { key: 'standard', label: 'Standard · 12×8 in', priceDelta: 0 },
+          { key: 'large', label: 'Large · 16×10 in', priceDelta: 500 }
+        ],
+        colors: [
+          { key: 'silver', label: 'Silver', hex: '#96AABE' },
+          { key: 'black', label: 'Matte Black', hex: '#1A1A1A' }
+        ],
+        finishes: [
+          { key: 'matte', label: 'Matte Steel', priceDelta: 0 },
+          { key: 'brushed', label: 'Brushed Steel', priceDelta: 200 }
+        ]
+      }
     }
   ];
+
+  /**
+   * ------------------------------------------------------------------
+   * Shared configurator option sets — these axes are the SAME choice
+   * list regardless of which product is selected (font, religious
+   * symbol and QR style are print/production choices, not material
+   * choices), so they live once here instead of being duplicated
+   * inside every SD_PRODUCTS entry.
+   * ------------------------------------------------------------------
+   */
+
+  /** @type {{key:string,label:string,family:string,weight:number}[]} */
+  const SD_FONTS = [
+    { key: 'modern', label: 'Modern Sans', family: "'Space Grotesk', sans-serif", weight: 700 },
+    { key: 'classic', label: 'Classic Serif', family: "Georgia, 'Times New Roman', serif", weight: 700 },
+    { key: 'bold', label: 'Bold Block', family: "'Arial Black', Impact, sans-serif", weight: 900 },
+    { key: 'script', label: 'Elegant Script', family: "'Brush Script MT', cursive", weight: 400 }
+  ];
+
+  /**
+   * Religious / cultural symbol options for the nameplate. Purely
+   * decorative print choices — "none" is the default so nothing is
+   * ever added unless the customer explicitly picks one.
+   * @type {{key:string,label:string,glyph:string}[]}
+   */
+  const SD_SYMBOLS = [
+    { key: 'none', label: 'None', glyph: '' },
+    { key: 'om', label: 'Om', glyph: '🕉️' },
+    { key: 'ganesha', label: 'Ganesha', glyph: '🐘' },
+    { key: 'cross', label: 'Cross', glyph: '✝️' },
+    { key: 'crescent', label: 'Crescent & Star', glyph: '☪️' },
+    { key: 'khanda', label: 'Khanda', glyph: '🔱' },
+    { key: 'lotus', label: 'Lotus', glyph: '🪷' }
+  ];
+
+  /**
+   * QR style is intentionally future-ready: only "classic" is available
+   * for checkout today, additional styles can be flipped from
+   * status:'coming-soon' to 'available' the moment production supports
+   * them — no UI code changes required.
+   * @type {{key:string,label:string,status:'available'|'coming-soon'}[]}
+   */
+  const SD_QR_STYLES = [
+    { key: 'classic', label: 'Classic Black QR', status: 'available' },
+    { key: 'premium-shield', label: 'Premium Gold Shield QR', status: 'coming-soon' }
+  ];
+
+  /** Returns the full configurator schema (product-specific + shared axes) for a product key. */
+  function getConfiguratorSchema(key) {
+    const p = SD_PRODUCTS.find((prod) => prod.key === key);
+    if (!p) return null;
+    return {
+      productKey: p.key,
+      previewBg: p.previewBg,
+      previewTextColor: p.previewTextColor,
+      sizes: (p.configurator && p.configurator.sizes) || [],
+      colors: (p.configurator && p.configurator.colors) || [],
+      finishes: (p.configurator && p.configurator.finishes) || [],
+      fonts: SD_FONTS,
+      symbols: SD_SYMBOLS,
+      qrStyles: SD_QR_STYLES
+    };
+  }
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -174,6 +305,11 @@
     buildProductTypeMap,
     buildGalleryImages,
     buildPriceMap,
-    getByKey
+    getByKey,
+    // Phase 2/3 — Product Configurator + Live Preview data source
+    fonts: SD_FONTS,
+    symbols: SD_SYMBOLS,
+    qrStyles: SD_QR_STYLES,
+    getConfiguratorSchema
   };
 })(window);
