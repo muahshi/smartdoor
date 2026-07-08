@@ -35,13 +35,41 @@ export async function call(payload) {
     });
 
     if (error || !data?.success) {
-      return { success: false, error: data?.message || error?.message || 'Exotel call failed' };
+      // DIAGNOSTIC FIX: on a non-2xx response, supabase-js sets `data` to
+      // null and `error` to a FunctionsHttpError whose .message is a fixed
+      // string ("Edge Function returned a non-2xx status code") — it does
+      // NOT contain the JSON body the Edge Function actually returned
+      // (e.g. { success:false, message:'Twilio returned 400: ...' }).
+      // That real body lives on error.context (the raw Response). We read
+      // it here so the visitor UI shows the actual provider error instead
+      // of the generic SDK message. Falls back to the old behavior if the
+      // body can't be parsed, so nothing regresses.
+      const serverMessage = await _extractEdgeFunctionErrorMessage(error);
+      return { success: false, error: data?.message || serverMessage || error?.message || 'Exotel call failed' };
     }
 
     return { success: true, callId: data.callId, status: data.status };
   } catch (err) {
     console.error('[Exotel] call() error:', err);
     return { success: false, error: 'Exotel provider unreachable' };
+  }
+}
+
+/**
+ * Reads the real response body off a supabase-js FunctionsHttpError, since
+ * error.message is always the generic "Edge Function returned a non-2xx
+ * status code" string, not the body the Edge Function returned.
+ * Safe no-op (returns null) for any other error shape.
+ */
+async function _extractEdgeFunctionErrorMessage(error) {
+  try {
+    if (!error?.context || typeof error.context.json !== 'function') return null;
+    // context is a Response — clone before reading so nothing else that
+    // might inspect it later is affected.
+    const body = await error.context.clone().json();
+    return body?.message || null;
+  } catch {
+    return null;
   }
 }
 
