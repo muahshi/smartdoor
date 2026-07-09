@@ -41,6 +41,16 @@ import { isWebRTCEnabledForOwner } from './featureFlags.js';
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 15000;
 
+// PRODUCTION FIX (stale-owner-listener, task 1): if webrtc isn't enabled
+// for this owner at the exact moment joinOwnerPresence() is called (flags
+// not yet flipped, or a transient feature_flags read hiccup), the old
+// code returned a permanent no-op cleanup — the only way to start
+// tracking presence afterward was a full page refresh. This interval
+// re-checks isWebRTCEnabledForOwner() and starts real presence tracking
+// automatically the moment it turns true. Kept above featureFlags.js's
+// own 30s cache TTL so each re-check sees a fresh read.
+const FLAG_RECHECK_INTERVAL_MS = 20000;
+
 function _getDeviceId() {
   const KEY = 'sd_rtc_device_id';
   try {
@@ -88,9 +98,37 @@ export async function joinOwnerPresence(ownerId) {
   const noOpCleanup = () => {};
   if (!ownerId) return noOpCleanup;
 
-  const enabled = await isWebRTCEnabledForOwner(ownerId);
-  if (!enabled) return noOpCleanup;
+  let outerTorndown = false;
+  let recheckTimer = null;
+  let activeCleanup = null;
 
+  async function _tryStart() {
+    if (outerTorndown) return;
+    const enabled = await isWebRTCEnabledForOwner(ownerId);
+    if (outerTorndown) return;
+    if (!enabled) {
+      recheckTimer = setTimeout(_tryStart, FLAG_RECHECK_INTERVAL_MS);
+      return;
+    }
+    activeCleanup = _startPresence(ownerId);
+  }
+
+  await _tryStart();
+
+  return function cleanup() {
+    outerTorndown = true;
+    clearTimeout(recheckTimer);
+    if (activeCleanup) activeCleanup();
+  };
+}
+
+/**
+ * The real presence join — split out of joinOwnerPresence() so the
+ * flag-recheck wrapper above can (re)start it without duplicating this
+ * logic. Behavior is byte-for-byte identical to the original
+ * implementation.
+ */
+function _startPresence(ownerId) {
   const deviceId = _getDeviceId();
   const channelName = `presence:owner:${ownerId}`;
   let channel = null;

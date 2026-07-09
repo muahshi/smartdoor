@@ -80,6 +80,13 @@ async function _ensureRealtimeAuth() {
  * Supabase Realtime. Private by default (see file header) — pass
  * `{ private: false }` explicitly if a future caller ever needs a public
  * signaling channel (no current caller does).
+ *
+ * SCOPE: SHORT-LIVED / ONE-SHOT joins only — a single call attempt's
+ * `rtc:call:{callId}` channel, or the visitor's one-shot send-then-leave
+ * join of `rtc:ring:{ownerId}`. Does NOT monitor the channel after the
+ * first SUBSCRIBED. Do not use this for a listener that must stay alive
+ * for an entire dashboard session — see joinPersistentBroadcastChannel
+ * below, and its header comment for why that distinction is load-bearing.
  */
 export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, private: isPrivate = true } = {}) {
   if (isPrivate) await _ensureRealtimeAuth();
@@ -97,14 +104,159 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
     channel.subscribe((status, err) => {
       if (status === 'SUBSCRIBED') {
         clearTimeout(timer);
+        console.log(`[RTC-TRACE] channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
         resolve(channel);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timer);
         try { supabase.removeChannel(channel); } catch {}
+        console.error(`[RTC-TRACE][FAIL] channel join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
         reject(new Error(`Signaling channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
       }
     });
   });
+}
+
+/**
+ * PRODUCTION FIX — root cause of the "WebRTC never completes" bug.
+ *
+ * joinBroadcastChannel()'s `channel.subscribe((status) => {...})` callback
+ * keeps firing for the ENTIRE lifetime of that channel, not just at the
+ * initial join. The one long-lived caller of it — services/webrtcOwnerCall.js,
+ * listening on the owner's ring channel for the whole dashboard session —
+ * awaited joinBroadcastChannel() once and kept the resolved channel
+ * forever. The very same subscribe callback that resolved the promise
+ * ALSO fires on any later CHANNEL_ERROR / TIMED_OUT / CLOSED — e.g. a
+ * normal Realtime websocket reconnect after a network blip, a
+ * backgrounded tab's socket being recycled by the browser/OS, or a
+ * long-idle dashboard tab. On that later event the callback ran
+ * `supabase.removeChannel(channel)` and then called `reject(...)` on a
+ * promise that was already resolved (a silent no-op) — so the channel was
+ * permanently destroyed with nothing but a console.error, and nothing
+ * ever rejoined it.
+ *
+ * From that moment the owner's dashboard looks completely normal —
+ * presence still shows online, because services/presence.js has its own
+ * independent reconnect-with-backoff loop — but the ring channel that
+ * 'incoming-call' broadcasts land on is gone. A visitor's Tap-to-Talk
+ * offer is sent into a channel with no listener, the 15s
+ * WEBRTC_CONNECT_TIMEOUT_MS in services/webrtcCall.js elapses, and the
+ * existing masked-call (Twilio) fallback fires — exactly the reported
+ * symptom, and it explains why it can happen even with the dashboard
+ * already open and all flags already on.
+ *
+ * This gives a long-lived channel the same resilience
+ * services/presence.js#joinOwnerPresence already has: any post-initial
+ * CHANNEL_ERROR/TIMED_OUT/CLOSED reconnects with capped exponential
+ * backoff instead of destroying the channel, so a dropped ring channel
+ * recovers automatically — no page refresh required.
+ *
+ * @param {string} channelName
+ * @param {(channel: object) => void} registerHandlers  Called with the
+ *   live channel object every time one is created — the FIRST join and
+ *   again on every reconnect (a reconnect is a brand-new channel object,
+ *   exactly like presence.js's `_subscribe()` recreating `channel.on(...)`
+ *   handlers each time). Callers must attach their `onSignal(channel, ...)`
+ *   handlers inside this callback, not just once outside it.
+ * @param {object} [opts]
+ * @param {boolean} [opts.private]
+ * @param {number} [opts.initialTimeoutMs]  timeout for the FIRST join only
+ * @param {(channel: object) => void} [opts.onSubscribed]  fires on every
+ *   successful (re)subscribe, including reconnects.
+ * @param {() => void} [opts.onLost]  fires the moment the channel drops
+ *   and a reconnect attempt has been scheduled.
+ * @returns {Promise<() => void>} cleanup function that stops any pending
+ *   reconnect and removes the current channel. Rejects only if the FIRST
+ *   join attempt itself fails (matching joinBroadcastChannel's contract).
+ */
+export async function joinPersistentBroadcastChannel(channelName, registerHandlers, {
+  private: isPrivate = true,
+  initialTimeoutMs = 8000,
+  onSubscribed = () => {},
+  onLost = () => {},
+} = {}) {
+  if (isPrivate) await _ensureRealtimeAuth();
+
+  const RECONNECT_BASE_DELAY_MS = 1000;
+  const RECONNECT_MAX_DELAY_MS = 15000;
+
+  let channel = null;
+  let torndown = false;
+  let firstSettled = false;
+  let reconnectAttempt = 0;
+  let reconnectTimer = null;
+  let initialTimer = null;
+
+  await new Promise((resolveFirst, rejectFirst) => {
+    function _subscribe() {
+      channel = supabase.channel(channelName, {
+        config: { broadcast: { self: false, ack: false }, private: isPrivate },
+      });
+
+      registerHandlers(channel);
+
+      if (!firstSettled) {
+        clearTimeout(initialTimer);
+        initialTimer = setTimeout(() => {
+          if (firstSettled || torndown) return;
+          firstSettled = true;
+          try { supabase.removeChannel(channel); } catch {}
+          console.error(`[RTC-TRACE][FAIL] persistent channel initial join timed out | File=services/webrtcSignaling.js Channel=${channelName} Reason=timeout(${initialTimeoutMs}ms) Current=not-subscribed Expected=SUBSCRIBED`);
+          rejectFirst(new Error('Persistent channel initial join timed out'));
+        }, initialTimeoutMs);
+      }
+
+      channel.subscribe((status, err) => {
+        if (torndown) return;
+
+        if (status === 'SUBSCRIBED') {
+          clearTimeout(initialTimer);
+          reconnectAttempt = 0;
+          console.log(`[RTC-TRACE] persistent channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
+          onSubscribed(channel);
+          if (!firstSettled) {
+            firstSettled = true;
+            resolveFirst();
+          }
+          return;
+        }
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          clearTimeout(initialTimer);
+
+          if (!firstSettled) {
+            // Genuine initial-join failure — no channel was ever live.
+            firstSettled = true;
+            try { supabase.removeChannel(channel); } catch {}
+            console.error(`[RTC-TRACE][FAIL] persistent channel initial join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
+            rejectFirst(new Error(`Persistent channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
+            return;
+          }
+
+          // Was live before, just dropped — reconnect, don't destroy.
+          console.warn(`[RTC-TRACE][FAIL] persistent channel dropped, reconnecting | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=disconnected Expected=SUBSCRIBED attempt=${reconnectAttempt + 1}`);
+          onLost();
+          if (torndown) return;
+          const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS);
+          reconnectAttempt += 1;
+          clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(() => {
+            if (torndown) return;
+            try { supabase.removeChannel(channel); } catch {}
+            _subscribe();
+          }, delay);
+        }
+      });
+    }
+
+    _subscribe();
+  });
+
+  return function cleanup() {
+    torndown = true;
+    clearTimeout(reconnectTimer);
+    clearTimeout(initialTimer);
+    if (channel) { try { supabase.removeChannel(channel); } catch {} }
+  };
 }
 
 /** Registers a handler for one broadcast event name on an already-joined channel. */
@@ -116,7 +268,9 @@ export function onSignal(channel, event, handler) {
 export async function sendSignal(channel, event, payload) {
   try {
     await channel.send({ type: 'broadcast', event, payload });
+    console.log(`[RTC-TRACE] broadcast sent | File=services/webrtcSignaling.js Event=${event}`);
   } catch (err) {
+    console.error(`[RTC-TRACE][FAIL] sendSignal failed | File=services/webrtcSignaling.js Event=${event} Reason=${err?.message || err} Current=not-sent Expected=delivered`);
     console.error(`[WebRTCSignaling] sendSignal(${event}) failed:`, err);
   }
 }
@@ -130,6 +284,7 @@ export default {
   ringChannelName,
   callChannelName,
   joinBroadcastChannel,
+  joinPersistentBroadcastChannel,
   onSignal,
   sendSignal,
   leaveChannel,

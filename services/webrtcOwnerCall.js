@@ -40,10 +40,21 @@ import {
   ringChannelName,
   callChannelName,
   joinBroadcastChannel,
+  joinPersistentBroadcastChannel,
   onSignal,
   sendSignal,
   leaveChannel,
 } from './webrtcSignaling.js';
+
+// PRODUCTION FIX (stale-owner-listener): if webrtc isn't enabled for this
+// owner the moment the dashboard mounts (flags not yet flipped, or a
+// transient feature_flags read hiccup), the old code returned a permanent
+// no-op — the only way to start listening afterward was a full page
+// refresh. This interval re-checks isWebRTCEnabledForOwner() and starts
+// the real listener automatically the moment it turns true, with no
+// refresh needed. Kept well above featureFlags.js's own 30s cache TTL so
+// a re-check always sees a fresh read.
+const FLAG_RECHECK_INTERVAL_MS = 20000;
 
 // PRODUCTION HARDENING (Fix 3 — call claiming): one stable id per browser
 // tab/device for the lifetime of this module (i.e. the page load). Used
@@ -93,8 +104,46 @@ export async function listenForIncomingCalls(ownerId, handlers = {}) {
   const noOpCleanup = () => {};
   if (!ownerId) return noOpCleanup;
 
-  const enabled = await isWebRTCEnabledForOwner(ownerId);
-  if (!enabled) return noOpCleanup;
+  // PRODUCTION FIX (stale-owner-listener, task 1): outer wrapper that
+  // re-checks the flag on an interval and (re)starts the real listener
+  // the moment it turns on — so a dashboard already open before flags
+  // changed recovers automatically, no refresh required.
+  let outerTorndown = false;
+  let recheckTimer = null;
+  let activeCleanup = null;
+
+  async function _tryStart() {
+    if (outerTorndown) return;
+    const enabled = await isWebRTCEnabledForOwner(ownerId);
+    console.log(`[RTC-TRACE] 2 Feature flags | File=services/webrtcOwnerCall.js ownerId=${ownerId} enabled=${enabled}`);
+    if (outerTorndown) return;
+    if (!enabled) {
+      recheckTimer = setTimeout(_tryStart, FLAG_RECHECK_INTERVAL_MS);
+      return;
+    }
+    activeCleanup = await _startListening(ownerId, handlers);
+  }
+
+  await _tryStart();
+
+  return function cleanup() {
+    outerTorndown = true;
+    clearTimeout(recheckTimer);
+    if (activeCleanup) activeCleanup();
+  };
+}
+
+/**
+ * The real listener — split out of listenForIncomingCalls() so the
+ * flag-recheck wrapper above can (re)start it without duplicating this
+ * logic. Behavior is identical to the original implementation except the
+ * ring channel join now uses joinPersistentBroadcastChannel (see
+ * services/webrtcSignaling.js's header comment for the actual root-cause
+ * fix) instead of the one-shot joinBroadcastChannel, so a dropped ring
+ * channel reconnects automatically instead of dying silently.
+ */
+async function _startListening(ownerId, handlers = {}) {
+  const noOpCleanup = () => {};
 
   const {
     onIncomingCall = () => {},
@@ -103,14 +152,6 @@ export async function listenForIncomingCalls(ownerId, handlers = {}) {
     onStatus = () => {},
     onCallClaimedElsewhere = () => {},
   } = handlers;
-
-  let ringChannel;
-  try {
-    ringChannel = await joinBroadcastChannel(ringChannelName(ownerId), { timeoutMs: 8000 });
-  } catch (err) {
-    console.error('[WebRTCOwnerCall] Could not join ring channel:', err);
-    return noOpCleanup;
-  }
 
   let activeCallChannel = null;
   let activePc = null;
@@ -144,30 +185,41 @@ export async function listenForIncomingCalls(ownerId, handlers = {}) {
   const _releaseOnUnload = () => cleanupActiveCall();
   window.addEventListener('pagehide', _releaseOnUnload);
 
-  // PRODUCTION HARDENING (Fix 3): if a sibling tab/device claims a call
-  // first, this tab hears about it here (best-effort UX signal — the
-  // authoritative guarantee is the DB unique constraint checked inside
-  // accept() itself, so this is safe even if this broadcast is dropped).
-  onSignal(ringChannel, 'call-claimed', ({ callId, deviceId }) => {
-    if (deviceId !== _deviceId) onCallClaimedElsewhere(callId);
-  });
+  // PRODUCTION FIX: registerHandlers is called by
+  // joinPersistentBroadcastChannel with the LIVE channel object every
+  // time one is created — the first join and again on every automatic
+  // reconnect. Attaching handlers in here (instead of once, outside, on a
+  // fixed reference) is what makes the ring listener survive a dropped
+  // channel: after a reconnect, this runs again against the new channel,
+  // so 'incoming-call' keeps being heard with no page refresh needed.
+  const registerRingHandlers = (channel) => {
+    // PRODUCTION HARDENING (Fix 3): if a sibling tab/device claims a call
+    // first, this tab hears about it here (best-effort UX signal — the
+    // authoritative guarantee is the DB unique constraint checked inside
+    // accept() itself, so this is safe even if this broadcast is dropped).
+    onSignal(channel, 'call-claimed', ({ callId, deviceId }) => {
+      if (deviceId !== _deviceId) onCallClaimedElsewhere(callId);
+    });
 
-  onSignal(ringChannel, 'incoming-call', async ({ callId, plateId, sdp }) => {
-    if (torndown) return;
+    onSignal(channel, 'incoming-call', async ({ callId, plateId, sdp }) => {
+      if (torndown) return;
+      console.log(`[RTC-TRACE] 7 Incoming received | File=services/webrtcOwnerCall.js ownerId=${ownerId} callId=${callId} plateId=${plateId}`);
 
-    const accept = async () => {
-      // Fix 3: claim BEFORE requesting the microphone or opening any
-      // channel/peer connection, so a losing tab never touches media at
-      // all — no duplicate audio, no duplicate answer, and no wasted mic
-      // permission prompt on a call this tab isn't going to handle.
-      const won = await _claimCall(callId, ownerId);
-      if (!won) {
-        onCallClaimedElsewhere(callId);
-        return;
-      }
-      sendSignal(ringChannel, 'call-claimed', { callId, deviceId: _deviceId }).catch(() => {});
+      const accept = async () => {
+        console.log(`[RTC-TRACE] 9 Accept clicked | File=services/webrtcOwnerCall.js callId=${callId}`);
+        // Fix 3: claim BEFORE requesting the microphone or opening any
+        // channel/peer connection, so a losing tab never touches media at
+        // all — no duplicate audio, no duplicate answer, and no wasted mic
+        // permission prompt on a call this tab isn't going to handle.
+        const won = await _claimCall(callId, ownerId);
+        if (!won) {
+          console.warn(`[RTC-TRACE][FAIL] call claimed elsewhere | File=services/webrtcOwnerCall.js callId=${callId} Reason=rtc_call_claims unique_violation Current=lost-claim Expected=won-claim`);
+          onCallClaimedElsewhere(callId);
+          return;
+        }
+        sendSignal(channel, 'call-claimed', { callId, deviceId: _deviceId }).catch(() => {});
 
-      let callChannel;
+        let callChannel;
       try {
         callChannel = await joinBroadcastChannel(callChannelName(callId));
       } catch (err) {
@@ -217,6 +269,8 @@ export async function listenForIncomingCalls(ownerId, handlers = {}) {
         if (activeCallTorndown) return;
 
         if (pc.connectionState === 'connected') {
+          console.log(`[RTC-TRACE] 12 ICE connected | File=services/webrtcOwnerCall.js callId=${callId}`);
+          console.log(`[RTC-TRACE] 13 Connected | File=services/webrtcOwnerCall.js callId=${callId}`);
           if (activeReconnectGraceTimer) {
             clearTimeout(activeReconnectGraceTimer);
             activeReconnectGraceTimer = null;
@@ -238,6 +292,7 @@ export async function listenForIncomingCalls(ownerId, handlers = {}) {
         }
 
         if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          console.error(`[RTC-TRACE][FAIL] ICE failed/closed | File=services/webrtcOwnerCall.js callId=${callId} Reason=connectionState=${pc.connectionState} Current=${pc.connectionState} Expected=connected`);
           cleanupActiveCall();
           onEnded();
         }
@@ -258,27 +313,47 @@ export async function listenForIncomingCalls(ownerId, handlers = {}) {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         await sendSignal(callChannel, 'answer', { sdp: pc.localDescription.sdp });
+        console.log(`[RTC-TRACE] 10 Answer sent | File=services/webrtcOwnerCall.js callId=${callId}`);
       } catch (err) {
+        console.error(`[RTC-TRACE][FAIL] answer build/send failed | File=services/webrtcOwnerCall.js callId=${callId} Reason=${err?.message || err} Current=no-answer-sent Expected=answer-sent`);
         console.error('[WebRTCOwnerCall] Failed to build/send answer:', err);
         cleanupActiveCall();
       }
-    };
+      };
 
-    const reject = () => {
-      joinBroadcastChannel(callChannelName(callId), { timeoutMs: 3000 })
-        .then((channel) => {
-          sendSignal(channel, 'reject', { reason: 'owner_declined' }).finally(() => leaveChannel(channel));
-        })
-        .catch(() => {});
-    };
+      const reject = () => {
+        joinBroadcastChannel(callChannelName(callId), { timeoutMs: 3000 })
+          .then((rejectChannel) => {
+            sendSignal(rejectChannel, 'reject', { reason: 'owner_declined' }).finally(() => leaveChannel(rejectChannel));
+          })
+          .catch(() => {});
+      };
 
-    onIncomingCall({ callId, plateId, accept, reject });
-  });
+      onIncomingCall({ callId, plateId, accept, reject });
+    });
+  };
+
+  let releasePersistentRing;
+  try {
+    releasePersistentRing = await joinPersistentBroadcastChannel(
+      ringChannelName(ownerId),
+      registerRingHandlers,
+      {
+        initialTimeoutMs: 8000,
+        onSubscribed: () => console.log(`[RTC-TRACE] 6 Owner subscribed | File=services/webrtcOwnerCall.js ownerId=${ownerId}`),
+        onLost: () => console.warn(`[RTC-TRACE][FAIL] Owner ring channel lost, auto-reconnecting | File=services/webrtcOwnerCall.js ownerId=${ownerId} Reason=CHANNEL_ERROR/CLOSED/TIMED_OUT Current=disconnected Expected=SUBSCRIBED`),
+      }
+    );
+  } catch (err) {
+    console.error(`[RTC-TRACE][FAIL] Owner ring channel initial join failed | File=services/webrtcOwnerCall.js ownerId=${ownerId} Reason=${err?.message || err} Current=not-subscribed Expected=SUBSCRIBED`);
+    console.error('[WebRTCOwnerCall] Could not join ring channel:', err);
+    return noOpCleanup;
+  }
 
   return function cleanup() {
     torndown = true;
     cleanupActiveCall();
-    leaveChannel(ringChannel);
+    releasePersistentRing();
     window.removeEventListener('pagehide', _releaseOnUnload);
   };
 }

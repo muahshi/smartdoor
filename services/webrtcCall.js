@@ -83,12 +83,16 @@ async function _logAttempt(ownerId, plateId, callId, outcome, fallbackTriggered)
  */
 export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStatus = () => {} }) {
   if (!ownerId || !plateId) return { attempted: false, connected: false, reason: 'missing_params' };
+  console.log(`[RTC-TRACE] 1 Visitor starts call | File=services/webrtcCall.js ownerId=${ownerId} plateId=${plateId}`);
 
   const enabled = await isWebRTCEnabledForOwner(ownerId);
+  console.log(`[RTC-TRACE] 2 Feature flags | File=services/webrtcCall.js ownerId=${ownerId} enabled=${enabled}`);
   if (!enabled) return { attempted: false, connected: false, reason: 'flag_off' };
 
   const presence = await getOwnerPresenceSnapshot(ownerId);
+  console.log(`[RTC-TRACE] 3 Presence | File=services/webrtcCall.js ownerId=${ownerId} online=${presence.online} deviceCount=${presence.deviceCount}`);
   if (!presence.online) {
+    console.warn(`[RTC-TRACE][FAIL] owner offline | File=services/webrtcCall.js ownerId=${ownerId} Reason=no presence tracked on presence:owner:${ownerId} Current=offline Expected=online`);
     await _logAttempt(ownerId, plateId, null, RTC_MONITORING_EVENTS.RTC_OWNER_OFFLINE_SKIP, true);
     return { attempted: false, connected: false, reason: 'owner_offline' };
   }
@@ -97,6 +101,7 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   } catch (err) {
+    console.warn(`[RTC-TRACE][FAIL] mic denied | File=services/webrtcCall.js ownerId=${ownerId} Reason=${err?.message || err} Current=no-mic-access Expected=mic-granted`);
     console.warn('[WebRTCCall] Microphone permission denied or unavailable:', err);
     await _logAttempt(ownerId, plateId, null, RTC_MONITORING_EVENTS.RTC_PERMISSION_DENIED, true);
     return { attempted: false, connected: false, reason: 'mic_denied' };
@@ -184,9 +189,12 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
         // Pre-connect phase — unchanged behavior.
         if (pc.connectionState === 'connected') {
           connected = true;
+          console.log(`[RTC-TRACE] 12 ICE connected | File=services/webrtcCall.js callId=${callId}`);
+          console.log(`[RTC-TRACE] 13 Connected | File=services/webrtcCall.js callId=${callId}`);
           onStatus('connected');
           finish({ connected: true, outcome: RTC_MONITORING_EVENTS.RTC_CONNECTED });
         } else if (pc.connectionState === 'failed') {
+          console.error(`[RTC-TRACE][FAIL] ICE failed | File=services/webrtcCall.js callId=${callId} Reason=connectionState=failed Current=failed Expected=connected`);
           finish({ connected: false, reason: 'ice_failed', outcome: RTC_MONITORING_EVENTS.RTC_ICE_FAILED });
         }
         return;
@@ -238,7 +246,9 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
     onSignal(callChannel, 'answer', async ({ sdp }) => {
       try {
         await pc.setRemoteDescription({ type: 'answer', sdp });
+        console.log(`[RTC-TRACE] 11 Answer received | File=services/webrtcCall.js callId=${callId}`);
       } catch (err) {
+        console.error(`[RTC-TRACE][FAIL] setRemoteDescription(answer) failed | File=services/webrtcCall.js callId=${callId} Reason=${err?.message || err} Current=no-remote-desc Expected=answer-applied`);
         console.error('[WebRTCCall] setRemoteDescription(answer) failed:', err);
         finish({ connected: false, reason: 'ice_failed', outcome: RTC_MONITORING_EVENTS.RTC_ICE_FAILED });
       }
@@ -277,20 +287,24 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
     let ringChannel;
     try {
       ringChannel = await joinBroadcastChannel(ringChannelName(ownerId), { timeoutMs: 3000 });
+      console.log(`[RTC-TRACE] 4 Ring channel joined | File=services/webrtcCall.js ownerId=${ownerId} callId=${callId}`);
       await sendSignal(ringChannel, 'incoming-call', {
         callId,
         plateId,
         sdp: pc.localDescription.sdp,
       });
+      console.log(`[RTC-TRACE] 5 Broadcast sent | File=services/webrtcCall.js ownerId=${ownerId} callId=${callId} event=incoming-call`);
       leaveChannel(ringChannel); // one-shot notify — the per-call channel carries the rest
       onStatus('ringing');
     } catch (err) {
+      console.error(`[RTC-TRACE][FAIL] ring channel unreachable | File=services/webrtcCall.js ownerId=${ownerId} callId=${callId} Reason=${err?.message || err} Current=not-sent Expected=incoming-call-delivered`);
       console.error('[WebRTCCall] Could not reach owner ring channel:', err);
       finish({ connected: false, reason: 'signaling_unavailable', outcome: RTC_MONITORING_EVENTS.RTC_ICE_FAILED });
       return;
     }
 
     timeoutTimer = setTimeout(() => {
+      console.warn(`[RTC-TRACE] 14 Timeout | File=services/webrtcCall.js callId=${callId} Reason=no-answer-within-${WEBRTC_CONNECT_TIMEOUT_MS}ms Current=not-connected Expected=connected`);
       finish({ connected: false, reason: 'timeout', outcome: RTC_MONITORING_EVENTS.RTC_TIMEOUT_FALLBACK });
     }, WEBRTC_CONNECT_TIMEOUT_MS);
   });
