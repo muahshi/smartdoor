@@ -35,6 +35,7 @@
     symbol: 'none',
     qrStyle: 'classic',
     houseNumber: '',
+    subtitle: '',
     logoDataUrl: null,
     logoFileName: null
   };
@@ -119,6 +120,13 @@
 
     sections.push(`
       <div class="cfg-field">
+        <label class="booking-form-label">Subtitle <span class="cfg-optional">(optional, e.g. "Est. 2020")</span></label>
+        <input type="text" id="plate-subtitle" class="booking-input" placeholder="e.g. Est. 2020" value="${escapeHtml(state.subtitle)}"
+          oninput="SD_Configurator._onSubtitleInput(this.value)" />
+      </div>`);
+
+    sections.push(`
+      <div class="cfg-field">
         <label class="booking-form-label">Religious Symbol <span class="cfg-optional">(optional)</span></label>
         <div class="cfg-symbol-grid">${renderSymbolGrid(schema.symbols, state.symbol)}</div>
       </div>`);
@@ -155,30 +163,48 @@
     return el ? el.value : 'modern';
   }
 
+  /** Plate width/height (inches) → aspect ratio, with a sane fallback for any future size that omits it. */
+  function aspectForSize(sizeOpt) {
+    if (sizeOpt && sizeOpt.widthIn && sizeOpt.heightIn) return sizeOpt.widthIn / sizeOpt.heightIn;
+    return 1.5; // ~12x8 default
+  }
+
   function renderPreview() {
     const el = document.getElementById(PREVIEW_ID);
     if (!el || !currentSchema) return;
 
     const font = currentSchema.fonts.find((f) => f.key === currentFontKey()) || currentSchema.fonts[0];
     const symbol = currentSchema.symbols.find((s) => s.key === state.symbol);
-    const color = (currentSchema.colors.find((c) => c.key === state.color) || {}).hex || currentSchema.previewTextColor;
+    const color = (currentSchema.colors.find((c) => c.key === state.color) || {}).hex || null;
     const name = currentNameValue() || 'Your Name Here';
-    const houseNo = state.houseNumber || '';
-    const qr = currentSchema.qrStyles.find((q) => q.key === state.qrStyle) || currentSchema.qrStyles[0];
-    const sizeLabel = (currentSchema.sizes.find((s) => s.key === state.size) || {}).label || '';
+    const sizeOpt = currentSchema.sizes.find((s) => s.key === state.size);
+    const sizeLabel = (sizeOpt || {}).label || '';
 
-    el.innerHTML = `
-      <div class="cfg-plate-mock" style="background:${currentSchema.previewBg};">
-        ${symbol && symbol.glyph ? `<div class="cfg-plate-symbol">${symbol.glyph}</div>` : ''}
-        ${state.logoDataUrl ? `<img class="cfg-plate-logo" src="${state.logoDataUrl}" alt="Custom logo" />` : ''}
-        <div class="cfg-plate-name" style="color:${color};font-family:${font.family};font-weight:${font.weight};">${escapeHtml(name)}</div>
-        ${houseNo ? `<div class="cfg-plate-houseno" style="color:${color};font-family:${font.family};">${escapeHtml(houseNo)}</div>` : ''}
-        <div class="cfg-plate-qr" title="${escapeHtml(qr.label)}">
-          <div class="cfg-plate-qr-box">QR</div>
-        </div>
-      </div>
-      <div class="cfg-preview-caption">${sizeLabel ? escapeHtml(sizeLabel) : ''}${sizeLabel ? ' · ' : ''}Live preview — updates instantly as you customize</div>
-    `;
+    // Ensure the SVG mount point + caption exist (created once, then reused
+    // across re-renders so we're not tearing down/rebuilding the <svg> DOM
+    // node on every keystroke).
+    if (!el.querySelector('.cfg-plate-svg-wrap')) {
+      el.innerHTML = `<div class="cfg-plate-svg-wrap" id="cfg-plate-svg-wrap"></div><div class="cfg-preview-caption" id="cfg-preview-caption"></div>`;
+    }
+    const svgWrap = document.getElementById('cfg-plate-svg-wrap');
+    const captionEl = document.getElementById('cfg-preview-caption');
+
+    global.SD_PlateRenderer.renderInto(svgWrap, {
+      templateKey: currentSchema.templateKey,
+      aspect: aspectForSize(sizeOpt),
+      name,
+      subtitle: state.subtitle || '',
+      houseNumber: state.houseNumber || '',
+      fontFamily: font.family,
+      fontWeight: font.weight,
+      color,
+      symbolGlyph: symbol && symbol.glyph ? symbol.glyph : '',
+      logoDataUrl: state.logoDataUrl || null
+    });
+
+    if (captionEl) {
+      captionEl.textContent = `${sizeLabel ? sizeLabel + ' · ' : ''}Live preview — updates instantly as you customize`;
+    }
   }
 
   function rerender() {
@@ -216,6 +242,11 @@
 
   function onHouseNumberInput(value) {
     state.houseNumber = value;
+    rerender();
+  }
+
+  function onSubtitleInput(value) {
+    state.subtitle = value;
     rerender();
   }
 
@@ -281,6 +312,7 @@
   function getCustomizationPayload() {
     return {
       houseNumber: state.houseNumber || '',
+      subtitle: state.subtitle || '',
       size: state.size || '',
       color: state.color || '',
       finish: state.finish || '',
@@ -299,6 +331,7 @@
     _onColorClick: onColorClick,
     _onSymbolClick: onSymbolClick,
     _onHouseNumberInput: onHouseNumberInput,
+    _onSubtitleInput: onSubtitleInput,
     _onLogoChange: onLogoChange
   };
 })(window);
