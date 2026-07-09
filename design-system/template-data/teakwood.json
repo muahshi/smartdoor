@@ -1,0 +1,158 @@
+{
+  "key": "teakwood",
+  "material": "teakwood",
+  "engravingColor": "#1A0D04",
+  "mutedColor": "rgba(26,13,4,0.72)",
+  "engraveStyle": "groove",
+  "background": {
+    "type": "linear",
+    "angle": 155,
+    "stops": [
+      {
+        "offset": 0,
+        "color": "#8a6438"
+      },
+      {
+        "offset": 0.32,
+        "color": "#a9814f"
+      },
+      {
+        "offset": 0.6,
+        "color": "#946c3d"
+      },
+      {
+        "offset": 1,
+        "color": "#6f512c"
+      }
+    ]
+  },
+  "texture": {
+    "type": "grain",
+    "opacity": 0.2
+  },
+  "textureExtra": {
+    "type": "vignette",
+    "opacity": 0.22
+  },
+  "border": {
+    "color": "rgba(26,13,4,0.4)",
+    "widthFrac": 0.007
+  },
+  "cornerRadiusFrac": 0.025,
+  "safeAreaInsetFrac": 0.06,
+  "screws": [
+    {
+      "xFrac": 0.1,
+      "yFrac": 0.045,
+      "rFrac": 0.018,
+      "color": "rgba(26,13,4,0.75)",
+      "style": "phillips"
+    },
+    {
+      "xFrac": 0.9,
+      "yFrac": 0.045,
+      "rFrac": 0.018,
+      "color": "rgba(26,13,4,0.75)",
+      "style": "phillips"
+    },
+    {
+      "xFrac": 0.1,
+      "yFrac": 0.955,
+      "rFrac": 0.018,
+      "color": "rgba(26,13,4,0.75)",
+      "style": "phillips"
+    },
+    {
+      "xFrac": 0.9,
+      "yFrac": 0.955,
+      "rFrac": 0.018,
+      "color": "rgba(26,13,4,0.75)",
+      "style": "phillips"
+    }
+  ],
+  "shadow": {
+    "blurFrac": 0.05,
+    "nearBlurFrac": 0.014,
+    "opacity": 0.45,
+    "nearOpacity": 0.35,
+    "color": "#000000",
+    "dyFrac": 0.03,
+    "nearDyFrac": 0.009
+  },
+  "symbolGold": "#D4AF37",
+  "layout": {
+    "topSymbol": {
+      "xFrac": 0.5,
+      "yFrac": 0.125,
+      "sizeFrac": 0.17,
+      "wFrac": 0.22,
+      "hFrac": 0.19
+    },
+    "dividerTop": {
+      "xFrac": 0.5,
+      "yFrac": 0.222,
+      "widthFrac": 0.34
+    },
+    "houseNoLabel": {
+      "xFrac": 0.5,
+      "yFrac": 0.263,
+      "fontSizeFrac": 0.028,
+      "letterSpacingFrac": 0.006
+    },
+    "houseNumber": {
+      "xFrac": 0.5,
+      "yFrac": 0.365,
+      "maxWidthFrac": 0.7,
+      "fontSizeFrac": 0.125,
+      "align": "middle"
+    },
+    "dividerMid": {
+      "xFrac": 0.5,
+      "yFrac": 0.452,
+      "widthFrac": 0.34
+    },
+    "familyName": {
+      "xFrac": 0.5,
+      "yFrac": 0.522,
+      "maxWidthFrac": 0.86,
+      "fontSizeFrac": 0.078,
+      "align": "middle"
+    },
+    "familyLabel": {
+      "xFrac": 0.5,
+      "yFrac": 0.575,
+      "fontSizeFrac": 0.032,
+      "letterSpacingFrac": 0.01
+    },
+    "scanLabel": {
+      "xFrac": 0.5,
+      "yFrac": 0.63,
+      "fontSizeFrac": 0.024,
+      "letterSpacingFrac": 0.007
+    },
+    "qr": {
+      "xFrac": 0.5,
+      "yFrac": 0.775,
+      "sizeFrac": 0.3
+    },
+    "brandIcon": {
+      "xFrac": 0.4,
+      "yFrac": 0.935,
+      "sizeFrac": 0.032
+    },
+    "brandName": {
+      "xFrac": 0.53,
+      "yFrac": 0.935,
+      "fontSizeFrac": 0.03,
+      "letterSpacingFrac": 0.004
+    },
+    "brandTagline": {
+      "xFrac": 0.5,
+      "yFrac": 0.965,
+      "fontSizeFrac": 0.016,
+      "letterSpacingFrac": 0.006
+    }
+  },
+  "masterReference": "design-system/master-reference/teakwood.webp",
+  "notes": "Canonical data-driven definition of the teakwood plate template. Mirrors js/plateTemplates.js exactly (which is the runtime source of truth for the browser renderer). This JSON is the intended input for future non-browser consumers: PDF/manufacturing export, mobile apps, AR overlays — see design-system/future/README.md."
+}
