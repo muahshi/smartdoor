@@ -348,10 +348,6 @@
     .cfg-pill-delta { color:var(--accent); font-weight:700; }
     .cfg-pill-soon { font-size:0.62rem; padding:2px 6px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); border-radius:100px; color:#F59E0B; margin-left:4px; }
 
-    .cfg-swatch-row { display:flex; flex-wrap:wrap; gap:10px; }
-    .cfg-swatch { width:34px; height:34px; border-radius:50%; border:2px solid rgba(255,255,255,0.15); cursor:pointer; transition:all 0.2s; padding:0; }
-    .cfg-swatch:hover { transform:scale(1.08); }
-    .cfg-swatch.active { border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,162,232,0.2); }
 
     .cfg-symbol-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
     .cfg-symbol { display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 4px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; cursor:pointer; transition:all 0.2s; }
@@ -368,6 +364,8 @@
 
     .cfg-preview-col { position:sticky; top:100px; align-self:start; }
     .cfg-preview { display:flex; flex-direction:column; gap:10px; }
+    .cfg-camera-btn { margin-top:4px; width:100%; padding:12px; border-radius:12px; border:1px solid rgba(0,162,232,0.35); background:rgba(0,162,232,0.08); color:#00A2E8; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:0.82rem; cursor:pointer; transition:background 0.2s; }
+    .cfg-camera-btn:hover { background:rgba(0,162,232,0.16); }
     /* Phase 4 — SVG-based Product Renderer wrapper. Aspect ratio is set
        inline per-render (from the selected size's viewBox), so this
        container just needs to hold the <svg> and match the existing
@@ -441,6 +439,7 @@
 <script src="js/plateTemplates.js"></script>
 <script src="js/plateRenderer.js"></script>
 <script src="js/productConfigurator.js"></script>
+<script src="js/cameraPreview.js"></script>
 <script src="js/analytics-web.js"></script>
 
 
@@ -845,6 +844,7 @@
             <div class="cfg-preview-col">
               <div class="cfg-section-title">👁️ Live Preview</div>
               <div id="configurator-preview" class="cfg-preview"><!-- Rendered by js/productConfigurator.js --></div>
+              <button type="button" class="cfg-camera-btn" onclick="SD_CameraPreview.open()">📷 See It On Your Door</button>
             </div>
           </div>
         </div>
@@ -1017,8 +1017,22 @@
     const woodCard = document.querySelector('[data-product="wood"]');
     if (woodCard) selectProduct(woodCard);
     // Phase 2/3 — mount the configurator + live preview for the default product
-    if (window.SD_Configurator) SD_Configurator.mount('wood');
+    if (window.SD_Configurator) {
+      SD_Configurator.mount('wood');
+      SD_Configurator.on(refreshTotalPrice); // keeps ₹ total in sync with size/finish selections
+    }
   });
+  function refreshTotalPrice() {
+    const delta = (window.SD_Configurator && SD_Configurator.getPriceDelta) ? SD_Configurator.getPriceDelta() : 0;
+    const total = selectedProduct.price + delta;
+    const fmt = `₹${total.toLocaleString('en-IN')}`;
+    document.getElementById('selected-name').textContent = selectedProduct.name;
+    document.getElementById('selected-price').textContent = fmt;
+    document.getElementById('form-product-name').textContent = selectedProduct.name;
+    document.getElementById('form-product-price').textContent = fmt;
+    document.getElementById('total-product').textContent = fmt;
+    document.getElementById('order-total').textContent = fmt;
+  }
   function selectProductBase(card) {
     document.querySelectorAll('.pcard.product-card').forEach(c => {
       c.classList.remove('selected');
@@ -1031,13 +1045,7 @@
     const product = card.dataset.product;
     const price = parseInt(card.dataset.price);
     selectedProduct = { name:productNames[product], price };
-    const fmt = `₹${price.toLocaleString('en-IN')}`;
-    document.getElementById('selected-name').textContent = selectedProduct.name;
-    document.getElementById('selected-price').textContent = fmt;
-    document.getElementById('form-product-name').textContent = selectedProduct.name;
-    document.getElementById('form-product-price').textContent = fmt;
-    document.getElementById('total-product').textContent = fmt;
-    document.getElementById('order-total').textContent = fmt;
+    refreshTotalPrice();
     document.getElementById('step-ind-1').classList.add('done');
     document.getElementById('step-ind-2').classList.add('active');
   }
@@ -1051,13 +1059,7 @@
     _currentProductKey = card.dataset?.product || _currentProductKey;
     // Phase 2/3 — re-render configurator + live preview for the newly selected product
     if (window.SD_Configurator) SD_Configurator.mount(_currentProductKey);
-    const fmt = `₹${selectedProduct.price.toLocaleString('en-IN')}`;
-    document.getElementById('selected-name').textContent = selectedProduct.name;
-    document.getElementById('selected-price').textContent = fmt;
-    document.getElementById('form-product-name').textContent = selectedProduct.name;
-    document.getElementById('form-product-price').textContent = fmt;
-    document.getElementById('total-product').textContent = fmt;
-    document.getElementById('order-total').textContent = fmt;
+    refreshTotalPrice();
     document.getElementById('step-ind-1').classList.add('done');
     document.getElementById('step-ind-2').classList.add('active');
   }
@@ -1076,11 +1078,11 @@
     return [
       '🔔 *New Smart Door Order Request*',
       '',
-      `*Product:* ${selectedProduct.name} (₹${selectedProduct.price.toLocaleString('en-IN')})`,
+      `*Product:* ${selectedProduct.name} (₹${(selectedProduct.price + ((window.SD_Configurator && SD_Configurator.getPriceDelta) ? SD_Configurator.getPriceDelta() : 0)).toLocaleString('en-IN')})`,
       `*Plate Text:* ${orderParams.houseName}`,
       orderParams.houseNumber ? `*House Number:* ${orderParams.houseNumber}` : null,
       `*Font Style:* ${orderParams.fontStyle}`,
-      orderParams.customization ? `*Customization:* Size: ${orderParams.customization.size || '-'} · Color: ${orderParams.customization.color || '-'} · Finish: ${orderParams.customization.finish || '-'} · Symbol: ${orderParams.customization.symbol || 'none'} · QR: ${orderParams.customization.qrStyle || 'classic'}` : null,
+      orderParams.customization ? `*Customization:* Size: ${orderParams.customization.size || '-'} · Finish: ${orderParams.customization.finish || '-'} · Symbol: ${orderParams.customization.symbol || 'none'} · QR: ${orderParams.customization.qrStyle || 'classic'}` : null,
       '',
       '*Customer Details:*',
       `Name: ${customerInfo.name}`,
