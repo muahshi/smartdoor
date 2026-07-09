@@ -26,11 +26,10 @@
   const CONTROLS_ID = 'configurator-controls';
   const PREVIEW_ID = 'configurator-preview';
 
-  /** @type {{productKey:string,size:string,color:string,finish:string,symbol:string,qrStyle:string,houseNumber:string,logoDataUrl:string|null,logoFileName:string|null}} */
+  /** @type {{productKey:string,size:string,finish:string,symbol:string,qrStyle:string,houseNumber:string,logoDataUrl:string|null,logoFileName:string|null}} */
   let state = {
     productKey: null,
     size: null,
-    color: null,
     finish: null,
     symbol: 'none',
     qrStyle: 'classic',
@@ -41,6 +40,30 @@
   };
 
   let currentSchema = null;
+  let changeListeners = [];
+
+  function onChangeSubscribe(cb) {
+    if (typeof cb === 'function') changeListeners.push(cb);
+  }
+
+  function onChangeUnsubscribe(cb) {
+    changeListeners = changeListeners.filter((fn) => fn !== cb);
+  }
+
+  function notifyChange() {
+    const summary = { priceDelta: getPriceDelta(), state: getState() };
+    changeListeners.forEach((cb) => {
+      try { cb(summary); } catch (e) { /* a bad listener must never break the configurator */ }
+    });
+  }
+
+  /** Sum of priceDelta across every currently-selected variant option (size, finish). */
+  function getPriceDelta() {
+    if (!currentSchema) return 0;
+    const sizeOpt = (currentSchema.sizes || []).find((o) => o.key === state.size);
+    const finishOpt = (currentSchema.finishes || []).find((o) => o.key === state.finish);
+    return (sizeOpt && sizeOpt.priceDelta ? sizeOpt.priceDelta : 0) + (finishOpt && finishOpt.priceDelta ? finishOpt.priceDelta : 0);
+  }
 
   function escapeHtml(str) {
     return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -57,15 +80,6 @@
       return `<button type="button" class="cfg-pill${isActive ? ' active' : ''}${disabled ? ' disabled' : ''}"
         data-group="${groupName}" data-key="${opt.key}" ${extraAttr || ''} ${disabled ? 'disabled' : ''}
         onclick="SD_Configurator._onPillClick(this)">${escapeHtml(opt.label)}${delta}${disabled ? ' <span class="cfg-pill-soon">Soon</span>' : ''}</button>`;
-    }).join('');
-  }
-
-  function renderColorSwatches(colors, activeKey) {
-    if (!colors || !colors.length) return '';
-    return colors.map((c) => {
-      const isActive = c.key === activeKey;
-      return `<button type="button" class="cfg-swatch${isActive ? ' active' : ''}" title="${escapeHtml(c.label)}"
-        style="background:${c.hex};" data-key="${c.key}" onclick="SD_Configurator._onColorClick(this)"></button>`;
     }).join('');
   }
 
@@ -95,14 +109,6 @@
         </div>`);
     }
 
-    if (schema.colors.length) {
-      sections.push(`
-        <div class="cfg-field">
-          <label class="booking-form-label">Letter Color</label>
-          <div class="cfg-swatch-row">${renderColorSwatches(schema.colors, state.color)}</div>
-        </div>`);
-    }
-
     if (schema.finishes.length) {
       sections.push(`
         <div class="cfg-field">
@@ -127,7 +133,7 @@
 
     sections.push(`
       <div class="cfg-field">
-        <label class="booking-form-label">Religious Symbol <span class="cfg-optional">(optional)</span></label>
+        <label class="booking-form-label">Top Symbol <span class="cfg-optional">(optional — replaces the default Home icon)</span></label>
         <div class="cfg-symbol-grid">${renderSymbolGrid(schema.symbols, state.symbol)}</div>
       </div>`);
 
@@ -145,7 +151,7 @@
           <input type="file" id="cfg-logo-input" accept="image/png,image/jpeg,image/svg+xml" style="display:none;" onchange="SD_Configurator._onLogoChange(this.files[0])" />
           <span class="cfg-logo-filename" id="cfg-logo-filename">${state.logoFileName ? escapeHtml(state.logoFileName) : 'No file chosen'}</span>
         </div>
-        <div class="cfg-logo-hint">Logo upload is architecture-ready. Files are previewed locally now; production printing review is handled by our team after order confirmation.</div>
+        <div class="cfg-logo-hint">A logo replaces the top symbol slot (Home icon / religious symbol) entirely. Files are previewed locally now; production printing review is handled by our team after order confirmation.</div>
       </div>`);
 
     el.innerHTML = sections.join('');
@@ -169,15 +175,31 @@
     return 0.667; // ~8x12 portrait default
   }
 
+  function buildRenderOptions() {
+    if (!currentSchema) return null;
+    const font = currentSchema.fonts.find((f) => f.key === currentFontKey()) || currentSchema.fonts[0];
+    const name = currentNameValue() || 'Your Name Here';
+    const sizeOpt = currentSchema.sizes.find((s) => s.key === state.size);
+    return {
+      templateKey: currentSchema.templateKey,
+      aspect: aspectForSize(sizeOpt),
+      name,
+      subtitle: state.subtitle || '',
+      houseNumber: state.houseNumber || '',
+      fontFamily: font.family,
+      fontWeight: font.weight,
+      symbolKey: state.symbol || 'none',
+      logoDataUrl: state.logoDataUrl || null,
+      sizeLabel: (sizeOpt || {}).label || ''
+    };
+  }
+
   function renderPreview() {
     const el = document.getElementById(PREVIEW_ID);
     if (!el || !currentSchema) return;
 
-    const font = currentSchema.fonts.find((f) => f.key === currentFontKey()) || currentSchema.fonts[0];
-    const symbol = currentSchema.symbols.find((s) => s.key === state.symbol);
-    const name = currentNameValue() || 'Your Name Here';
-    const sizeOpt = currentSchema.sizes.find((s) => s.key === state.size);
-    const sizeLabel = (sizeOpt || {}).label || '';
+    const opts = buildRenderOptions();
+    if (!opts) return;
 
     // Ensure the SVG mount point + caption exist (created once, then reused
     // across re-renders so we're not tearing down/rebuilding the <svg> DOM
@@ -188,25 +210,16 @@
     const svgWrap = document.getElementById('cfg-plate-svg-wrap');
     const captionEl = document.getElementById('cfg-preview-caption');
 
-    global.SD_PlateRenderer.renderInto(svgWrap, {
-      templateKey: currentSchema.templateKey,
-      aspect: aspectForSize(sizeOpt),
-      name,
-      subtitle: state.subtitle || '',
-      houseNumber: state.houseNumber || '',
-      fontFamily: font.family,
-      fontWeight: font.weight,
-      symbolGlyph: symbol && symbol.glyph ? symbol.glyph : '',
-      logoDataUrl: state.logoDataUrl || null
-    });
+    global.SD_PlateRenderer.renderInto(svgWrap, opts);
 
     if (captionEl) {
-      captionEl.textContent = `${sizeLabel ? sizeLabel + ' · ' : ''}Live preview — updates instantly as you customize`;
+      captionEl.textContent = `${opts.sizeLabel ? opts.sizeLabel + ' · ' : ''}Live preview — updates instantly as you customize`;
     }
   }
 
   function rerender() {
     renderPreview();
+    notifyChange();
   }
 
   // ────────── EVENT HANDLERS (exposed for inline onclick, matches existing codebase pattern) ──────────
@@ -218,14 +231,6 @@
     state[group] = key;
     const row = btn.closest('.cfg-pill-row');
     if (row) row.querySelectorAll('.cfg-pill').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    rerender();
-  }
-
-  function onColorClick(btn) {
-    state.color = btn.dataset.key;
-    const row = btn.closest('.cfg-swatch-row');
-    if (row) row.querySelectorAll('.cfg-swatch').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     rerender();
   }
@@ -282,11 +287,11 @@
     // keep cross-product selections (symbol, qrStyle, houseNumber, logo) as-is.
     state.productKey = productKey;
     state.size = schema.sizes[0] ? schema.sizes[0].key : null;
-    state.color = schema.colors[0] ? schema.colors[0].key : null;
     state.finish = schema.finishes[0] ? schema.finishes[0].key : null;
 
     renderControls(schema);
     renderPreview();
+    notifyChange();
 
     // Keep preview in sync with the existing name/font-style inputs
     // (owned by index.html, not this module) without modifying them.
@@ -312,7 +317,6 @@
       houseNumber: state.houseNumber || '',
       subtitle: state.subtitle || '',
       size: state.size || '',
-      color: state.color || '',
       finish: state.finish || '',
       symbol: state.symbol || 'none',
       qrStyle: state.qrStyle || 'classic',
@@ -324,9 +328,12 @@
     mount,
     getState,
     getCustomizationPayload,
+    getPriceDelta,
+    getRenderOptions: buildRenderOptions,
+    on: onChangeSubscribe,
+    _removeListener: onChangeUnsubscribe,
     // internal — exposed only for inline onclick handlers in rendered markup
     _onPillClick: onPillClick,
-    _onColorClick: onColorClick,
     _onSymbolClick: onSymbolClick,
     _onHouseNumberInput: onHouseNumberInput,
     _onSubtitleInput: onSubtitleInput,

@@ -46,7 +46,9 @@
    * PHASE 2 ADDITION — Product Configurator schema
    * ------------------------------------------------------------------
    * Every product may carry an optional `configurator` object describing
-   * the variant axes (sizes/colors/finishes) available for THAT product.
+   * the variant axes (sizes/finishes) available for THAT product. Engraving
+   * color is intentionally NOT a customer-selectable axis — every product's
+   * engraving color is fixed by its own template (see js/plateTemplates.js).
    * The Configurator UI (js/productConfigurator.js) reads this schema at
    * runtime and renders controls automatically — nothing here is wired
    * to product-specific code. A future product simply declares its own
@@ -88,11 +90,6 @@
           { key: 'standard', label: 'Standard · 8×12 in', priceDelta: 0, widthIn: 8, heightIn: 12 },
           { key: 'large', label: 'Large · 10×16 in', priceDelta: 400, widthIn: 10, heightIn: 16 }
         ],
-        colors: [
-          { key: 'gold', label: 'Gold', hex: '#D4AF37' },
-          { key: 'silver', label: 'Silver', hex: '#C8D6E0' },
-          { key: 'white', label: 'White', hex: '#F5F5F5' }
-        ],
         finishes: [
           { key: 'high-gloss', label: 'High Gloss', priceDelta: 0 },
           { key: 'matte', label: 'Matte', priceDelta: 150 }
@@ -126,11 +123,6 @@
           { key: 'standard', label: 'Standard · 8×12 in', priceDelta: 0, widthIn: 8, heightIn: 12 },
           { key: 'large', label: 'Large · 10×16 in', priceDelta: 500, widthIn: 10, heightIn: 16 }
         ],
-        colors: [
-          { key: 'brass', label: 'Brass', hex: '#B5935C' },
-          { key: 'gold', label: 'Gold', hex: '#D4AF37' },
-          { key: 'copper', label: 'Copper', hex: '#B87333' }
-        ],
         finishes: [
           { key: 'polished', label: 'Polished Teak', priceDelta: 0 },
           { key: 'natural', label: 'Natural Grain', priceDelta: 0 }
@@ -163,10 +155,6 @@
         sizes: [
           { key: 'standard', label: 'Standard · 8×12 in', priceDelta: 0, widthIn: 8, heightIn: 12 },
           { key: 'large', label: 'Large · 10×16 in', priceDelta: 500, widthIn: 10, heightIn: 16 }
-        ],
-        colors: [
-          { key: 'silver', label: 'Silver', hex: '#96AABE' },
-          { key: 'black', label: 'Matte Black', hex: '#1A1A1A' }
         ],
         finishes: [
           { key: 'matte', label: 'Matte Steel', priceDelta: 0 },
@@ -237,7 +225,6 @@
       previewBg: p.previewBg,
       previewTextColor: p.previewTextColor,
       sizes: (p.configurator && p.configurator.sizes) || [],
-      colors: (p.configurator && p.configurator.colors) || [],
       finishes: (p.configurator && p.configurator.finishes) || [],
       fonts: SD_FONTS,
       symbols: SD_SYMBOLS,
