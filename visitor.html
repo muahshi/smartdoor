@@ -1600,6 +1600,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       // WebRTC wasn't attempted (flag off / owner offline / mic denied) or
       // it failed/timed out/was rejected — automatically fall back to the
       // existing, unmodified masked-calling flow. No user action needed.
+      console.warn(`[RTC-TRACE] 15 Fallback | File=visitor.html ownerId=${ownerId} plateId=${plateId} rtc.attempted=${rtc.attempted} rtc.connected=${rtc.connected} rtc.reason=${rtc.reason || 'n/a'} → initiateMaskedCall()`);
       const r = await initiateMaskedCall({ plateId, ownerId, visitorPhone: vPhone });
       if (r.success) {
         document.getElementById('call-sub').textContent = 'Connected — your number is hidden';
