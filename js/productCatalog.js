@@ -85,8 +85,8 @@
       previewTextColor: '#D4AF37',
       configurator: {
         sizes: [
-          { key: 'standard', label: 'Standard · 12×8 in', priceDelta: 0, widthIn: 12, heightIn: 8 },
-          { key: 'large', label: 'Large · 16×10 in', priceDelta: 400, widthIn: 16, heightIn: 10 }
+          { key: 'standard', label: 'Standard · 8×12 in', priceDelta: 0, widthIn: 8, heightIn: 12 },
+          { key: 'large', label: 'Large · 10×16 in', priceDelta: 400, widthIn: 10, heightIn: 16 }
         ],
         colors: [
           { key: 'gold', label: 'Gold', hex: '#D4AF37' },
@@ -123,8 +123,8 @@
       previewTextColor: '#D9B26A',
       configurator: {
         sizes: [
-          { key: 'standard', label: 'Standard · 12×8 in', priceDelta: 0, widthIn: 12, heightIn: 8 },
-          { key: 'large', label: 'Large · 16×10 in', priceDelta: 500, widthIn: 16, heightIn: 10 }
+          { key: 'standard', label: 'Standard · 8×12 in', priceDelta: 0, widthIn: 8, heightIn: 12 },
+          { key: 'large', label: 'Large · 10×16 in', priceDelta: 500, widthIn: 10, heightIn: 16 }
         ],
         colors: [
           { key: 'brass', label: 'Brass', hex: '#B5935C' },
@@ -161,8 +161,8 @@
       previewTextColor: '#0B1525',
       configurator: {
         sizes: [
-          { key: 'standard', label: 'Standard · 12×8 in', priceDelta: 0, widthIn: 12, heightIn: 8 },
-          { key: 'large', label: 'Large · 16×10 in', priceDelta: 500, widthIn: 16, heightIn: 10 }
+          { key: 'standard', label: 'Standard · 8×12 in', priceDelta: 0, widthIn: 8, heightIn: 12 },
+          { key: 'large', label: 'Large · 10×16 in', priceDelta: 500, widthIn: 10, heightIn: 16 }
         ],
         colors: [
           { key: 'silver', label: 'Silver', hex: '#96AABE' },

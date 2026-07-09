@@ -35,7 +35,7 @@
     symbol: 'none',
     qrStyle: 'classic',
     houseNumber: '',
-    subtitle: '',
+    subtitle: 'FAMILY',
     logoDataUrl: null,
     logoFileName: null
   };
@@ -166,7 +166,7 @@
   /** Plate width/height (inches) → aspect ratio, with a sane fallback for any future size that omits it. */
   function aspectForSize(sizeOpt) {
     if (sizeOpt && sizeOpt.widthIn && sizeOpt.heightIn) return sizeOpt.widthIn / sizeOpt.heightIn;
-    return 1.5; // ~12x8 default
+    return 0.667; // ~8x12 portrait default
   }
 
   function renderPreview() {
@@ -175,7 +175,6 @@
 
     const font = currentSchema.fonts.find((f) => f.key === currentFontKey()) || currentSchema.fonts[0];
     const symbol = currentSchema.symbols.find((s) => s.key === state.symbol);
-    const color = (currentSchema.colors.find((c) => c.key === state.color) || {}).hex || null;
     const name = currentNameValue() || 'Your Name Here';
     const sizeOpt = currentSchema.sizes.find((s) => s.key === state.size);
     const sizeLabel = (sizeOpt || {}).label || '';
@@ -197,7 +196,6 @@
       houseNumber: state.houseNumber || '',
       fontFamily: font.family,
       fontWeight: font.weight,
-      color,
       symbolGlyph: symbol && symbol.glyph ? symbol.glyph : '',
       logoDataUrl: state.logoDataUrl || null
     });

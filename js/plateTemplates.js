@@ -3,20 +3,25 @@
  * ------------------------------------------------------------------
  * PHASE 4 — Professional Product Preview Engine (Template Layer)
  *
- * Every SmartDoor material (Acrylic / Teakwood / Stainless Steel /
- * any future material) declares ONE template object here. The
- * renderer (js/plateRenderer.js) never hardcodes a material's look —
- * it only reads these templates.
+ * Vertical "classic nameplate" layout — matches the reference SmartDoor
+ * plate designs (house icon → HOUSE NO. → big number → divider →
+ * Family Name → FAMILY caption → SCAN TO CONNECT → QR → SMART DOOR
+ * brand footer), stacked top-to-bottom on a portrait plate.
+ *
+ * The LAYOUT (positions/sizes of every element) is shared across every
+ * material — only look-and-feel tokens (background, texture, border,
+ * screws, shadow, primaryColor) differ per material. This is what
+ * "reusable rendering engine" means here: a future material is just a
+ * new set of style tokens via SD_PlateTemplates.register(); it
+ * automatically gets the exact same proven layout.
  *
  * COORDINATE SYSTEM: every position/size below is a FRACTION (0–1) of
  * the plate's own width/height, not a pixel value. This is what makes
- * the renderer size-agnostic — a 12×8, 16×10, 18×12, 24×16 or any
- * future/custom size all reuse the exact same template unchanged;
- * only the outer viewBox aspect ratio changes (driven by the product's
- * `sizes` catalog entry), and every element scales proportionally.
- *
- * To add a future product/material: call SD_PlateTemplates.register()
- * with a new key — no renderer code changes required.
+ * the renderer size-agnostic — 8×12, 10×16, 18×12, 24×16, Custom, or
+ * any future size all reuse the exact same layout unchanged; only the
+ * outer viewBox aspect ratio changes (driven by the product's `sizes`
+ * catalog entry via widthIn/heightIn), and every element scales
+ * proportionally with it.
  * ------------------------------------------------------------------
  */
 (function (global) {
@@ -25,21 +30,38 @@
   const TEMPLATES = {};
 
   /**
+   * SHARED LAYOUT — identical structural positions for every material.
+   * Only `js/plateRenderer.js` reads this; templates below never repeat it.
+   * @typedef {Object} PlateLayout
+   */
+  const LAYOUT = {
+    houseIcon:   { xFrac: 0.5, yFrac: 0.125, sizeFrac: 0.16 },
+    dividerTop:  { xFrac: 0.5, yFrac: 0.205, widthFrac: 0.34 },
+    houseNoLabel:{ xFrac: 0.5, yFrac: 0.248, fontSizeFrac: 0.028, letterSpacingFrac: 0.006 },
+    houseNumber: { xFrac: 0.5, yFrac: 0.355, fontSizeFrac: 0.125, align: 'middle' },
+    dividerMid:  { xFrac: 0.5, yFrac: 0.445, widthFrac: 0.34 },
+    familyName:  { xFrac: 0.5, yFrac: 0.515, maxWidthFrac: 0.86, fontSizeFrac: 0.078, align: 'middle' },
+    familyLabel: { xFrac: 0.5, yFrac: 0.568, fontSizeFrac: 0.032, letterSpacingFrac: 0.01 },
+    scanLabel:   { xFrac: 0.5, yFrac: 0.625, fontSizeFrac: 0.024, letterSpacingFrac: 0.007 },
+    qr:          { xFrac: 0.5, yFrac: 0.775, sizeFrac: 0.30 },
+    logo:        { xFrac: 0.5, yFrac: 0.125, wFrac: 0.15, hFrac: 0.15, defaultSrc: null },
+    religionSymbol: { xFrac: 0.115, yFrac: 0.11, sizeFrac: 0.09 },
+    brandIcon:   { xFrac: 0.40, yFrac: 0.935, sizeFrac: 0.032 },
+    brandName:   { xFrac: 0.53, yFrac: 0.935, fontSizeFrac: 0.03, letterSpacingFrac: 0.004 },
+    brandTagline:{ xFrac: 0.5, yFrac: 0.965, fontSizeFrac: 0.016, letterSpacingFrac: 0.006 }
+  };
+
+  /**
    * @typedef {Object} PlateTemplate
    * @property {string} key
+   * @property {string} primaryColor    - single accent used for icon/dividers/labels/name/QR (matches reference: one consistent ink color per plate)
+   * @property {string} mutedColor      - softer variant used for captions (FAMILY / SCAN TO CONNECT / tagline)
    * @property {{type:'linear'|'radial', angle?:number, stops:{offset:number,color:string}[]}} background
    * @property {{type:'none'|'grain'|'brushed'|'gloss', opacity:number}} texture
    * @property {{color:string, widthFrac:number}} border
-   * @property {number} cornerRadiusFrac   - fraction of the SHORTER plate side
+   * @property {number} cornerRadiusFrac
    * @property {{xFrac:number,yFrac:number,rFrac:number,color:string}[]} screws
    * @property {{blurFrac:number, opacity:number, color:string, dyFrac:number}} shadow
-   * @property {{x1Frac:number,y1Frac:number,x2Frac:number,y2Frac:number,color:string,widthFrac:number}[]} decorativeLines
-   * @property {{xFrac:number,yFrac:number,wFrac:number,hFrac:number,defaultSrc:string|null}} logo
-   * @property {{xFrac:number,yFrac:number,sizeFrac:number}} qr
-   * @property {{xFrac:number,yFrac:number,maxWidthFrac:number,fontSizeFrac:number,color:string,align:'start'|'middle'|'end'}} familyName
-   * @property {{xFrac:number,yFrac:number,fontSizeFrac:number,color:string,align:string}} houseNumber
-   * @property {{xFrac:number,yFrac:number,fontSizeFrac:number,color:string,align:string}} subtitle
-   * @property {{xFrac:number,yFrac:number,sizeFrac:number}} religionSymbol
    */
 
   function register(key, template) {
@@ -48,6 +70,8 @@
 
   // ────────── ACRYLIC — high-gloss black + metallic gold ──────────
   register('acrylic', {
+    primaryColor: '#D4AF37',
+    mutedColor: 'rgba(212,175,55,0.72)',
     background: {
       type: 'linear', angle: 155,
       stops: [
@@ -57,86 +81,63 @@
       ]
     },
     texture: { type: 'gloss', opacity: 0.10 },
-    border: { color: 'rgba(212,175,55,0.35)', widthFrac: 0.006 },
-    cornerRadiusFrac: 0.045,
+    border: { color: 'rgba(212,175,55,0.4)', widthFrac: 0.006 },
+    cornerRadiusFrac: 0.035,
     screws: [
-      { xFrac: 0.055, yFrac: 0.09, rFrac: 0.012, color: 'rgba(212,175,55,0.55)' },
-      { xFrac: 0.945, yFrac: 0.09, rFrac: 0.012, color: 'rgba(212,175,55,0.55)' },
-      { xFrac: 0.055, yFrac: 0.91, rFrac: 0.012, color: 'rgba(212,175,55,0.55)' },
-      { xFrac: 0.945, yFrac: 0.91, rFrac: 0.012, color: 'rgba(212,175,55,0.55)' }
+      { xFrac: 0.10, yFrac: 0.045, rFrac: 0.018, color: '#D4AF37' },
+      { xFrac: 0.90, yFrac: 0.045, rFrac: 0.018, color: '#D4AF37' },
+      { xFrac: 0.10, yFrac: 0.955, rFrac: 0.018, color: '#D4AF37' },
+      { xFrac: 0.90, yFrac: 0.955, rFrac: 0.018, color: '#D4AF37' }
     ],
-    shadow: { blurFrac: 0.03, opacity: 0.55, color: '#000000', dyFrac: 0.02 },
-    decorativeLines: [
-      { x1Frac: 0.14, y1Frac: 0.60, x2Frac: 0.86, y2Frac: 0.60, color: 'rgba(212,175,55,0.4)', widthFrac: 0.0025 }
-    ],
-    logo: { xFrac: 0.5, yFrac: 0.20, wFrac: 0.16, hFrac: 0.16, defaultSrc: null },
-    qr: { xFrac: 0.855, yFrac: 0.80, sizeFrac: 0.14 },
-    religionSymbol: { xFrac: 0.10, yFrac: 0.15, sizeFrac: 0.09 },
-    familyName: { xFrac: 0.5, yFrac: 0.44, maxWidthFrac: 0.8, fontSizeFrac: 0.095, color: '#D4AF37', align: 'middle' },
-    subtitle: { xFrac: 0.5, yFrac: 0.535, fontSizeFrac: 0.038, color: 'rgba(212,175,55,0.7)', align: 'middle' },
-    houseNumber: { xFrac: 0.5, yFrac: 0.70, fontSizeFrac: 0.058, color: '#D4AF37', align: 'middle' }
+    shadow: { blurFrac: 0.025, opacity: 0.55, color: '#000000', dyFrac: 0.015 }
   });
 
-  // ────────── TEAKWOOD — polished teak + brass ──────────
+  // ────────── TEAKWOOD — polished teak, dark engraved text ──────────
   register('teakwood', {
+    primaryColor: '#2A1608',
+    mutedColor: 'rgba(42,22,8,0.72)',
     background: {
       type: 'linear', angle: 155,
       stops: [
-        { offset: 0, color: '#3b2413' },
-        { offset: 0.45, color: '#5a3820' },
-        { offset: 1, color: '#2a1a0d' }
+        { offset: 0, color: '#8a6438' },
+        { offset: 0.45, color: '#a9814f' },
+        { offset: 1, color: '#7a5a33' }
       ]
     },
-    texture: { type: 'grain', opacity: 0.16 },
-    border: { color: 'rgba(181,147,82,0.4)', widthFrac: 0.008 },
-    cornerRadiusFrac: 0.03,
+    texture: { type: 'grain', opacity: 0.18 },
+    border: { color: 'rgba(42,22,8,0.35)', widthFrac: 0.007 },
+    cornerRadiusFrac: 0.025,
     screws: [
-      { xFrac: 0.06, yFrac: 0.08, rFrac: 0.013, color: 'rgba(181,147,82,0.65)' },
-      { xFrac: 0.94, yFrac: 0.08, rFrac: 0.013, color: 'rgba(181,147,82,0.65)' },
-      { xFrac: 0.06, yFrac: 0.92, rFrac: 0.013, color: 'rgba(181,147,82,0.65)' },
-      { xFrac: 0.94, yFrac: 0.92, rFrac: 0.013, color: 'rgba(181,147,82,0.65)' }
+      { xFrac: 0.10, yFrac: 0.045, rFrac: 0.018, color: 'rgba(42,22,8,0.7)' },
+      { xFrac: 0.90, yFrac: 0.045, rFrac: 0.018, color: 'rgba(42,22,8,0.7)' },
+      { xFrac: 0.10, yFrac: 0.955, rFrac: 0.018, color: 'rgba(42,22,8,0.7)' },
+      { xFrac: 0.90, yFrac: 0.955, rFrac: 0.018, color: 'rgba(42,22,8,0.7)' }
     ],
-    shadow: { blurFrac: 0.035, opacity: 0.6, color: '#000000', dyFrac: 0.022 },
-    decorativeLines: [
-      { x1Frac: 0.12, y1Frac: 0.615, x2Frac: 0.88, y2Frac: 0.615, color: 'rgba(181,147,82,0.5)', widthFrac: 0.003 }
-    ],
-    logo: { xFrac: 0.5, yFrac: 0.19, wFrac: 0.15, hFrac: 0.15, defaultSrc: null },
-    qr: { xFrac: 0.85, yFrac: 0.805, sizeFrac: 0.145 },
-    religionSymbol: { xFrac: 0.105, yFrac: 0.145, sizeFrac: 0.095 },
-    familyName: { xFrac: 0.5, yFrac: 0.45, maxWidthFrac: 0.78, fontSizeFrac: 0.10, color: '#D9B26A', align: 'middle' },
-    subtitle: { xFrac: 0.5, yFrac: 0.545, fontSizeFrac: 0.04, color: 'rgba(217,178,106,0.75)', align: 'middle' },
-    houseNumber: { xFrac: 0.5, yFrac: 0.715, fontSizeFrac: 0.06, color: '#D9B26A', align: 'middle' }
+    shadow: { blurFrac: 0.03, opacity: 0.5, color: '#000000', dyFrac: 0.018 }
   });
 
-  // ────────── STAINLESS STEEL — brushed matte silver ──────────
+  // ────────── STAINLESS STEEL — brushed matte silver, dark text ──────────
   register('stainless', {
+    primaryColor: '#0B1525',
+    mutedColor: 'rgba(11,21,37,0.72)',
     background: {
       type: 'linear', angle: 155,
       stops: [
-        { offset: 0, color: '#3a4550' },
-        { offset: 0.45, color: '#8291a0' },
-        { offset: 1, color: '#2b333c' }
+        { offset: 0, color: '#c3ccd4' },
+        { offset: 0.45, color: '#e4e9ed' },
+        { offset: 1, color: '#aab3bc' }
       ]
     },
-    texture: { type: 'brushed', opacity: 0.22 },
-    border: { color: 'rgba(11,21,37,0.4)', widthFrac: 0.006 },
+    texture: { type: 'brushed', opacity: 0.16 },
+    border: { color: 'rgba(11,21,37,0.3)', widthFrac: 0.005 },
     cornerRadiusFrac: 0.02,
     screws: [
-      { xFrac: 0.05, yFrac: 0.085, rFrac: 0.014, color: 'rgba(11,21,37,0.55)' },
-      { xFrac: 0.95, yFrac: 0.085, rFrac: 0.014, color: 'rgba(11,21,37,0.55)' },
-      { xFrac: 0.05, yFrac: 0.915, rFrac: 0.014, color: 'rgba(11,21,37,0.55)' },
-      { xFrac: 0.95, yFrac: 0.915, rFrac: 0.014, color: 'rgba(11,21,37,0.55)' }
+      { xFrac: 0.10, yFrac: 0.045, rFrac: 0.018, color: 'rgba(11,21,37,0.6)' },
+      { xFrac: 0.90, yFrac: 0.045, rFrac: 0.018, color: 'rgba(11,21,37,0.6)' },
+      { xFrac: 0.10, yFrac: 0.955, rFrac: 0.018, color: 'rgba(11,21,37,0.6)' },
+      { xFrac: 0.90, yFrac: 0.955, rFrac: 0.018, color: 'rgba(11,21,37,0.6)' }
     ],
-    shadow: { blurFrac: 0.025, opacity: 0.5, color: '#000000', dyFrac: 0.018 },
-    decorativeLines: [
-      { x1Frac: 0.14, y1Frac: 0.60, x2Frac: 0.86, y2Frac: 0.60, color: 'rgba(11,21,37,0.35)', widthFrac: 0.0025 }
-    ],
-    logo: { xFrac: 0.5, yFrac: 0.20, wFrac: 0.16, hFrac: 0.16, defaultSrc: null },
-    qr: { xFrac: 0.855, yFrac: 0.80, sizeFrac: 0.14 },
-    religionSymbol: { xFrac: 0.10, yFrac: 0.15, sizeFrac: 0.09 },
-    familyName: { xFrac: 0.5, yFrac: 0.44, maxWidthFrac: 0.8, fontSizeFrac: 0.095, color: '#0B1525', align: 'middle' },
-    subtitle: { xFrac: 0.5, yFrac: 0.535, fontSizeFrac: 0.038, color: 'rgba(11,21,37,0.7)', align: 'middle' },
-    houseNumber: { xFrac: 0.5, yFrac: 0.70, fontSizeFrac: 0.058, color: '#0B1525', align: 'middle' }
+    shadow: { blurFrac: 0.02, opacity: 0.4, color: '#000000', dyFrac: 0.012 }
   });
 
   /** Generic fallback template used only if a future product forgets to register one. */
@@ -146,5 +147,5 @@
     return TEMPLATES[key] || FALLBACK;
   }
 
-  global.SD_PlateTemplates = { register, get, _all: TEMPLATES };
+  global.SD_PlateTemplates = { register, get, layout: LAYOUT, _all: TEMPLATES };
 })(window);
