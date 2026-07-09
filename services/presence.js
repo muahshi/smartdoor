@@ -96,7 +96,10 @@ async function _logPresenceEvent(ownerId, eventType, deviceCount, deviceId) {
  */
 export async function joinOwnerPresence(ownerId) {
   const noOpCleanup = () => {};
-  if (!ownerId) return noOpCleanup;
+  if (!ownerId) {
+    console.error('[RTC-TRACE][FAIL] joinOwnerPresence called with no ownerId | File=services/presence.js Reason=ownerId is falsy at call time (likely called before state.owner was populated) Current=never-started Expected=tracking-started');
+    return noOpCleanup;
+  }
 
   let outerTorndown = false;
   let recheckTimer = null;
@@ -105,8 +108,10 @@ export async function joinOwnerPresence(ownerId) {
   async function _tryStart() {
     if (outerTorndown) return;
     const enabled = await isWebRTCEnabledForOwner(ownerId);
+    console.log(`[RTC-TRACE] Owner presence flag check | File=services/presence.js ownerId=${ownerId} enabled=${enabled}`);
     if (outerTorndown) return;
     if (!enabled) {
+      console.warn(`[RTC-TRACE][FAIL] presence not started, flag disabled | File=services/presence.js ownerId=${ownerId} Reason=isWebRTCEnabledForOwner()=false Current=not-tracking Expected=tracking — will recheck in ${FLAG_RECHECK_INTERVAL_MS}ms`);
       recheckTimer = setTimeout(_tryStart, FLAG_RECHECK_INTERVAL_MS);
       return;
     }
@@ -146,6 +151,33 @@ function _startPresence(ownerId) {
     }
   }
 
+  // PRODUCTION FIX: channel.track() can fail (transient network hiccup,
+  // a race right after SUBSCRIBED, etc.) while the channel itself stays
+  // perfectly SUBSCRIBED. The old code swallowed that failure with an
+  // empty catch and no retry — CHANNEL_ERROR/CLOSED/TIMED_OUT never
+  // fires in this case (the channel genuinely is subscribed), so nothing
+  // ever tried tracking again. The device silently never appears in
+  // presenceState(), the owner shows deviceCount=0 forever, and every
+  // visitor sees "owner offline" even with the dashboard open — this is
+  // the second half of the reported bug (Phone A's console showed
+  // `online=false deviceCount=0`). This retries a few times with a short
+  // delay and logs every attempt so a real underlying failure (e.g. a
+  // genuine RLS/config problem) is now visible instead of silent.
+  async function _trackWithRetry(attempt = 1) {
+    if (torndown) return;
+    try {
+      await channel.track({ online_at: new Date().toISOString() });
+      console.log(`[RTC-TRACE] presence track() succeeded | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId} attempt=${attempt} deviceCount=${_deviceCount()}`);
+    } catch (err) {
+      console.warn(`[RTC-TRACE][FAIL] presence track() failed | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId} Reason=${err?.message || err} Current=subscribed-but-untracked Expected=tracked attempt=${attempt}`);
+      if (attempt < 3 && !torndown) {
+        setTimeout(() => _trackWithRetry(attempt + 1), 1000 * attempt);
+      } else {
+        console.error(`[RTC-TRACE][FAIL] presence track() gave up after ${attempt} attempts | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId} Current=subscribed-but-untracked Expected=tracked`);
+      }
+    }
+  }
+
   function _subscribe() {
     channel = supabase.channel(channelName, {
       config: { presence: { key: deviceId } },
@@ -174,12 +206,8 @@ function _startPresence(ownerId) {
       if (torndown) return;
 
       if (status === 'SUBSCRIBED') {
-        try {
-          await channel.track({ online_at: new Date().toISOString() });
-        } catch {
-          // Track failure is non-fatal — channel stays subscribed and
-          // will retry on the next reconnect cycle if needed.
-        }
+        console.log(`[RTC-TRACE] presence channel SUBSCRIBED | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId} channel=${channelName}`);
+        await _trackWithRetry();
         reconnectAttempt = 0;
         _logPresenceEvent(
           ownerId,
@@ -221,9 +249,9 @@ function _startPresence(ownerId) {
 
 /**
  * One-shot read of an owner's current presence state, without holding a
- * long-lived subscription open. NOT called by any code path yet — this
- * is the function a future Phase 2 "should I attempt WebRTC?" check
- * would use before opening a peer connection.
+ * long-lived subscription open. Called by services/webrtcCall.js's
+ * attemptTapToTalk() before opening a peer connection, to decide whether
+ * this owner is currently reachable over WebRTC.
  *
  * Also guarded by isWebRTCEnabledForOwner — returns { online: false,
  * deviceCount: 0 } immediately if WebRTC isn't enabled for this owner,
