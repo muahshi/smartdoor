@@ -163,6 +163,7 @@ export async function initOwnerCallUI(ownerId) {
   const unsubscribe = await listenForIncomingCalls(ownerId, {
     onIncomingCall: ({ callId, plateId, accept, reject }) => {
       _currentCallId = callId;
+      console.log(`[RTC-TRACE] 8 Popup shown | File=js/webrtcCallUI.js ownerId=${ownerId} callId=${callId}`);
       _ensureDom();
       _setRinging(plateId);
       _show();
