@@ -22,7 +22,7 @@
 
     /** Screw geometry + the 4-corner mounting layout shared by every material. */
     screw: {
-      rFrac: 0.018,
+      rFrac: 0.023,
       positions: [
         { xFrac: 0.10, yFrac: 0.045 },
         { xFrac: 0.90, yFrac: 0.045 },

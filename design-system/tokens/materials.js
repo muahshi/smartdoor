@@ -50,25 +50,25 @@
       shadow: { blurFrac: 0.045, nearBlurFrac: 0.012, opacity: 0.5, nearOpacity: 0.38, color: '#000000', dyFrac: 0.028, nearDyFrac: 0.008 }
     },
 
-    // ────────── TEAKWOOD — polished teak, black engraved text (groove cut) ──────────
+    // ────────── TEAKWOOD — dark polished mahogany, gold engraved text (matches master reference) ──────────
     teakwood: {
-      engravingColor: '#1A0D04',
-      mutedColor: 'rgba(26,13,4,0.72)',
-      engraveStyle: 'groove',
+      engravingColor: '#D4AF37',
+      mutedColor: 'rgba(212,175,55,0.75)',
+      engraveStyle: 'gold-shine',
       background: {
         type: 'linear', angle: 155,
         stops: [
-          { offset: 0, color: '#8a6438' },
-          { offset: 0.32, color: '#a9814f' },
-          { offset: 0.6, color: '#946c3d' },
-          { offset: 1, color: '#6f512c' }
+          { offset: 0, color: '#6b4023' },
+          { offset: 0.30, color: '#7a4c2a' },
+          { offset: 0.6, color: '#4a2c15' },
+          { offset: 1, color: '#2c1608' }
         ]
       },
-      texture: { type: 'grain', opacity: 0.20 },
-      textureExtra: { type: 'vignette', opacity: 0.22 },
-      border: { color: 'rgba(26,13,4,0.4)', widthFrac: 0.007 },
-      cornerRadiusFrac: 0.025,
-      screwStyle: { color: 'rgba(26,13,4,0.75)', style: 'phillips' },
+      texture: { type: 'grain', opacity: 0.24 },
+      textureExtra: { type: 'vignette', opacity: 0.24 },
+      border: { color: '#D4AF37', widthFrac: 0.014 },
+      cornerRadiusFrac: 0.018,
+      screwStyle: { color: '#D4AF37', style: 'flat' },
       shadow: { blurFrac: 0.05, nearBlurFrac: 0.014, opacity: 0.45, nearOpacity: 0.35, color: '#000000', dyFrac: 0.03, nearDyFrac: 0.009 }
     },
 
