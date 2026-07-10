@@ -44,28 +44,28 @@
     {
       "xFrac": 0.1,
       "yFrac": 0.045,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "rgba(11,21,37,0.65)",
       "style": "flat"
     },
     {
       "xFrac": 0.9,
       "yFrac": 0.045,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "rgba(11,21,37,0.65)",
       "style": "flat"
     },
     {
       "xFrac": 0.1,
       "yFrac": 0.955,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "rgba(11,21,37,0.65)",
       "style": "flat"
     },
     {
       "xFrac": 0.9,
       "yFrac": 0.955,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "rgba(11,21,37,0.65)",
       "style": "flat"
     }

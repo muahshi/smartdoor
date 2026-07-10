@@ -44,28 +44,28 @@
     {
       "xFrac": 0.1,
       "yFrac": 0.045,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "#D4AF37",
       "style": "flat"
     },
     {
       "xFrac": 0.9,
       "yFrac": 0.045,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "#D4AF37",
       "style": "flat"
     },
     {
       "xFrac": 0.1,
       "yFrac": 0.955,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "#D4AF37",
       "style": "flat"
     },
     {
       "xFrac": 0.9,
       "yFrac": 0.955,
-      "rFrac": 0.018,
+      "rFrac": 0.023,
       "color": "#D4AF37",
       "style": "flat"
     }
