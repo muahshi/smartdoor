@@ -559,8 +559,12 @@
         ? `<line x1="${(cx - r * 0.55).toFixed(2)}" y1="${cy.toFixed(2)}" x2="${(cx + r * 0.55).toFixed(2)}" y2="${cy.toFixed(2)}" stroke="rgba(0,0,0,0.35)" stroke-width="${(r * 0.16).toFixed(2)}"/>
            <line x1="${cx.toFixed(2)}" y1="${(cy - r * 0.55).toFixed(2)}" x2="${cx.toFixed(2)}" y2="${(cy + r * 0.55).toFixed(2)}" stroke="rgba(0,0,0,0.35)" stroke-width="${(r * 0.16).toFixed(2)}"/>`
         : `<line x1="${(cx - r * 0.6).toFixed(2)}" y1="${cy.toFixed(2)}" x2="${(cx + r * 0.6).toFixed(2)}" y2="${cy.toFixed(2)}" stroke="rgba(0,0,0,0.35)" stroke-width="${(r * 0.18).toFixed(2)}"/>`;
+      // small offset specular dot — gives the flat fill a metallic, domed-bolt read
+      // instead of a flat sticker look, without needing a per-screw gradient def.
+      const hlR = r * 0.28, hlCx = cx - r * 0.32, hlCy = cy - r * 0.32;
       return `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${s.color}"/>
         <circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="${(r * 0.12).toFixed(2)}"/>
+        <circle cx="${hlCx.toFixed(2)}" cy="${hlCy.toFixed(2)}" r="${hlR.toFixed(2)}" fill="rgba(255,255,255,0.45)"/>
         ${slot}`;
     }).join('');
   }
