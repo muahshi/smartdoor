@@ -17,21 +17,22 @@
  * microphone, or creates a peer connection. Existing visitors experience
  * zero behavioral change until an owner is explicitly opted in.
  *
- * KNOWN LIMITATION (documented, not a blocker — see PHASE2 audit report):
- * config/rtcConfig.js#getIceServers() is STUN-only today; the TURN
- * credential-issuing Edge Function is explicitly Phase 4, not built yet.
- * Visitors/owners behind symmetric NATs or restrictive corporate
- * firewalls may fail ICE connectivity even when both parties are online.
- * This is safe by design: an ICE failure is just another reason code
- * that makes attemptTapToTalk() resolve `{ attempted: true, connected:
- * false }`, and the existing masked-call fallback fires exactly as it
- * would for a timeout.
+ * PRODUCTION FIX (was: KNOWN LIMITATION — STUN-only): TURN credentials
+ * are now fetched via config/rtcConfig.js#fetchIceServers() (Twilio NTS,
+ * supabase/functions/get-turn-credentials), so visitors/owners behind
+ * symmetric NATs or CGNAT (the common case on Indian mobile carriers)
+ * can still establish a relayed path. If TURN credentials can't be
+ * fetched for any reason, this fails open to STUN-only exactly as
+ * before — an ICE failure is just another reason code that makes
+ * attemptTapToTalk() resolve `{ attempted: true, connected: false }`,
+ * and the existing masked-call fallback fires exactly as it would for a
+ * timeout.
  */
 
 import { getOwnerPresenceSnapshot } from './presence.js';
 import { isWebRTCEnabledForOwner } from './featureFlags.js';
 import {
-  getIceServers,
+  fetchIceServers,
   WEBRTC_CONNECT_TIMEOUT_MS,
   RTC_RECONNECT_GRACE_MS,
   RTC_MONITORING_EVENTS,
@@ -108,8 +109,14 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
   }
 
   const callId = crypto.randomUUID();
+  // PRODUCTION FIX (Root Cause #2 — TURN): fetch short-lived TURN
+  // credentials (Twilio NTS) in addition to STUN. Never blocks longer
+  // than ~2.5s and always falls back to STUN-only on any failure — see
+  // config/rtcConfig.js#fetchIceServers for the fail-open contract.
+  const iceServers = await fetchIceServers(supabase, { ownerId, plateId });
+  console.log(`[RTC-TRACE] 3b ICE servers resolved | File=services/webrtcCall.js callId=${callId} serverCount=${iceServers.length}`);
   const pc = new RTCPeerConnection({
-    iceServers: getIceServers(),
+    iceServers,
     iceTransportPolicy: 'all',
   });
 

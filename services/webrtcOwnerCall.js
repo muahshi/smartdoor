@@ -34,7 +34,7 @@
  */
 
 import { isWebRTCEnabledForOwner } from './featureFlags.js';
-import { getIceServers, RTC_RECONNECT_GRACE_MS } from '../config/rtcConfig.js';
+import { fetchIceServers, RTC_RECONNECT_GRACE_MS, WEBRTC_CONNECT_TIMEOUT_MS } from '../config/rtcConfig.js';
 import { supabase } from './supabase.js';
 import {
   ringChannelName,
@@ -205,8 +205,87 @@ async function _startListening(ownerId, handlers = {}) {
       if (torndown) return;
       console.log(`[RTC-TRACE] 7 Incoming received | File=services/webrtcOwnerCall.js ownerId=${ownerId} callId=${callId} plateId=${plateId}`);
 
+      // ═══════════════════════════════════════════════════════════════
+      // ROOT-CAUSE FIX (ICE candidate race — see PHASE2 audit):
+      //
+      // Previously the owner only called joinBroadcastChannel(rtc:call:
+      // {callId}) INSIDE accept(), i.e. only after the human tapped
+      // "Accept". But services/webrtcCall.js (visitor) joins that same
+      // channel and starts trickling ICE candidates (pc.onicecandidate)
+      // within milliseconds of creating its offer — almost always
+      // *before* a human has even seen the popup, let alone reacted to
+      // it. Supabase Realtime BROADCAST channels deliver only to clients
+      // already subscribed at send time; there is no history/replay for
+      // a late joiner. So every one of the visitor's early candidates
+      // was silently dropped, the owner's future RTCPeerConnection had
+      // zero remote candidates to run connectivity checks against, and
+      // connectionState could never leave 'new'/'checking' — exactly
+      // reproducing "Connecting… never becomes Connected, then falls
+      // back to masked calling," on every call, not intermittently.
+      //
+      // Fix: join the call channel and start buffering the visitor's
+      // ice-candidate broadcasts THE MOMENT the offer arrives (right
+      // here), independent of whether/when the human taps Accept.
+      // getUserMedia/RTCPeerConnection/answer creation still only happen
+      // inside accept() — nothing about consent or the claim-before-mic
+      // guarantee (Fix 3) changes. When accept() runs, any candidates
+      // gathered while the popup was on screen are flushed into the
+      // freshly-created peer connection immediately after
+      // setRemoteDescription(offer).
+      // ═══════════════════════════════════════════════════════════════
+      let preJoinedChannel = null;
+      let preJoinReleased = false;
+      const bufferedCandidates = [];
+      let livePc = null;
+      let remoteDescSet = false;
+
+      const releasePreJoin = () => {
+        if (preJoinReleased) return;
+        preJoinReleased = true;
+        clearTimeout(preJoinTimer);
+        if (preJoinedChannel && preJoinedChannel !== activeCallChannel) leaveChannel(preJoinedChannel);
+      };
+
+      try {
+        preJoinedChannel = await joinBroadcastChannel(callChannelName(callId));
+        console.log(`[RTC-TRACE] 7b Call channel pre-joined | File=services/webrtcOwnerCall.js callId=${callId}`);
+
+        onSignal(preJoinedChannel, 'ice-candidate', ({ candidate, from }) => {
+          if (from !== 'visitor' || !candidate) return;
+          if (livePc && remoteDescSet) {
+            livePc.addIceCandidate(candidate).catch(() => {});
+          } else {
+            bufferedCandidates.push(candidate);
+            console.log(`[RTC-TRACE] 7c ICE candidate buffered pre-accept | File=services/webrtcOwnerCall.js callId=${callId} bufferedCount=${bufferedCandidates.length}`);
+          }
+        });
+
+        // Visitor gave up (own WEBRTC_CONNECT_TIMEOUT_MS fired, or the
+        // person closed the tab) before the owner reacted — dismiss the
+        // ringing popup instead of leaving it up for a dead call.
+        onSignal(preJoinedChannel, 'hangup', () => {
+          if (!livePc) {
+            releasePreJoin();
+            onCallClaimedElsewhere(callId); // reuses the existing "dismiss this popup" UI path
+          }
+        });
+      } catch (err) {
+        // Pre-join failed (rare — network hiccup). Not fatal: accept()
+        // below falls back to its own join, matching pre-fix behavior
+        // for this one edge case only.
+        console.error(`[RTC-TRACE][FAIL] pre-join call channel failed | File=services/webrtcOwnerCall.js callId=${callId} Reason=${err?.message || err}`);
+      }
+
+      // Safety net: if nobody accepts or rejects, don't leave a
+      // subscribed channel open forever. A little longer than the
+      // visitor's own timeout so a legitimate slow Accept isn't cut off.
+      const preJoinTimer = setTimeout(() => {
+        if (!livePc) releasePreJoin();
+      }, WEBRTC_CONNECT_TIMEOUT_MS + 5000);
+
       const accept = async () => {
         console.log(`[RTC-TRACE] 9 Accept clicked | File=services/webrtcOwnerCall.js callId=${callId}`);
+        clearTimeout(preJoinTimer);
         // Fix 3: claim BEFORE requesting the microphone or opening any
         // channel/peer connection, so a losing tab never touches media at
         // all — no duplicate audio, no duplicate answer, and no wasted mic
@@ -214,117 +293,150 @@ async function _startListening(ownerId, handlers = {}) {
         const won = await _claimCall(callId, ownerId);
         if (!won) {
           console.warn(`[RTC-TRACE][FAIL] call claimed elsewhere | File=services/webrtcOwnerCall.js callId=${callId} Reason=rtc_call_claims unique_violation Current=lost-claim Expected=won-claim`);
+          releasePreJoin();
           onCallClaimedElsewhere(callId);
           return;
         }
         sendSignal(channel, 'call-claimed', { callId, deviceId: _deviceId }).catch(() => {});
 
-        let callChannel;
-      try {
-        callChannel = await joinBroadcastChannel(callChannelName(callId));
-      } catch (err) {
-        console.error('[WebRTCOwnerCall] Could not join call channel to accept:', err);
-        return;
-      }
-      activeCallChannel = callChannel;
-      activeCallTorndown = false;
-
-      let localStream;
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      } catch (err) {
-        console.warn('[WebRTCOwnerCall] Microphone permission denied on accept:', err);
-        sendSignal(callChannel, 'reject', { reason: 'owner_mic_denied' }).catch(() => {});
-        cleanupActiveCall();
-        return;
-      }
-      activeLocalStream = localStream;
-
-      const pc = new RTCPeerConnection({ iceServers: getIceServers(), iceTransportPolicy: 'all' });
-      activePc = pc;
-
-      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
-
-      const hangUp = () => {
-        if (activeCallChannel) sendSignal(activeCallChannel, 'hangup', { from: 'owner' }).catch(() => {});
-        cleanupActiveCall();
-        onEnded();
-      };
-
-      pc.ontrack = (event) => {
-        if (event.streams?.[0]) onConnected(event.streams[0], { hangUp });
-      };
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          sendSignal(callChannel, 'ice-candidate', { candidate: event.candidate, from: 'owner' });
-        }
-      };
-
-      // PRODUCTION HARDENING (Fix 2 + Fix 4): tolerate a transient ICE
-      // disconnect with a grace window instead of tearing the call down
-      // immediately; only 'failed'/'closed' (or the grace window
-      // expiring) is treated as permanent.
-      pc.onconnectionstatechange = () => {
-        if (activeCallTorndown) return;
-
-        if (pc.connectionState === 'connected') {
-          console.log(`[RTC-TRACE] 12 ICE connected | File=services/webrtcOwnerCall.js callId=${callId}`);
-          console.log(`[RTC-TRACE] 13 Connected | File=services/webrtcOwnerCall.js callId=${callId}`);
-          if (activeReconnectGraceTimer) {
-            clearTimeout(activeReconnectGraceTimer);
-            activeReconnectGraceTimer = null;
-            onStatus('connected');
+        let callChannel = preJoinedChannel;
+        if (!callChannel) {
+          // Pre-join failed earlier — fall back to a fresh join exactly
+          // like the pre-fix code path (candidates sent before this join
+          // completes can still be lost in this one fallback case).
+          try {
+            callChannel = await joinBroadcastChannel(callChannelName(callId));
+          } catch (err) {
+            console.error('[WebRTCOwnerCall] Could not join call channel to accept:', err);
+            return;
           }
+          onSignal(callChannel, 'ice-candidate', ({ candidate, from }) => {
+            if (from !== 'visitor' || !candidate) return;
+            if (livePc && remoteDescSet) livePc.addIceCandidate(candidate).catch(() => {});
+            else bufferedCandidates.push(candidate);
+          });
+        }
+        activeCallChannel = callChannel;
+        activeCallTorndown = false;
+
+        // PRODUCTION FIX (Root Cause #2 — TURN): fetch short-lived TURN
+        // credentials (Twilio NTS) alongside the mic prompt so the two
+        // run in parallel instead of adding latency serially. Always
+        // resolves — falls back to STUN-only on any failure. See
+        // config/rtcConfig.js#fetchIceServers.
+        const iceServersPromise = fetchIceServers(supabase, { ownerId, plateId });
+
+        let localStream;
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } catch (err) {
+          console.warn('[WebRTCOwnerCall] Microphone permission denied on accept:', err);
+          sendSignal(callChannel, 'reject', { reason: 'owner_mic_denied' }).catch(() => {});
+          releasePreJoin();
+          cleanupActiveCall();
           return;
         }
+        activeLocalStream = localStream;
 
-        if (pc.connectionState === 'disconnected') {
-          if (!activeReconnectGraceTimer) {
-            onStatus('reconnecting');
-            activeReconnectGraceTimer = setTimeout(() => {
-              activeReconnectGraceTimer = null;
-              cleanupActiveCall();
-              onEnded();
-            }, RTC_RECONNECT_GRACE_MS);
-          }
-          return;
-        }
+        const iceServers = await iceServersPromise;
+        console.log(`[RTC-TRACE] 9c ICE servers resolved | File=services/webrtcOwnerCall.js callId=${callId} serverCount=${iceServers.length}`);
+        const pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: 'all' });
+        activePc = pc;
+        livePc = pc;
 
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-          console.error(`[RTC-TRACE][FAIL] ICE failed/closed | File=services/webrtcOwnerCall.js callId=${callId} Reason=connectionState=${pc.connectionState} Current=${pc.connectionState} Expected=connected`);
+        localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+        const hangUp = () => {
+          if (activeCallChannel) sendSignal(activeCallChannel, 'hangup', { from: 'owner' }).catch(() => {});
           cleanupActiveCall();
           onEnded();
+        };
+
+        pc.ontrack = (event) => {
+          if (event.streams?.[0]) onConnected(event.streams[0], { hangUp });
+        };
+
+        pc.onicecandidate = (event) => {
+          if (event.candidate) {
+            sendSignal(callChannel, 'ice-candidate', { candidate: event.candidate, from: 'owner' });
+          }
+        };
+
+        // PRODUCTION HARDENING (Fix 2 + Fix 4): tolerate a transient ICE
+        // disconnect with a grace window instead of tearing the call down
+        // immediately; only 'failed'/'closed' (or the grace window
+        // expiring) is treated as permanent.
+        pc.onconnectionstatechange = () => {
+          if (activeCallTorndown) return;
+
+          if (pc.connectionState === 'connected') {
+            console.log(`[RTC-TRACE] 12 ICE connected | File=services/webrtcOwnerCall.js callId=${callId}`);
+            console.log(`[RTC-TRACE] 13 Connected | File=services/webrtcOwnerCall.js callId=${callId}`);
+            if (activeReconnectGraceTimer) {
+              clearTimeout(activeReconnectGraceTimer);
+              activeReconnectGraceTimer = null;
+              onStatus('connected');
+            }
+            return;
+          }
+
+          if (pc.connectionState === 'disconnected') {
+            if (!activeReconnectGraceTimer) {
+              onStatus('reconnecting');
+              activeReconnectGraceTimer = setTimeout(() => {
+                activeReconnectGraceTimer = null;
+                cleanupActiveCall();
+                onEnded();
+              }, RTC_RECONNECT_GRACE_MS);
+            }
+            return;
+          }
+
+          if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+            console.error(`[RTC-TRACE][FAIL] ICE failed/closed | File=services/webrtcOwnerCall.js callId=${callId} Reason=connectionState=${pc.connectionState} Current=${pc.connectionState} Expected=connected`);
+            cleanupActiveCall();
+            onEnded();
+          }
+        };
+
+        onSignal(callChannel, 'hangup', () => {
+          cleanupActiveCall();
+          onEnded();
+        });
+
+        try {
+          await pc.setRemoteDescription({ type: 'offer', sdp });
+          remoteDescSet = true;
+
+          // Flush any ICE candidates the visitor sent while the popup
+          // was on screen (this is the actual bug fix taking effect).
+          const toFlush = bufferedCandidates.splice(0, bufferedCandidates.length);
+          console.log(`[RTC-TRACE] 9d Flushing buffered ICE candidates | File=services/webrtcOwnerCall.js callId=${callId} count=${toFlush.length}`);
+          toFlush.forEach((candidate) => pc.addIceCandidate(candidate).catch(() => {}));
+
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await sendSignal(callChannel, 'answer', { sdp: pc.localDescription.sdp });
+          console.log(`[RTC-TRACE] 10 Answer sent | File=services/webrtcOwnerCall.js callId=${callId}`);
+        } catch (err) {
+          console.error(`[RTC-TRACE][FAIL] answer build/send failed | File=services/webrtcOwnerCall.js callId=${callId} Reason=${err?.message || err} Current=no-answer-sent Expected=answer-sent`);
+          console.error('[WebRTCOwnerCall] Failed to build/send answer:', err);
+          cleanupActiveCall();
         }
-      };
-
-      onSignal(callChannel, 'ice-candidate', ({ candidate, from }) => {
-        if (from !== 'visitor' || !candidate) return;
-        pc.addIceCandidate(candidate).catch(() => {});
-      });
-
-      onSignal(callChannel, 'hangup', () => {
-        cleanupActiveCall();
-        onEnded();
-      });
-
-      try {
-        await pc.setRemoteDescription({ type: 'offer', sdp });
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await sendSignal(callChannel, 'answer', { sdp: pc.localDescription.sdp });
-        console.log(`[RTC-TRACE] 10 Answer sent | File=services/webrtcOwnerCall.js callId=${callId}`);
-      } catch (err) {
-        console.error(`[RTC-TRACE][FAIL] answer build/send failed | File=services/webrtcOwnerCall.js callId=${callId} Reason=${err?.message || err} Current=no-answer-sent Expected=answer-sent`);
-        console.error('[WebRTCOwnerCall] Failed to build/send answer:', err);
-        cleanupActiveCall();
-      }
       };
 
       const reject = () => {
+        const rejectChannel = preJoinedChannel;
+        releasePreJoin();
+        if (rejectChannel) {
+          sendSignal(rejectChannel, 'reject', { reason: 'owner_declined' }).finally(() => leaveChannel(rejectChannel));
+          return;
+        }
+        // Pre-join failed earlier — fall back to a one-shot join, exactly
+        // like the pre-fix behavior.
         joinBroadcastChannel(callChannelName(callId), { timeoutMs: 3000 })
-          .then((rejectChannel) => {
-            sendSignal(rejectChannel, 'reject', { reason: 'owner_declined' }).finally(() => leaveChannel(rejectChannel));
+          .then((ch) => {
+            sendSignal(ch, 'reject', { reason: 'owner_declined' }).finally(() => leaveChannel(ch));
           })
           .catch(() => {});
       };
