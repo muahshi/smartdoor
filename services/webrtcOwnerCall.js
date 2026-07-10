@@ -205,6 +205,35 @@ async function _startListening(ownerId, handlers = {}) {
       if (torndown) return;
       console.log(`[RTC-TRACE] 7 Incoming received | File=services/webrtcOwnerCall.js ownerId=${ownerId} callId=${callId} plateId=${plateId}`);
 
+      // PRODUCTION HARDENING (Fix 5 — concurrent-call collision):
+      // activeCallTorndown/activePc/activeLocalStream/activeCallChannel are
+      // shared per-owner-listener state (one _startListening() closure per
+      // ownerId), by design, since one owner device can only usefully be on
+      // one call at a time. Before this fix, a second 'incoming-call' event
+      // arriving while a first call was already ringing/connected still ran
+      // this whole handler and, if accepted, overwrote activePc/activeCall-
+      // Channel/activeLocalStream with the second call's — orphaning the
+      // first call's peer connection and microphone with nothing left to
+      // clean it up, and routing the first call's later 'hangup' broadcast
+      // into cleanupActiveCall(), which would then tear down the SECOND
+      // call's (now-current) pc instead. Reproducible any time two visitors
+      // (or one visitor retrying) call the same owner within the same
+      // ringing/active window. Fix: auto-decline any second call the moment
+      // its offer arrives, before any pre-join/buffering/UI work — the
+      // owner's UI never shows a second overlay and the shared state is
+      // never double-claimed.
+      if (!activeCallTorndown) {
+        console.warn(`[RTC-TRACE][FAIL] owner busy, auto-declining concurrent call | File=services/webrtcOwnerCall.js ownerId=${ownerId} callId=${callId} Reason=activeCallAlreadyInProgress Current=busy Expected=idle`);
+        try {
+          const busyChannel = await joinBroadcastChannel(callChannelName(callId), { timeoutMs: 3000 });
+          await sendSignal(busyChannel, 'reject', { reason: 'owner_busy' });
+          leaveChannel(busyChannel);
+        } catch (err) {
+          console.error(`[RTC-TRACE][FAIL] could not send owner_busy reject | File=services/webrtcOwnerCall.js callId=${callId} Reason=${err?.message || err}`);
+        }
+        return;
+      }
+
       // ═══════════════════════════════════════════════════════════════
       // ROOT-CAUSE FIX (ICE candidate race — see PHASE2 audit):
       //

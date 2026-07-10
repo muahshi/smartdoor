@@ -141,6 +141,17 @@ function _startPresence(ownerId) {
   let reconnectAttempt = 0;
   let reconnectTimer = null;
   let torndown = false;
+  // PRODUCTION HARDENING (Fix 6 — background/foreground & network-switch
+  // recovery, mirrors services/webrtcSignaling.js#joinPersistentBroadcastChannel):
+  // tracks whether presence is CURRENTLY tracked/subscribed so a tab
+  // returning to the foreground (or the browser reporting back-online)
+  // can force an immediate reconnect instead of waiting for Realtime's own
+  // heartbeat timeout to notice a backgrounded socket died. This is what
+  // visitors' getOwnerPresenceSnapshot() reads to decide "is this owner
+  // reachable at all" — a stale presence entry here silently sends every
+  // Tap to Talk attempt straight to masked-call fallback.
+  let isSubscribed = false;
+  let _subscribeRef = null;
 
   function _deviceCount() {
     if (!channel) return 0;
@@ -209,6 +220,7 @@ function _startPresence(ownerId) {
         console.log(`[RTC-TRACE] presence channel SUBSCRIBED | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId} channel=${channelName}`);
         await _trackWithRetry();
         reconnectAttempt = 0;
+        isSubscribed = true;
         _logPresenceEvent(
           ownerId,
           hasConnectedBefore ? 'reconnect' : 'connect',
@@ -223,6 +235,7 @@ function _startPresence(ownerId) {
         // Graceful reconnect: exponential backoff, capped, so a network
         // blip retries quickly but a persistent outage doesn't hammer
         // the realtime service.
+        isSubscribed = false;
         if (torndown) return;
         const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempt, RECONNECT_MAX_DELAY_MS);
         reconnectAttempt += 1;
@@ -236,11 +249,33 @@ function _startPresence(ownerId) {
     });
   }
 
+  _subscribeRef = _subscribe;
   _subscribe();
+
+  // PRODUCTION HARDENING (Fix 6): see webrtcSignaling.js's identical
+  // comment — reconnect immediately on tab-foreground/back-online instead
+  // of waiting for the socket-level heartbeat timeout to notice a
+  // backgrounded connection died.
+  const _forceReconnectNow = () => {
+    if (torndown || isSubscribed) return;
+    console.log(`[RTC-TRACE] presence fast-reconnect on foreground/online | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId}`);
+    clearTimeout(reconnectTimer);
+    reconnectAttempt = 0;
+    if (channel) { try { supabase.removeChannel(channel); } catch {} }
+    _subscribeRef();
+  };
+  const _onVisible = () => { if (document.visibilityState === 'visible') _forceReconnectNow(); };
+  const _onOnline = () => _forceReconnectNow();
+  document.addEventListener('visibilitychange', _onVisible);
+  window.addEventListener('online', _onOnline);
+  window.addEventListener('focus', _onVisible);
 
   return function cleanup() {
     torndown = true;
     clearTimeout(reconnectTimer);
+    document.removeEventListener('visibilitychange', _onVisible);
+    window.removeEventListener('online', _onOnline);
+    window.removeEventListener('focus', _onVisible);
     if (channel) {
       try { supabase.removeChannel(channel); } catch {}
     }

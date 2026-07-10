@@ -185,6 +185,13 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
   let reconnectAttempt = 0;
   let reconnectTimer = null;
   let initialTimer = null;
+  // PRODUCTION HARDENING (Fix 6 — background/foreground & network-switch
+  // recovery): tracks whether the channel is CURRENTLY subscribed, so
+  // that returning to the foreground or coming back online can check
+  // "am I actually connected right now" instead of just hoping the
+  // socket-level heartbeat notices in time.
+  let isSubscribed = false;
+  let _subscribeRef = null;
 
   await new Promise((resolveFirst, rejectFirst) => {
     function _subscribe() {
@@ -211,6 +218,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
         if (status === 'SUBSCRIBED') {
           clearTimeout(initialTimer);
           reconnectAttempt = 0;
+          isSubscribed = true;
           console.log(`[RTC-TRACE] persistent channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
           onSubscribed(channel);
           if (!firstSettled) {
@@ -233,6 +241,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
           }
 
           // Was live before, just dropped — reconnect, don't destroy.
+          isSubscribed = false;
           console.warn(`[RTC-TRACE][FAIL] persistent channel dropped, reconnecting | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=disconnected Expected=SUBSCRIBED attempt=${reconnectAttempt + 1}`);
           onLost();
           if (torndown) return;
@@ -248,13 +257,46 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
       });
     }
 
+    _subscribeRef = _subscribe;
     _subscribe();
   });
+
+  // PRODUCTION HARDENING (Fix 6 — background/foreground & network-switch
+  // recovery): the existing CHANNEL_ERROR/CLOSED path above already
+  // reconnects with backoff, but that depends on the browser/OS actually
+  // delivering a close event, which on a backgrounded mobile tab (screen
+  // locked, app switched away) can lag well behind the moment the socket
+  // is truly dead — Realtime's own heartbeat timeout has to elapse first,
+  // sometimes tens of seconds after the person returns to the app. During
+  // that window an incoming call would ring into a channel that LOOKS
+  // subscribed client-side but isn't really receiving broadcasts yet.
+  // Fix: the moment the tab becomes visible again, or the browser reports
+  // it's back online, actively check isSubscribed — if it's false (or the
+  // check itself is uncertain because we haven't heard SUBSCRIBED/CLOSED
+  // recently), skip any remaining backoff wait and reconnect immediately
+  // instead of waiting out whatever delay was already scheduled. This is
+  // additive to the existing backoff loop, not a replacement for it.
+  const _forceReconnectNow = () => {
+    if (torndown || isSubscribed) return;
+    console.log(`[RTC-TRACE] persistent channel fast-reconnect on foreground/online | File=services/webrtcSignaling.js Channel=${channelName}`);
+    clearTimeout(reconnectTimer);
+    reconnectAttempt = 0;
+    if (channel) { try { supabase.removeChannel(channel); } catch {} }
+    _subscribeRef();
+  };
+  const _onVisible = () => { if (document.visibilityState === 'visible') _forceReconnectNow(); };
+  const _onOnline = () => _forceReconnectNow();
+  document.addEventListener('visibilitychange', _onVisible);
+  window.addEventListener('online', _onOnline);
+  window.addEventListener('focus', _onVisible);
 
   return function cleanup() {
     torndown = true;
     clearTimeout(reconnectTimer);
     clearTimeout(initialTimer);
+    document.removeEventListener('visibilitychange', _onVisible);
+    window.removeEventListener('online', _onOnline);
+    window.removeEventListener('focus', _onVisible);
     if (channel) { try { supabase.removeChannel(channel); } catch {} }
   };
 }
