@@ -1,5 +1,5 @@
 /**
- * Smart Door — WebRTC Tap to Talk, Owner UI (Phase 2)
+ * Smart Door — WebRTC Tap to Talk, Owner UI (Phase 2 UX upgrade)
  * js/webrtcCallUI.js
  *
  * Self-contained UI glue for the owner dashboard (app.html). Injects its
@@ -15,12 +15,33 @@
  * opt-in) — no overlay is ever injected into the DOM for an owner who
  * isn't opted in, so there is zero visual or behavioral change for
  * every existing owner today.
+ *
+ * UX UPGRADE (this revision): richer states — a caller card (door/plate
+ * id, since no visitor name/phone crosses the signaling channel today),
+ * a live call timer, and mute/speaker controls fed by the localStream
+ * services/webrtcOwnerCall.js now hands back alongside hangUp. None of
+ * the accept()/reject()/hangUp() call-handling logic below changed —
+ * this file only renders what that service already reports.
  */
 
 import { listenForIncomingCalls } from '../services/webrtcOwnerCall.js';
 
 let _overlayEl = null;
 let _remoteAudioEl = null;
+let _timerInterval = null;
+let _startedAt = null;
+let _localStream = null;
+let _muted = false;
+
+function _fmt(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(totalSeconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function _stopTimer() {
+  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+}
 
 function _ensureDom() {
   if (_overlayEl) return;
@@ -31,22 +52,54 @@ function _ensureDom() {
     #sd-rtc-overlay {
       position: fixed; inset: 0; z-index: 99999;
       display: none; align-items: center; justify-content: center;
-      background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(4px);
+      background: radial-gradient(circle at 50% 20%, rgba(212,175,55,0.08), rgba(5,6,10,0.94) 60%);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
       font-family: inherit;
     }
     #sd-rtc-overlay.sd-rtc-show { display: flex; }
     #sd-rtc-card {
-      width: min(340px, 90vw); border-radius: 20px; padding: 28px 24px;
-      background: #0F172A; color: #fff; text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
-      animation: sd-rtc-pop 0.25s ease-out;
+      width: min(360px, 92vw); border-radius: 26px; padding: 30px 26px 26px;
+      background: linear-gradient(165deg, #14161c 0%, #0a0b0f 100%);
+      border: 1px solid rgba(212,175,55,0.22);
+      color: #fff; text-align: center;
+      box-shadow: 0 24px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04);
+      animation: sd-rtc-pop 0.28s cubic-bezier(.2,.8,.2,1);
     }
-    @keyframes sd-rtc-pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    #sd-rtc-icon { font-size: 42px; margin-bottom: 8px; animation: sd-rtc-pulse 1.4s ease-in-out infinite; }
-    @keyframes sd-rtc-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
-    #sd-rtc-title { font-size: 18px; font-weight: 700; margin: 4px 0 2px; }
-    #sd-rtc-sub { font-size: 13px; color: #94A3B8; margin-bottom: 20px; }
-    #sd-rtc-actions { display: flex; gap: 12px; }
+    @keyframes sd-rtc-pop { from { transform: scale(0.94) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+
+    #sd-rtc-avatar {
+      width: 72px; height: 72px; margin: 0 auto 14px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle, rgba(212,175,55,0.16), rgba(212,175,55,0.02));
+      border: 1.5px solid rgba(212,175,55,0.4); font-size: 30px; position: relative;
+    }
+    #sd-rtc-avatar.sd-rtc-pulse::before {
+      content: ''; position: absolute; inset: -8px; border-radius: 50%;
+      border: 1.5px solid rgba(212,175,55,0.35);
+      animation: sd-rtc-ring 1.6s ease-out infinite;
+    }
+    @keyframes sd-rtc-ring { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.5); opacity: 0; } }
+
+    #sd-rtc-card-box {
+      background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px; padding: 10px 14px; margin-bottom: 18px; text-align: left;
+    }
+    #sd-rtc-card-plate { font-size: 15px; font-weight: 700; color: #fff; }
+    #sd-rtc-card-purpose { font-size: 12px; color: #9CA3AF; margin-top: 2px; }
+
+    #sd-rtc-title { font-size: 19px; font-weight: 700; margin: 4px 0 2px; }
+    #sd-rtc-sub { font-size: 13px; color: #9CA3AF; margin-bottom: 18px; }
+    #sd-rtc-timer { font-size: 13px; color: #D4AF37; font-variant-numeric: tabular-nums; margin: -10px 0 18px; letter-spacing: 0.5px; }
+
+    #sd-rtc-banner {
+      display: none; align-items: center; justify-content: center; gap: 6px;
+      font-size: 12px; color: #FBBF24; background: rgba(251,191,36,0.1);
+      border: 1px solid rgba(251,191,36,0.28); border-radius: 10px;
+      padding: 6px 10px; margin: -10px 0 18px;
+    }
+    #sd-rtc-banner.sd-rtc-banner-show { display: flex; }
+
+    #sd-rtc-actions { display: flex; gap: 12px; justify-content: center; }
     .sd-rtc-btn {
       flex: 1; padding: 13px 0; border-radius: 14px; border: none;
       font-size: 15px; font-weight: 600; cursor: pointer;
@@ -54,6 +107,15 @@ function _ensureDom() {
     #sd-rtc-accept { background: #22C55E; color: #fff; }
     #sd-rtc-reject { background: #EF4444; color: #fff; }
     #sd-rtc-hangup { background: #EF4444; color: #fff; width: 100%; }
+
+    .sd-rtc-round-btn {
+      width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 19px;
+      transition: transform 0.15s ease, background 0.15s ease; flex: none;
+    }
+    .sd-rtc-round-btn:active { transform: scale(0.92); }
+    .sd-rtc-btn-secondary { background: rgba(255,255,255,0.08); color: #fff; }
+    .sd-rtc-btn-secondary.sd-rtc-toggled { background: rgba(212,175,55,0.9); color: #0a0b0f; }
   `;
   document.head.appendChild(style);
 
@@ -61,9 +123,14 @@ function _ensureDom() {
   overlay.id = 'sd-rtc-overlay';
   overlay.innerHTML = `
     <div id="sd-rtc-card">
-      <div id="sd-rtc-icon">📞</div>
-      <div id="sd-rtc-title">Someone's at the door</div>
-      <div id="sd-rtc-sub">Incoming Tap to Talk call…</div>
+      <div id="sd-rtc-avatar">📞</div>
+      <div id="sd-rtc-card-box">
+        <div id="sd-rtc-card-plate">Someone's at the door</div>
+        <div id="sd-rtc-card-purpose">Incoming Tap to Talk call</div>
+      </div>
+      <div id="sd-rtc-title">Ringing…</div>
+      <div id="sd-rtc-sub"></div>
+      <div id="sd-rtc-banner">🌐 Weak network — reconnecting…</div>
       <div id="sd-rtc-actions">
         <button type="button" class="sd-rtc-btn" id="sd-rtc-reject">Decline</button>
         <button type="button" class="sd-rtc-btn" id="sd-rtc-accept">Accept</button>
@@ -84,11 +151,16 @@ function _ensureDom() {
 
 function _show() { _overlayEl.classList.add('sd-rtc-show'); }
 function _hide() { _overlayEl.classList.remove('sd-rtc-show'); }
+function _banner(on) { _overlayEl.querySelector('#sd-rtc-banner').classList.toggle('sd-rtc-banner-show', !!on); }
 
 function _setRinging(plateId) {
-  _overlayEl.querySelector('#sd-rtc-icon').textContent = '📞';
+  _overlayEl.querySelector('#sd-rtc-avatar').className = 'sd-rtc-pulse';
+  _overlayEl.querySelector('#sd-rtc-avatar').textContent = '📞';
+  _overlayEl.querySelector('#sd-rtc-card-plate').textContent = plateId ? `Door ${plateId}` : "Someone's at the door";
+  _overlayEl.querySelector('#sd-rtc-card-purpose').textContent = 'Incoming Tap to Talk call';
   _overlayEl.querySelector('#sd-rtc-title').textContent = "Someone's at the door";
   _overlayEl.querySelector('#sd-rtc-sub').textContent = 'Incoming Tap to Talk call…';
+  _banner(false);
   _overlayEl.querySelector('#sd-rtc-actions').innerHTML = `
     <button type="button" class="sd-rtc-btn" id="sd-rtc-reject">Decline</button>
     <button type="button" class="sd-rtc-btn" id="sd-rtc-accept">Accept</button>
@@ -96,12 +168,43 @@ function _setRinging(plateId) {
 }
 
 function _setConnected() {
-  _overlayEl.querySelector('#sd-rtc-icon').textContent = '🔊';
+  _stopTimer();
+  _startedAt = Date.now();
+  _overlayEl.querySelector('#sd-rtc-avatar').className = '';
+  _overlayEl.querySelector('#sd-rtc-avatar').textContent = '🔊';
   _overlayEl.querySelector('#sd-rtc-title').textContent = 'Connected';
   _overlayEl.querySelector('#sd-rtc-sub').textContent = 'Talking with your visitor';
+  _banner(false);
   _overlayEl.querySelector('#sd-rtc-actions').innerHTML = `
+    <button type="button" class="sd-rtc-round-btn sd-rtc-btn-secondary" id="sd-rtc-mute" title="Mute">🎤</button>
     <button type="button" class="sd-rtc-btn" id="sd-rtc-hangup">End Call</button>
+    <button type="button" class="sd-rtc-round-btn sd-rtc-btn-secondary sd-rtc-toggled" id="sd-rtc-speaker" title="Speaker">🔈</button>
   `;
+  let timerEl = document.getElementById('sd-rtc-timer');
+  if (!timerEl) {
+    timerEl = document.createElement('div');
+    timerEl.id = 'sd-rtc-timer';
+    _overlayEl.querySelector('#sd-rtc-sub').insertAdjacentElement('afterend', timerEl);
+  }
+  timerEl.textContent = '00:00';
+  _timerInterval = setInterval(() => {
+    if (!_startedAt) return;
+    timerEl.textContent = _fmt((Date.now() - _startedAt) / 1000);
+  }, 250);
+
+  document.getElementById('sd-rtc-mute')?.addEventListener('click', (e) => {
+    if (!_localStream) return;
+    _muted = !_muted;
+    _localStream.getAudioTracks().forEach((t) => { t.enabled = !_muted; });
+    e.currentTarget.classList.toggle('sd-rtc-toggled', _muted);
+    e.currentTarget.textContent = _muted ? '🔇' : '🎤';
+  });
+  document.getElementById('sd-rtc-speaker')?.addEventListener('click', (e) => {
+    if (!_remoteAudioEl) return;
+    _remoteAudioEl.muted = !_remoteAudioEl.muted;
+    e.currentTarget.classList.toggle('sd-rtc-toggled', !_remoteAudioEl.muted);
+    e.currentTarget.textContent = _remoteAudioEl.muted ? '🔇' : '🔈';
+  });
 }
 
 // PRODUCTION HARDENING (Fix 4): shown during a transient post-connect ICE
@@ -109,19 +212,32 @@ function _setConnected() {
 // hiding the overlay (which would orphan the still-open peer
 // connection/mic). The End Call button stays available throughout.
 function _setReconnecting() {
-  _overlayEl.querySelector('#sd-rtc-icon').textContent = '🔄';
+  _banner(true);
   _overlayEl.querySelector('#sd-rtc-title').textContent = 'Reconnecting…';
   _overlayEl.querySelector('#sd-rtc-sub').textContent = 'Call may recover automatically';
-  _overlayEl.querySelector('#sd-rtc-actions').innerHTML = `
-    <button type="button" class="sd-rtc-btn" id="sd-rtc-hangup">End Call</button>
-  `;
+  if (!document.getElementById('sd-rtc-hangup')) {
+    _overlayEl.querySelector('#sd-rtc-actions').innerHTML = `
+      <button type="button" class="sd-rtc-btn" id="sd-rtc-hangup">End Call</button>
+    `;
+  }
 }
 
 function _setConnecting() {
-  _overlayEl.querySelector('#sd-rtc-icon').textContent = '⏳';
+  _overlayEl.querySelector('#sd-rtc-avatar').className = '';
+  _overlayEl.querySelector('#sd-rtc-avatar').textContent = '⏳';
   _overlayEl.querySelector('#sd-rtc-title').textContent = 'Connecting…';
   _overlayEl.querySelector('#sd-rtc-sub').textContent = 'Setting up a secure voice call';
+  _banner(false);
   _overlayEl.querySelector('#sd-rtc-actions').innerHTML = '';
+}
+
+function _resetLocalState() {
+  _stopTimer();
+  _startedAt = null;
+  _localStream = null;
+  _muted = false;
+  const timerEl = document.getElementById('sd-rtc-timer');
+  timerEl?.remove();
 }
 
 /**
@@ -156,6 +272,7 @@ export async function initOwnerCallUI(ownerId) {
       _activeHangUp?.();
       _activeHangUp = null;
       _currentCallId = null;
+      _resetLocalState();
       _hide();
     }, { once: true });
   };
@@ -195,10 +312,11 @@ export async function initOwnerCallUI(ownerId) {
       _hide();
     },
 
-    onConnected: (remoteStream, { hangUp } = {}) => {
+    onConnected: (remoteStream, { hangUp, localStream } = {}) => {
       _ensureDom();
       _remoteAudioEl.srcObject = remoteStream;
       _remoteAudioEl.play().catch(() => {});
+      _localStream = localStream || null;
       _setConnected();
       _activeHangUp = hangUp || null;
       _wireHangupButton();
@@ -221,6 +339,7 @@ export async function initOwnerCallUI(ownerId) {
     onEnded: () => {
       _activeHangUp = null;
       _currentCallId = null;
+      _resetLocalState();
       _hide();
     },
   });
