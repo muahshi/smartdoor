@@ -485,6 +485,7 @@
   import { isNightModeActive } from './services/security.js';
   import { getOrCreateConversation, sendMessage as sendConvMessage, sendVoiceMessage as sendConvVoiceMessage, getConversationMessages, subscribeToConversation, sendTypingSignal } from './services/messaging.js';
   import { attemptTapToTalk } from './services/webrtcCall.js';
+  import { recordVisitorVisit, getVisitorRecognition } from './services/visitorMemory.js';
 
   const shell = document.getElementById('shell');
 
@@ -1559,6 +1560,13 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         vPhone = raw.replace(/\D/g,'').slice(-10);
         if (vPhone.length !== 10) { showToast('Valid 10-digit phone number darj karein', 'error'); return; }
         cachedPhone = vPhone;
+        // Visitor Memory System — best-effort recognition greeting only;
+        // never blocks or delays the call itself.
+        getVisitorRecognition(ownerId, vPhone).then((rec) => {
+          if (rec.known) {
+            showToast(`👋 Welcome back! Visit #${rec.visitCount + 1}`, 'success');
+          }
+        }).catch(() => {});
       }
       btnCall.disabled = true;
       document.getElementById('call-sub').textContent = 'Connecting…';
@@ -1594,6 +1602,8 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         showToast('🔊 Connected via SmartDoor Voice', 'success');
         if (voiceEnabled) speak('Aap resident se seedhe jud gaye hain.', 'hi-IN');
         btnCall.disabled = false;
+        // Visitor Memory System — best-effort, never blocks the call UI.
+        recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'webrtc', accepted: true }).catch(() => {});
         return;
       }
 
@@ -1610,6 +1620,8 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         document.getElementById('call-sub').textContent = 'Connect with the family';
         showToast(r.error || 'Call failed. Try again.', 'error');
       }
+      // Visitor Memory System — best-effort, never blocks the call UI.
+      recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'masked_call', accepted: !!r.success }).catch(() => {});
       btnCall.disabled = !s.access?.allowCall;
     });
 
