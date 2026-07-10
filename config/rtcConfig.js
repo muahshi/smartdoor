@@ -152,8 +152,71 @@ export const RTC_MONITORING_EVENTS = Object.freeze({
   RTC_CALL_CLAIMED_ELSEWHERE: 'rtc_call_claimed_elsewhere',   // another owner tab/device answered first
 });
 
+/**
+ * PRODUCTION FIX (Root Cause #2 — TURN support).
+ *
+ * getIceServers() above was STUN-only by design ("Phase 4 not built
+ * yet"). STUN alone cannot traverse the symmetric / carrier-grade NAT
+ * used by most Indian mobile carriers (Jio, Airtel, Vi), so even after
+ * the ICE-candidate-delivery race fix in services/webrtcOwnerCall.js,
+ * a visitor and owner who are both on mobile data (the overwhelmingly
+ * common case for SmartDoor) can still fail to find a direct P2P path.
+ * That failure looks identical to the reported symptom: "Connecting…"
+ * never becomes "Connected", then the existing masked-call fallback
+ * fires after WEBRTC_CONNECT_TIMEOUT_MS.
+ *
+ * fetchIceServers() calls the new get-turn-credentials Edge Function
+ * (supabase/functions/get-turn-credentials), which issues short-lived
+ * Twilio Network Traversal Service TURN credentials — reusing the
+ * existing approved Twilio vendor relationship and the same
+ * server-issues-short-lived-credentials pattern already used for
+ * Exotel/Twilio call secrets in supabase/functions/initiate-call
+ * (secrets never reach the browser).
+ *
+ * Contract: NEVER throws, NEVER blocks longer than TURN_FETCH_TIMEOUT_MS,
+ * and ALWAYS resolves to at least the STUN-only list getIceServers()
+ * already returned. Any failure — Edge Function not deployed, Twilio
+ * secrets not configured yet, network error, timeout — fails open to
+ * exactly the pre-existing STUN-only behavior, so this can only ever
+ * improve connectivity, never regress it.
+ */
+const TURN_FETCH_TIMEOUT_MS = 2500;
+
+export async function fetchIceServers(supabaseClient, { ownerId, plateId } = {}) {
+  const stunOnly = getIceServers();
+  if (!supabaseClient?.functions?.invoke) return stunOnly;
+
+  let timer;
+  try {
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('turn_fetch_timeout')), TURN_FETCH_TIMEOUT_MS);
+    });
+
+    const { data, error } = await Promise.race([
+      supabaseClient.functions.invoke('get-turn-credentials', {
+        body: { ownerId: ownerId || null, plateId: plateId || null },
+      }),
+      timeoutPromise,
+    ]);
+    clearTimeout(timer);
+
+    if (error || !Array.isArray(data?.iceServers) || data.iceServers.length === 0) {
+      console.warn(`[RTC-TRACE] TURN fetch returned no servers, using STUN-only | File=config/rtcConfig.js Reason=${error?.message || 'empty iceServers'}`);
+      return stunOnly;
+    }
+
+    console.log(`[RTC-TRACE] TURN credentials fetched | File=config/rtcConfig.js serverCount=${data.iceServers.length}`);
+    return [...stunOnly, ...data.iceServers];
+  } catch (err) {
+    clearTimeout(timer);
+    console.warn(`[RTC-TRACE] TURN fetch failed, using STUN-only | File=config/rtcConfig.js Reason=${err?.message || err}`);
+    return stunOnly;
+  }
+}
+
 export default {
   getIceServers,
+  fetchIceServers,
   RTC_CONFIG_DEFAULTS,
   WEBRTC_CONNECT_TIMEOUT_MS,
   RTC_MONITORING_EVENTS,
