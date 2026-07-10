@@ -486,6 +486,7 @@
   import { getOrCreateConversation, sendMessage as sendConvMessage, sendVoiceMessage as sendConvVoiceMessage, getConversationMessages, subscribeToConversation, sendTypingSignal } from './services/messaging.js';
   import { attemptTapToTalk } from './services/webrtcCall.js';
   import { recordVisitorVisit, getVisitorRecognition } from './services/visitorMemory.js';
+  import { visitorCallUI } from './js/visitorCallUI.js';
 
   const shell = document.getElementById('shell');
 
@@ -500,6 +501,7 @@
   rtcRemoteAudio.setAttribute('playsinline', '');
   rtcRemoteAudio.style.display = 'none';
   document.body.appendChild(rtcRemoteAudio);
+  visitorCallUI.attachRemoteAudio(rtcRemoteAudio);
 
   // Extract plate slug from BOTH sources:
   // 1. Query param: visitor.html?plate=SD-UMBAU4 (direct URL)
@@ -1572,6 +1574,14 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       document.getElementById('call-sub').textContent = 'Connecting…';
       _logVisitorEvent(ownerId, plateId, 'call_attempt');
 
+      // Full-screen call overlay — purely presentational, driven by the
+      // same onStatus()/onCallHandle hooks passed to attemptTapToTalk()
+      // below. Shows nothing extra if WebRTC isn't attempted at all
+      // (flag off / owner offline / mic denied resolve before any
+      // status fires) — the existing masked-call fallback path is
+      // unaffected either way.
+      visitorCallUI.start({ label: `Door ${plateId}` });
+
       // Try WebRTC Tap to Talk first. attemptTapToTalk() is fully guarded —
       // it resolves { attempted: false } immediately (no mic prompt, no
       // channel) unless this owner is explicitly opted into WebRTC and
@@ -1580,15 +1590,25 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         ownerId,
         plateId,
         remoteAudioEl: rtcRemoteAudio,
+        onCallHandle: ({ cancel }) => {
+          // Lets the visitor cancel a ringing/connecting call before the
+          // owner answers — wired straight to the Cancel button that
+          // appears on the "Ringing…" screen.
+          visitorCallUI.setCancelHandle(cancel);
+        },
         onStatus: (status) => {
+          visitorCallUI.status(status);
           if (status === 'connecting') document.getElementById('call-sub').textContent = 'Connecting…';
           if (status === 'ringing') document.getElementById('call-sub').textContent = 'Ringing resident…';
+          if (status === 'owner_answered') document.getElementById('call-sub').textContent = 'Owner answered…';
           // PRODUCTION HARDENING (Fix 2 + Fix 4): a temporary ICE drop
           // after the call was already connected. The peer connection is
           // still open — this is UI feedback only, no state reset.
           if (status === 'reconnecting') document.getElementById('call-sub').textContent = 'Reconnecting…';
           if (status === 'connected' && activeRtcCall) document.getElementById('call-sub').textContent = 'Connected — tap again to end';
           if (status === 'ended') {
+            const durationSec = activeRtcCall?._connectedAt ? (Date.now() - activeRtcCall._connectedAt) / 1000 : 0;
+            visitorCallUI.ended({ durationSec });
             activeRtcCall = null;
             document.getElementById('call-sub').textContent = 'Connect with the family';
             btnCall.disabled = !s.access?.allowCall;
@@ -1597,7 +1617,8 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       });
 
       if (rtc.attempted && rtc.connected) {
-        activeRtcCall = { endCall: rtc.endCall };
+        activeRtcCall = { endCall: rtc.endCall, _connectedAt: Date.now() };
+        visitorCallUI.connected({ localStream: rtc.localStream, endCall: rtc.endCall });
         document.getElementById('call-sub').textContent = 'Connected — tap again to end';
         showToast('🔊 Connected via SmartDoor Voice', 'success');
         if (voiceEnabled) speak('Aap resident se seedhe jud gaye hain.', 'hi-IN');
@@ -1606,6 +1627,20 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'webrtc', accepted: true }).catch(() => {});
         return;
       }
+
+      // Visitor explicitly cancelled a ringing/connecting WebRTC call —
+      // respect that choice and stop, same as tapping Cancel on the
+      // existing masked-call flow would. Does not fall back to masked
+      // calling, since that would place a call the visitor just said
+      // to stop.
+      if (rtc.reason === 'visitor_cancelled') {
+        visitorCallUI.close();
+        document.getElementById('call-sub').textContent = 'Connect with the family';
+        btnCall.disabled = !s.access?.allowCall;
+        return;
+      }
+
+      visitorCallUI.close();
 
       // WebRTC wasn't attempted (flag off / owner offline / mic denied) or
       // it failed/timed out/was rejected — automatically fall back to the
