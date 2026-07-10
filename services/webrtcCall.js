@@ -82,7 +82,7 @@ async function _logAttempt(ownerId, plateId, callId, outcome, fallbackTriggered)
  *   endCall?: () => void,
  * }>}
  */
-export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStatus = () => {} }) {
+export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStatus = () => {}, onCallHandle = () => {} }) {
   if (!ownerId || !plateId) return { attempted: false, connected: false, reason: 'missing_params' };
   console.log(`[RTC-TRACE] 1 Visitor starts call | File=services/webrtcCall.js ownerId=${ownerId} plateId=${plateId}`);
 
@@ -158,6 +158,18 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
   const _releaseOnUnload = () => cleanup();
   window.addEventListener('pagehide', _releaseOnUnload, { once: true });
 
+  // UX HOOK (additive, non-signaling): hands the caller (visitor.html /
+  // js/visitorCallUI.js) a single stable "stop this call" control that
+  // works correctly whether tapped before or after connect — before
+  // `settled`, endCall() alone would leave the outer Promise (below)
+  // unresolved forever, since onconnectionstatechange's pre-connect
+  // branch only ever settles on 'connected' or 'failed', never on the
+  // 'closed' state pc.close() produces. `finish` (assigned just below,
+  // inside the Promise executor) is what actually resolves it, so
+  // `_cancel` is filled in there and read here via closure.
+  let _cancel = null;
+  onCallHandle({ callId, cancel: () => _cancel?.() });
+
   return new Promise(async (resolve) => {
     const finish = async (result) => {
       if (settled) return;
@@ -165,14 +177,29 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
       if (!result.connected) {
         cleanup();
       }
-      await _logAttempt(ownerId, plateId, callId, result.outcome, !result.connected);
+      // Explicit visitor cancel (Cancel while ringing) isn't a fallback
+      // trigger — visitor.html's caller checks reason and skips masked
+      // calling for this one outcome, same as an owner-rejected call
+      // still counts fallback_triggered=true today.
+      const fallbackTriggered = result.connected ? false : result.reason !== 'visitor_cancelled';
+      await _logAttempt(ownerId, plateId, callId, result.outcome, fallbackTriggered);
       resolve({
         attempted: true,
         connected: result.connected,
         reason: result.reason,
         callId,
         endCall: result.connected ? endCall : undefined,
+        localStream: result.connected ? localStream : undefined,
       });
+    };
+
+    // Pre-connect cancel path: reuses the exact same "not connected" exit
+    // as a timeout/rejection, just with its own reason/outcome code —
+    // RTC_VISITOR_CANCELLED was already reserved in config/rtcConfig.js
+    // and simply never wired to a caller before now.
+    _cancel = () => {
+      if (settled) { endCall(); return; }
+      finish({ connected: false, reason: 'visitor_cancelled', outcome: RTC_MONITORING_EVENTS.RTC_VISITOR_CANCELLED });
     };
 
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
@@ -254,6 +281,12 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
       try {
         await pc.setRemoteDescription({ type: 'answer', sdp });
         console.log(`[RTC-TRACE] 11 Answer received | File=services/webrtcCall.js callId=${callId}`);
+        // UX HOOK (additive): owner's device has answered — media/ICE is
+        // still negotiating underneath. Gives the visitor UI a distinct
+        // "Owner Answered" beat between "Ringing…" and "Connected"
+        // instead of jumping straight there. No effect on the actual
+        // negotiation, which proceeds exactly as before.
+        if (!settled) onStatus('owner_answered');
       } catch (err) {
         console.error(`[RTC-TRACE][FAIL] setRemoteDescription(answer) failed | File=services/webrtcCall.js callId=${callId} Reason=${err?.message || err} Current=no-remote-desc Expected=answer-applied`);
         console.error('[WebRTCCall] setRemoteDescription(answer) failed:', err);

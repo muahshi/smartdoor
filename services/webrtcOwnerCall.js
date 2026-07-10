@@ -382,7 +382,7 @@ async function _startListening(ownerId, handlers = {}) {
         };
 
         pc.ontrack = (event) => {
-          if (event.streams?.[0]) onConnected(event.streams[0], { hangUp });
+          if (event.streams?.[0]) onConnected(event.streams[0], { hangUp, localStream });
         };
 
         pc.onicecandidate = (event) => {
