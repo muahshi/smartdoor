@@ -99,7 +99,40 @@ serve(async (req) => {
     const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-webhook?call_id=${callLog.id}`;
     const providerModule = provider === 'twilio' ? twilio : exotel;
 
-    const result = await providerModule.placeCall({ visitorPhone, ownerPhone: owner.phone, callbackUrl });
+    // PRODUCTION FIX (phone-format bug — root cause of the reported
+    // "+19575877758 is unverified" Twilio error): phone numbers are
+    // stored and passed around this codebase as bare 10-digit Indian
+    // numbers (see services/sanitize.js#phone, which intentionally
+    // returns a 10-digit string, not E.164). That's correct for SMS
+    // (send-sms strips any +91 back off) and for DB storage, but Twilio's
+    // Voice API requires E.164 and — critically — silently assumes a
+    // bare/ambiguous number is a US number (+1) rather than rejecting it,
+    // which is exactly how an Indian mobile number became "+19575877758"
+    // and then failed as "unverified" against a US number. Exotel's
+    // Connect API also expects a fully-qualified number. Normalizing to
+    // +91XXXXXXXXXX here — the one place both providers are invoked from
+    // — fixes this for both providers without touching DB storage format,
+    // sanitize.js, or any other caller.
+    const toE164India = (raw: string | null): string | null => {
+      if (!raw) return null;
+      const digits = String(raw).replace(/\D/g, '');
+      const ten = digits.length === 12 && digits.startsWith('91')
+        ? digits.slice(2)
+        : digits.length === 10
+          ? digits
+          : null;
+      return ten ? `+91${ten}` : null;
+    };
+
+    const e164Visitor = toE164India(visitorPhone);
+    const e164Owner = toE164India(owner.phone);
+    if (!e164Owner) {
+      console.error(`[initiate-call] Owner phone "${owner.phone}" could not be normalized to E.164 for callLog ${callLog.id}`);
+      await supabaseAdmin.from('call_logs').update({ call_status: 'failed' }).eq('id', callLog.id);
+      return Response.json({ success: false, message: 'Owner contact number is invalid.' }, { status: 500, headers: corsHeaders });
+    }
+
+    const result = await providerModule.placeCall({ visitorPhone: e164Visitor, ownerPhone: e164Owner, callbackUrl });
 
     if (!result.success) {
       // DIAGNOSTIC FIX: this path previously returned 502 with no server-side
