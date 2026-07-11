@@ -47,6 +47,35 @@ import {
 } from './webrtcSignaling.js';
 import { supabase } from './supabase.js';
 
+// DIAGNOSTIC ADDITION (audio-drops-after-connect investigation): logs the
+// currently-selected ICE candidate pair's type (host / srflx / relay) and
+// transport protocol whenever connectionState changes. Read-only —
+// pc.getStats() never affects negotiation, SDP, or media. This exists
+// because `connectionState === 'connected'` only proves ICE+DTLS
+// completed on SOME candidate pair, not that it's a pair carrying real
+// audio (e.g. a host/srflx pair across a symmetric-NAT'd mobile network
+// can report "connected" briefly and then produce total silence). Logging
+// the pair type gives concrete proof — on the NEXT call attempt — of
+// whether a relay (TURN) candidate was actually selected or not.
+async function _logSelectedCandidatePair(pc, callId, file) {
+  try {
+    const stats = await pc.getStats();
+    let pair = null;
+    stats.forEach((report) => {
+      if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.selected)) pair = report;
+    });
+    if (!pair) {
+      console.log(`[RTC-TRACE] ICE candidate pair | File=${file} callId=${callId} Reason=no-succeeded-pair-yet`);
+      return;
+    }
+    const local = stats.get(pair.localCandidateId);
+    const remote = stats.get(pair.remoteCandidateId);
+    console.log(`[RTC-TRACE] ICE candidate pair | File=${file} callId=${callId} localType=${local?.candidateType} remoteType=${remote?.candidateType} localProtocol=${local?.protocol} remoteProtocol=${remote?.protocol} bytesSent=${pair.bytesSent} bytesReceived=${pair.bytesReceived}`);
+  } catch (err) {
+    console.warn(`[RTC-TRACE] getStats() failed | File=${file} callId=${callId} Reason=${err?.message || err}`);
+  }
+}
+
 // Fail-silent outcome log — never blocks or throws into the caller.
 // Mirrors services/presence.js#_logPresenceEvent's trust model exactly.
 async function _logAttempt(ownerId, plateId, callId, outcome, fallbackTriggered) {
@@ -225,10 +254,12 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
           connected = true;
           console.log(`[RTC-TRACE] 12 ICE connected | File=services/webrtcCall.js callId=${callId}`);
           console.log(`[RTC-TRACE] 13 Connected | File=services/webrtcCall.js callId=${callId}`);
+          _logSelectedCandidatePair(pc, callId, 'services/webrtcCall.js');
           onStatus('connected');
           finish({ connected: true, outcome: RTC_MONITORING_EVENTS.RTC_CONNECTED });
         } else if (pc.connectionState === 'failed') {
           console.error(`[RTC-TRACE][FAIL] ICE failed | File=services/webrtcCall.js callId=${callId} Reason=connectionState=failed Current=failed Expected=connected`);
+          _logSelectedCandidatePair(pc, callId, 'services/webrtcCall.js');
           finish({ connected: false, reason: 'ice_failed', outcome: RTC_MONITORING_EVENTS.RTC_ICE_FAILED });
         }
         return;
@@ -253,6 +284,8 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
         // within a few seconds as ICE renegotiates.
         if (!reconnectGraceTimer) {
           onStatus('reconnecting');
+          console.warn(`[RTC-TRACE] post-connect disconnect, starting grace window | File=services/webrtcCall.js callId=${callId} graceMs=${RTC_RECONNECT_GRACE_MS}`);
+          _logSelectedCandidatePair(pc, callId, 'services/webrtcCall.js');
           reconnectGraceTimer = setTimeout(() => {
             reconnectGraceTimer = null;
             cleanup();
@@ -264,6 +297,7 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
 
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
         // Permanent — clean up immediately, don't wait out the grace window.
+        console.error(`[RTC-TRACE][FAIL] post-connect permanent disconnect | File=services/webrtcCall.js callId=${callId} Reason=connectionState=${pc.connectionState}`);
         cleanup();
         onStatus('ended');
       }
