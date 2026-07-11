@@ -74,6 +74,47 @@ async function _ensureRealtimeAuth() {
 }
 
 /**
+ * PRODUCTION FIX — root cause of the "Maximum call stack size exceeded"
+ * recursive channel-cleanup bug (RTC-TRACE evidence: repeated
+ * `channel join failed | Reason=CLOSED` immediately followed by a stack
+ * overflow through push.js → channel.js → SupabaseClient.ts →
+ * removeChannel() → unsubscribe()).
+ *
+ * Every teardown path in this file (join-timeout, CHANNEL_ERROR/TIMED_OUT/
+ * CLOSED handling, reconnect, explicit leave) was calling
+ * `supabase.removeChannel(channel)` SYNCHRONOUSLY from inside that very
+ * channel's own `channel.subscribe((status) => {...})` dispatch callback.
+ * `removeChannel()` internally calls `channel.unsubscribe()`, which walks
+ * the channel's Phoenix `push` queue and can itself invoke that same
+ * status callback again (e.g. re-entering with CLOSED) while the original
+ * call is still on the stack — each re-entry calling removeChannel() again
+ * — producing unbounded recursion instead of a single clean teardown.
+ *
+ * Fix: NEVER call supabase.removeChannel()/channel.unsubscribe() directly.
+ * Route every removal through this one idempotent, deferred helper:
+ *   - Idempotent: a WeakSet keyed on the channel object guarantees
+ *     removeChannel() is invoked at most once per channel, no matter how
+ *     many teardown paths race to remove the same channel (join-timeout
+ *     racing a CLOSED event, hangup racing a permanent ICE failure, etc.).
+ *   - Deferred: the actual removeChannel() call is scheduled on a fresh
+ *     macrotask (setTimeout 0), so it always runs AFTER the current
+ *     channel-dispatch callback has fully returned and the call stack has
+ *     unwound — the same channel's dispatch loop can never still be on
+ *     the stack when removeChannel() runs, which is what breaks the
+ *     recursion. This adds no observable delay (still same tick vs. next
+ *     tick) and changes no business logic, SDP/ICE handling, or logging.
+ */
+const _removedChannels = new WeakSet();
+
+function _safeRemoveChannel(channel) {
+  if (!channel || _removedChannels.has(channel)) return;
+  _removedChannels.add(channel);
+  setTimeout(() => {
+    try { supabase.removeChannel(channel); } catch {}
+  }, 0);
+}
+
+/**
  * Joins a broadcast channel and resolves once SUBSCRIBED (or rejects on
  * timeout), so callers never broadcast into a channel that isn't ready
  * yet — a broadcast sent before SUBSCRIBED is silently dropped by
@@ -97,7 +138,7 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
     });
 
     const timer = setTimeout(() => {
-      try { supabase.removeChannel(channel); } catch {}
+      _safeRemoveChannel(channel);
       reject(new Error('Signaling channel join timed out'));
     }, timeoutMs);
 
@@ -108,7 +149,7 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
         resolve(channel);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timer);
-        try { supabase.removeChannel(channel); } catch {}
+        _safeRemoveChannel(channel);
         console.error(`[RTC-TRACE][FAIL] channel join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
         reject(new Error(`Signaling channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
       }
@@ -206,7 +247,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
         initialTimer = setTimeout(() => {
           if (firstSettled || torndown) return;
           firstSettled = true;
-          try { supabase.removeChannel(channel); } catch {}
+          _safeRemoveChannel(channel);
           console.error(`[RTC-TRACE][FAIL] persistent channel initial join timed out | File=services/webrtcSignaling.js Channel=${channelName} Reason=timeout(${initialTimeoutMs}ms) Current=not-subscribed Expected=SUBSCRIBED`);
           rejectFirst(new Error('Persistent channel initial join timed out'));
         }, initialTimeoutMs);
@@ -234,7 +275,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
           if (!firstSettled) {
             // Genuine initial-join failure — no channel was ever live.
             firstSettled = true;
-            try { supabase.removeChannel(channel); } catch {}
+            _safeRemoveChannel(channel);
             console.error(`[RTC-TRACE][FAIL] persistent channel initial join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
             rejectFirst(new Error(`Persistent channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
             return;
@@ -250,7 +291,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
           clearTimeout(reconnectTimer);
           reconnectTimer = setTimeout(() => {
             if (torndown) return;
-            try { supabase.removeChannel(channel); } catch {}
+            _safeRemoveChannel(channel);
             _subscribe();
           }, delay);
         }
@@ -281,7 +322,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
     console.log(`[RTC-TRACE] persistent channel fast-reconnect on foreground/online | File=services/webrtcSignaling.js Channel=${channelName}`);
     clearTimeout(reconnectTimer);
     reconnectAttempt = 0;
-    if (channel) { try { supabase.removeChannel(channel); } catch {} }
+    if (channel) _safeRemoveChannel(channel);
     _subscribeRef();
   };
   const _onVisible = () => { if (document.visibilityState === 'visible') _forceReconnectNow(); };
@@ -297,7 +338,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
     document.removeEventListener('visibilitychange', _onVisible);
     window.removeEventListener('online', _onOnline);
     window.removeEventListener('focus', _onVisible);
-    if (channel) { try { supabase.removeChannel(channel); } catch {} }
+    if (channel) _safeRemoveChannel(channel);
   };
 }
 
@@ -318,8 +359,7 @@ export async function sendSignal(channel, event, payload) {
 }
 
 export function leaveChannel(channel) {
-  if (!channel) return;
-  try { supabase.removeChannel(channel); } catch {}
+  _safeRemoveChannel(channel);
 }
 
 export default {
@@ -331,4 +371,5 @@ export default {
   sendSignal,
   leaveChannel,
 };
+
 
