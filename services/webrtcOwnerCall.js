@@ -63,6 +63,29 @@ const FLAG_RECHECK_INTERVAL_MS = 20000;
 // sibling tab's.
 const _deviceId = 'owner_dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
 
+// DIAGNOSTIC ADDITION (audio-drops-after-connect investigation) — see the
+// matching comment in services/webrtcCall.js for the full rationale. Same
+// read-only helper, duplicated here since this file doesn't import from
+// webrtcCall.js (they're deliberately independent, symmetric modules).
+async function _logSelectedCandidatePair(pc, callId, file) {
+  try {
+    const stats = await pc.getStats();
+    let pair = null;
+    stats.forEach((report) => {
+      if (report.type === 'candidate-pair' && (report.state === 'succeeded' || report.selected)) pair = report;
+    });
+    if (!pair) {
+      console.log(`[RTC-TRACE] ICE candidate pair | File=${file} callId=${callId} Reason=no-succeeded-pair-yet`);
+      return;
+    }
+    const local = stats.get(pair.localCandidateId);
+    const remote = stats.get(pair.remoteCandidateId);
+    console.log(`[RTC-TRACE] ICE candidate pair | File=${file} callId=${callId} localType=${local?.candidateType} remoteType=${remote?.candidateType} localProtocol=${local?.protocol} remoteProtocol=${remote?.protocol} bytesSent=${pair.bytesSent} bytesReceived=${pair.bytesReceived}`);
+  } catch (err) {
+    console.warn(`[RTC-TRACE] getStats() failed | File=${file} callId=${callId} Reason=${err?.message || err}`);
+  }
+}
+
 /**
  * Attempts to atomically claim a call for this device via a UNIQUE
  * (call_id) INSERT. Resolves true if this device won the claim, false if
@@ -401,6 +424,7 @@ async function _startListening(ownerId, handlers = {}) {
           if (pc.connectionState === 'connected') {
             console.log(`[RTC-TRACE] 12 ICE connected | File=services/webrtcOwnerCall.js callId=${callId}`);
             console.log(`[RTC-TRACE] 13 Connected | File=services/webrtcOwnerCall.js callId=${callId}`);
+            _logSelectedCandidatePair(pc, callId, 'services/webrtcOwnerCall.js');
             if (activeReconnectGraceTimer) {
               clearTimeout(activeReconnectGraceTimer);
               activeReconnectGraceTimer = null;
@@ -412,6 +436,8 @@ async function _startListening(ownerId, handlers = {}) {
           if (pc.connectionState === 'disconnected') {
             if (!activeReconnectGraceTimer) {
               onStatus('reconnecting');
+              console.warn(`[RTC-TRACE] post-connect disconnect, starting grace window | File=services/webrtcOwnerCall.js callId=${callId} graceMs=${RTC_RECONNECT_GRACE_MS}`);
+              _logSelectedCandidatePair(pc, callId, 'services/webrtcOwnerCall.js');
               activeReconnectGraceTimer = setTimeout(() => {
                 activeReconnectGraceTimer = null;
                 cleanupActiveCall();
