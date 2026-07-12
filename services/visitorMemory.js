@@ -35,9 +35,12 @@ import { supabase } from './supabase.js';
  * @param {string} [params.callType]   'webrtc' | 'masked_call' | 'bell' | 'message'
  * @param {boolean} [params.accepted]
  * @param {number} [params.duration]   seconds
+ * @param {string} [params.name]        optional visitor-entered name (Feature 1: Visitor Call History)
+ * @param {string} [params.callStatus]  'incoming' | 'connected' | 'missed' | 'rejected' | 'cancelled' | 'failed'
+ * @param {string} [params.networkType] best-effort navigator.connection.effectiveType/type snapshot
  * @returns {Promise<{ known: boolean, isReturning?: boolean, visitCount?: number, firstSeen?: string }>}
  */
-export async function recordVisitorVisit({ ownerId, plateId, phone, purpose = null, callType = null, accepted = null, duration = 0 }) {
+export async function recordVisitorVisit({ ownerId, plateId, phone, purpose = null, callType = null, accepted = null, duration = 0, name = null, callStatus = null, networkType = null }) {
   if (!ownerId || !plateId || !phone) return { known: false };
   try {
     const { data, error } = await supabase.rpc('record_visitor_visit', {
@@ -48,6 +51,9 @@ export async function recordVisitorVisit({ ownerId, plateId, phone, purpose = nu
       p_call_type: callType,
       p_accepted: accepted,
       p_duration: duration,
+      p_name: name,
+      p_call_status: callStatus,
+      p_network_type: networkType,
     });
     if (error || !data) {
       console.error('[VisitorMemory] record_visitor_visit failed:', error);
@@ -141,7 +147,7 @@ export async function getVisitsForProfile(visitorProfileId, limit = 50) {
   try {
     const { data, error } = await supabase
       .from('visitor_visits')
-      .select('id, plate_id, purpose, call_type, accepted, duration, created_at')
+      .select('id, plate_id, purpose, call_type, accepted, duration, visitor_name, call_status, network_type, created_at')
       .eq('visitor_profile_id', visitorProfileId)
       .order('created_at', { ascending: false })
       .limit(limit);
