@@ -669,7 +669,7 @@
           <div class="quick-action-icon">👨‍👩‍👧</div>
           <div class="quick-action-label">Family</div>
         </div>
-        <div class="quick-action-tile" onclick="OwnerPremium.openTimeline()">
+        <div class="quick-action-tile" onclick="ActivityCenter.open()">
           <div class="quick-action-icon">📋</div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
@@ -731,7 +731,7 @@
       <div class="dash-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Live Visitor Logs</div>
-          <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;cursor:pointer;" onclick="OwnerPremium.openTimeline()">View All</div>
+          <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;cursor:pointer;" onclick="ActivityCenter.open()">View All</div>
         </div>
         <div id="visitor-logs"></div>
       </div>
@@ -1213,7 +1213,7 @@
           <div class="quick-action-icon">👨‍👩‍👧</div>
           <div class="quick-action-label">Family</div>
         </div>
-        <div class="quick-action-tile" onclick="OwnerPremium.openTimeline()">
+        <div class="quick-action-tile" onclick="ActivityCenter.open()">
           <div class="quick-action-icon">📋</div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
@@ -1552,7 +1552,7 @@
         <div class="dash-card" style="margin-bottom:16px;">
           <div id="visitor-logs"></div>
           <div style="margin-top:10px;text-align:center;">
-            <button style="font-size:0.72rem;color:#00A2E8;background:none;border:none;cursor:pointer;font-weight:600;" onclick="OwnerPremium.openTimeline()">View All Logs →</button>
+            <button style="font-size:0.72rem;color:#00A2E8;background:none;border:none;cursor:pointer;font-weight:600;" onclick="ActivityCenter.open()">View All Logs →</button>
           </div>
         </div>
 
@@ -1694,6 +1694,7 @@
 <script type="module" src="js/app.js"></script>
 <!-- Premium Owner Experience (additive only — reads DashboardModule.getState(), never modifies dashboard.js) -->
 <script type="module" src="js/ownerPremium.js"></script>
+<script type="module" src="js/activityCenter.js"></script>
 
 <script>
   // ── Mobile tab switcher ──
