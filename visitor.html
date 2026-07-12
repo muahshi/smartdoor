@@ -1537,9 +1537,19 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
     const ownerId = s.owner.id;
     const plateId = s.plate.plateId;
 
+    // Feature 1 (Visitor Call History): best-effort network type snapshot,
+    // never blocks the call flow if unavailable.
+    function _getNetworkType() {
+      try {
+        const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        return c?.effectiveType || c?.type || null;
+      } catch (_) { return null; }
+    }
+
     // CALL — Tap to Talk (WebRTC) with automatic masked-call fallback
     const btnCall = document.getElementById('btn-call');
     let cachedPhone = null;
+    let cachedName = null;
     let activeRtcCall = null; // { endCall } while a WebRTC call is live
     btnCall?.addEventListener('click', async () => {
       if (btnCall.disabled) return;
@@ -1562,6 +1572,10 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         vPhone = raw.replace(/\D/g,'').slice(-10);
         if (vPhone.length !== 10) { showToast('Valid 10-digit phone number darj karein', 'error'); return; }
         cachedPhone = vPhone;
+        // Optional — helps the owner see "Rahul" / "Swiggy" instead of
+        // "Unknown Visitor" in their dashboard. Skippable (Cancel/blank OK).
+        const rawName = window.prompt('Aapka naam? (optional — jaise Rahul, Swiggy, Milkman)');
+        cachedName = rawName && rawName.trim() ? rawName.trim().slice(0, 60) : null;
         // Visitor Memory System — best-effort recognition greeting only;
         // never blocks or delays the call itself.
         getVisitorRecognition(ownerId, vPhone).then((rec) => {
@@ -1570,6 +1584,8 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           }
         }).catch(() => {});
       }
+      const vName = cachedName;
+      const netType = _getNetworkType();
       btnCall.disabled = true;
       document.getElementById('call-sub').textContent = 'Connecting…';
       _logVisitorEvent(ownerId, plateId, 'call_attempt');
@@ -1624,7 +1640,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         if (voiceEnabled) speak('Aap resident se seedhe jud gaye hain.', 'hi-IN');
         btnCall.disabled = false;
         // Visitor Memory System — best-effort, never blocks the call UI.
-        recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'webrtc', accepted: true }).catch(() => {});
+        recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'webrtc', accepted: true, name: vName, callStatus: 'connected', networkType: netType }).catch(() => {});
         return;
       }
 
@@ -1637,6 +1653,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         visitorCallUI.close();
         document.getElementById('call-sub').textContent = 'Connect with the family';
         btnCall.disabled = !s.access?.allowCall;
+        recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'webrtc', accepted: false, name: vName, callStatus: 'cancelled', networkType: netType }).catch(() => {});
         return;
       }
 
@@ -1656,7 +1673,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
         showToast(r.error || 'Call failed. Try again.', 'error');
       }
       // Visitor Memory System — best-effort, never blocks the call UI.
-      recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'masked_call', accepted: !!r.success }).catch(() => {});
+      recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'masked_call', accepted: !!r.success, name: vName, callStatus: r.success ? 'connected' : 'failed', networkType: netType }).catch(() => {});
       btnCall.disabled = !s.access?.allowCall;
     });
 
