@@ -1641,7 +1641,7 @@ const DashboardModule = (() => {
       btn.addEventListener('click', () => openThread(btn.dataset.openConv));
     });
     document.querySelectorAll('[data-open-log]').forEach((btn) => {
-      btn.addEventListener('click', () => window.OwnerPremium?.openTimeline?.());
+      btn.addEventListener('click', () => window.ActivityCenter?.open?.());
     });
   }
 
