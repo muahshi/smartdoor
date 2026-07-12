@@ -20,6 +20,16 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { allowEdgeRequest, callerIp } from '../_shared/edgeRateLimit.ts';
+
+// Phase 4 hardening: this function is deployed --no-verify-jwt (OTP delivery
+// and cron jobs need to call it without a user session), so without its own
+// limits it was open to unlimited-cost abuse. Per-recipient and per-caller
+// windows below stop both a targeted spam target and a broad script blast.
+const PER_PHONE_WINDOW_MS = 10 * 60_000;
+const PER_PHONE_MAX       = 5;   // 5 SMS to the same number per 10 min
+const PER_IP_WINDOW_MS    = 60_000;
+const PER_IP_MAX          = 20;  // 20 SMS requests per minute from one source
 
 // ── DLT-registered template bodies ──────────────────────────────────────────
 // These must match your DLT-approved templates exactly (variables as {#var#}).
@@ -129,6 +139,20 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ success: false, error: 'template and phone are required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const ip = callerIp(req);
+    if (!allowEdgeRequest(`send-sms:ip:${ip}`, PER_IP_WINDOW_MS, PER_IP_MAX)) {
+      return new Response(JSON.stringify({ success: false, error: 'Too many requests. Please try again shortly.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
+      });
+    }
+    if (!allowEdgeRequest(`send-sms:phone:${phone}`, PER_PHONE_WINDOW_MS, PER_PHONE_MAX)) {
+      return new Response(JSON.stringify({ success: false, error: 'Too many messages sent to this number recently.' }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '300' },
       });
     }
 
