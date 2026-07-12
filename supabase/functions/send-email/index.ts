@@ -11,9 +11,18 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { allowEdgeRequest, callerIp } from "../_shared/edgeRateLimit.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const FROM_EMAIL     = "Smart Door <noreply@mysmartdoor.in>";
+
+// Phase 4 hardening — same rationale as send-sms/send-whatsapp: this
+// function is --no-verify-jwt with no other auth gate, so it needs its
+// own limits to avoid becoming a free spam/cost-abuse relay.
+const PER_EMAIL_WINDOW_MS = 10 * 60_000;
+const PER_EMAIL_MAX       = 5;
+const PER_IP_WINDOW_MS    = 60_000;
+const PER_IP_MAX          = 20;
 
 // ────────── EMAIL TEMPLATES ──────────
 function getEmailContent(template: string, toName: string, data: Record<string, string>) {
@@ -98,6 +107,14 @@ serve(async (req) => {
 
     if (!template || !to) {
       return Response.json({ success: false, message: "template and to required." }, { status: 400, headers: corsHeaders });
+    }
+
+    const ip = callerIp(req);
+    if (!allowEdgeRequest(`send-email:ip:${ip}`, PER_IP_WINDOW_MS, PER_IP_MAX)) {
+      return Response.json({ success: false, message: "Too many requests. Please try again shortly." }, { status: 429, headers: { ...corsHeaders, "Retry-After": "60" } });
+    }
+    if (!allowEdgeRequest(`send-email:to:${String(to).toLowerCase()}`, PER_EMAIL_WINDOW_MS, PER_EMAIL_MAX)) {
+      return Response.json({ success: false, message: "Too many emails sent to this address recently." }, { status: 429, headers: { ...corsHeaders, "Retry-After": "300" } });
     }
 
     const content = getEmailContent(template, to_name || "Customer", data);
