@@ -1732,3 +1732,116 @@ body {
 @media (max-width: 480px) {
   .ac-drawer-panel { max-width: 100%; }
 }
+
+/* ═══════════════════════════════════════════════════════
+   Visitor Management Upgrade (Phase 9) — additive only.
+   Avatars, favorites, smart badges, quick actions, blocked
+   state, and the Visitor Insights dashboard card. Reuses
+   .op-mini-stat / .op-chip / .ac-row / .skeleton — does not
+   override any existing selector.
+   ═══════════════════════════════════════════════════════ */
+
+.ac-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ac-avatar-fallback {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 800;
+}
+
+.ac-avatar-edit-btn {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #00A2E8;
+  border: 2px solid #0A1828;
+  color: #fff;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.ac-avatar-edit-btn:active { transform: scale(0.92); }
+
+.ac-fav-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.3);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.ac-fav-star:active { transform: scale(0.85); }
+.ac-fav-star-lg { font-size: 1.3rem; }
+.ac-fav-star.ac-fav-star-active { color: #F5C518; }
+
+.ac-mini-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.ac-mini-badge-new       { background: rgba(0,162,232,0.12); border-color: rgba(0,162,232,0.35); color: #00A2E8; }
+.ac-mini-badge-repeat    { background: rgba(34,197,94,0.1);  border-color: rgba(34,197,94,0.3);  color: #4ADE80; }
+.ac-mini-badge-regular   { background: rgba(201,162,75,0.14); border-color: rgba(201,162,75,0.4); color: #E8C874; }
+.ac-mini-badge-blocked   { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.35); color: #F87171; }
+
+.ac-row-blocked { opacity: 0.55; }
+
+.ac-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ac-quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.75);
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.ac-quick-action-btn span {
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  color: rgba(255,255,255,0.55);
+}
+
+.ac-quick-action-btn:active { transform: scale(0.95); }
+.ac-quick-action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
+.ac-quick-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.ac-quick-action-danger span { color: rgba(248,113,113,0.7); }
+.ac-quick-action-danger { color: #F87171; }
+.ac-quick-action-danger-active { background: rgba(34,197,94,0.1); border-color: rgba(34,197,94,0.3); color: #4ADE80; }
+.ac-quick-action-danger-active span { color: rgba(74,222,128,0.8); }
+
