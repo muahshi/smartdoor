@@ -25,7 +25,7 @@ import { supabase } from './supabase.js';
  * @param {number} [params.pageSize]
  * @returns {Promise<{success:boolean, rows:Array, totalCount:number, error?:string}>}
  */
-export async function getActivityFeed({ ownerId, search = null, dateRange = 'all', status = 'all', page = 1, pageSize = 20 }) {
+export async function getActivityFeed({ ownerId, search = null, dateRange = 'all', status = 'all', page = 1, pageSize = 20, label = 'all' }) {
   if (!ownerId) return { success: false, rows: [], totalCount: 0, error: 'Missing owner id' };
   try {
     const offset = Math.max(0, (page - 1) * pageSize);
@@ -36,6 +36,7 @@ export async function getActivityFeed({ ownerId, search = null, dateRange = 'all
       p_status: status,
       p_limit: pageSize,
       p_offset: offset,
+      p_label: label,
     });
     if (error) {
       console.error('[ActivityCenter] getActivityFeed failed:', error);
@@ -106,7 +107,7 @@ export async function getVisitorProfileSummary(ownerId, visitorProfileId, { limi
  * @param {object} params
  * @param {boolean} [params.clearLabel] pass true to remove an existing label
  */
-export async function saveVisitorNoteAndLabel({ ownerId, visitorProfileId, notes = null, label = null, labelColor = null, clearLabel = false }) {
+export async function saveVisitorNoteAndLabel({ ownerId, visitorProfileId, notes = null, label = null, labelColor = null, clearLabel = false, photoUrl = null }) {
   if (!ownerId || !visitorProfileId) return { success: false, error: 'Missing ids' };
   try {
     const { data, error } = await supabase.rpc('update_visitor_notes_and_label', {
@@ -116,6 +117,7 @@ export async function saveVisitorNoteAndLabel({ ownerId, visitorProfileId, notes
       p_label: label,
       p_label_color: labelColor,
       p_clear_label: clearLabel,
+      p_photo_url: photoUrl,
     });
     if (error || !data) {
       console.error('[ActivityCenter] saveVisitorNoteAndLabel failed:', error);
@@ -125,6 +127,111 @@ export async function saveVisitorNoteAndLabel({ ownerId, visitorProfileId, notes
   } catch (err) {
     console.error('[ActivityCenter] saveVisitorNoteAndLabel threw:', err);
     return { success: false, error: String(err) };
+  }
+}
+
+/**
+ * Star / unstar a visitor for quick recognition and the Favorites filter.
+ */
+export async function toggleVisitorFavorite(ownerId, visitorProfileId, favorite) {
+  if (!ownerId || !visitorProfileId) return { success: false, error: 'Missing ids' };
+  try {
+    const { data, error } = await supabase.rpc('toggle_visitor_favorite', {
+      p_owner_id: ownerId,
+      p_visitor_profile_id: visitorProfileId,
+      p_favorite: !!favorite,
+    });
+    if (error || !data) {
+      console.error('[ActivityCenter] toggleVisitorFavorite failed:', error);
+      return { success: false, error: error?.message || 'Unknown error' };
+    }
+    return data;
+  } catch (err) {
+    console.error('[ActivityCenter] toggleVisitorFavorite threw:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+/**
+ * Block / unblock a visitor. Management tag only — does not affect call
+ * routing or signaling.
+ */
+export async function setVisitorBlocked(ownerId, visitorProfileId, blocked) {
+  if (!ownerId || !visitorProfileId) return { success: false, error: 'Missing ids' };
+  try {
+    const { data, error } = await supabase.rpc('set_visitor_blocked', {
+      p_owner_id: ownerId,
+      p_visitor_profile_id: visitorProfileId,
+      p_blocked: !!blocked,
+    });
+    if (error || !data) {
+      console.error('[ActivityCenter] setVisitorBlocked failed:', error);
+      return { success: false, error: error?.message || 'Unknown error' };
+    }
+    return data;
+  } catch (err) {
+    console.error('[ActivityCenter] setVisitorBlocked threw:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+const VISITOR_PHOTO_BUCKET = 'visitor-photos';
+
+/**
+ * Uploads a visitor profile photo to the visitor-photos storage bucket and
+ * saves the resulting public URL onto the visitor profile in one step.
+ * @param {object} params
+ * @param {File|Blob} params.file
+ * @returns {Promise<{success:boolean, photoUrl?:string, error?:string}>}
+ */
+export async function uploadVisitorPhoto({ ownerId, visitorProfileId, file }) {
+  if (!ownerId || !visitorProfileId || !file) return { success: false, error: 'Missing ownerId, visitorProfileId, or file' };
+  try {
+    const ext = (file.type && file.type.includes('png')) ? 'png' : (file.type && file.type.includes('webp')) ? 'webp' : 'jpg';
+    const path = `${ownerId}/${visitorProfileId}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from(VISITOR_PHOTO_BUCKET)
+      .upload(path, file, { contentType: file.type || 'image/jpeg', upsert: true });
+    if (uploadError) {
+      console.error('[ActivityCenter] uploadVisitorPhoto upload failed:', uploadError);
+      return { success: false, error: uploadError.message };
+    }
+    const { data: urlData } = supabase.storage.from(VISITOR_PHOTO_BUCKET).getPublicUrl(path);
+    const photoUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+    const saveRes = await saveVisitorNoteAndLabel({ ownerId, visitorProfileId, photoUrl });
+    if (!saveRes.success) return { success: false, error: saveRes.error || 'Could not save photo' };
+    return { success: true, photoUrl };
+  } catch (err) {
+    console.error('[ActivityCenter] uploadVisitorPhoto threw:', err);
+    return { success: false, error: String(err) };
+  }
+}
+
+/**
+ * Peak visiting hours (24-bucket histogram, last 30 days), top 5 most
+ * frequent visitors, and repeat-vs-new visitor ratio, for the dashboard's
+ * "Visitor Insights" card.
+ */
+export async function getVisitorInsights(ownerId) {
+  const empty = { hourlyHistogram: new Array(24).fill(0), topVisitors: [], totalUnique: 0, repeatUnique: 0, repeatPct: 0, newThisWeek: 0 };
+  if (!ownerId) return empty;
+  try {
+    const { data, error } = await supabase.rpc('get_owner_visitor_insights', { p_owner_id: ownerId });
+    if (error || !data) {
+      console.error('[ActivityCenter] getVisitorInsights failed:', error);
+      return empty;
+    }
+    return {
+      hourlyHistogram: (data.hourly_histogram || []).length ? data.hourly_histogram : empty.hourlyHistogram,
+      topVisitors: data.top_visitors || [],
+      totalUnique: data.total_unique || 0,
+      repeatUnique: data.repeat_unique || 0,
+      repeatPct: data.repeat_pct || 0,
+      newThisWeek: data.new_this_week || 0,
+    };
+  } catch (err) {
+    console.error('[ActivityCenter] getVisitorInsights threw:', err);
+    return empty;
   }
 }
 
@@ -153,4 +260,8 @@ export default {
   getVisitorProfileSummary,
   saveVisitorNoteAndLabel,
   subscribeToActivityFeed,
+  toggleVisitorFavorite,
+  setVisitorBlocked,
+  uploadVisitorPhoto,
+  getVisitorInsights,
 };
