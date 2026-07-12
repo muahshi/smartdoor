@@ -20,7 +20,10 @@
  * still references it.
  */
 
-import { getActivityFeed, getActivityStats, getVisitorProfileSummary, saveVisitorNoteAndLabel, subscribeToActivityFeed } from '../services/activityCenter.js';
+import {
+  getActivityFeed, getActivityStats, getVisitorProfileSummary, saveVisitorNoteAndLabel, subscribeToActivityFeed,
+  toggleVisitorFavorite, setVisitorBlocked, uploadVisitorPhoto, getVisitorInsights,
+} from '../services/activityCenter.js';
 
 const ActivityCenter = (() => {
   const PAGE_SIZE = 20;
@@ -32,11 +35,16 @@ const ActivityCenter = (() => {
   let search = '';
   let dateRange = 'all';
   let status = 'all';
+  let labelFilter = 'all';
   let page = 1;
   let rows = [];
   let totalCount = 0;
   let loading = false;
   let searchDebounceTimer = null;
+
+  // Visitor Insights (dashboard card) state
+  let insightsInitTries = 0;
+  let insightsRealtimeUnsub = null;
 
   // Drawer state
   let drawerProfileId = null;
@@ -53,12 +61,21 @@ const ActivityCenter = (() => {
   const DEFAULT_STATUS_STYLE = { color: 'rgba(255,255,255,0.35)', label: 'Visit', icon: '🔔' };
 
   const LABEL_PRESETS = [
+    { name: 'Trusted',  color: '#22C55E' },
     { name: 'Family',   color: '#22C55E' },
     { name: 'Delivery', color: '#00A2E8' },
     { name: 'Courier',  color: '#A855F7' },
     { name: 'Guest',    color: '#C9A24B' },
     { name: 'Office',   color: '#F59E0B' },
     { name: 'Unknown',  color: 'rgba(255,255,255,0.4)' },
+  ];
+
+  // Quick "Type" filter chips shown in the feed — reuses the same label
+  // values as LABEL_PRESETS, plus two virtual filters (Favorites/Blocked)
+  // resolved server-side in get_owner_activity_feed's p_label param.
+  const TYPE_FILTER_CHIPS = [
+    ['all', 'All'], ['favorites', '★ Favorites'], ['Trusted', 'Trusted'], ['Family', 'Family'],
+    ['Delivery', 'Delivery'], ['Office', 'Office'], ['blocked', '🚫 Blocked'],
   ];
 
   // ────────── helpers ──────────
@@ -111,6 +128,60 @@ const ActivityCenter = (() => {
     return `<span class="ac-network-chip">${icon} ${_esc(networkType)}</span>`;
   }
 
+  const _AVATAR_PALETTE = ['#00A2E8', '#22C55E', '#A855F7', '#F59E0B', '#EF4444', '#C9A24B', '#0078D7'];
+
+  function _initials(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+  }
+
+  function _avatarColor(seed) {
+    let h = 0;
+    const s = String(seed || '');
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return _AVATAR_PALETTE[h % _AVATAR_PALETTE.length];
+  }
+
+  function _avatarHtml(name, photoUrl, size = 40) {
+    if (photoUrl) {
+      return `<img src="${_esc(photoUrl)}" alt="${_esc(name || 'Visitor')}" class="ac-avatar" style="width:${size}px;height:${size}px;" loading="lazy" />`;
+    }
+    const color = _avatarColor(name || 'Unknown');
+    return `<div class="ac-avatar ac-avatar-fallback" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.38)}px;background:${color}26;color:${color};">${_esc(_initials(name))}</div>`;
+  }
+
+  function _favStarHtml(profileId, isFavorite, size = 'sm') {
+    if (!profileId) return '';
+    return `<button type="button" class="ac-fav-star ${isFavorite ? 'ac-fav-star-active' : ''} ac-fav-star-${size}"
+      aria-label="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}"
+      onclick="event.stopPropagation();ActivityCenter.toggleFavoriteFromRow('${profileId}', ${!isFavorite})">${isFavorite ? '★' : '☆'}</button>`;
+  }
+
+  function _visitBadgeHtml(visitCount) {
+    const n = Number(visitCount) || 1;
+    if (n <= 1) return `<span class="ac-mini-badge ac-mini-badge-new">🆕 New</span>`;
+    if (n >= 5) return `<span class="ac-mini-badge ac-mini-badge-regular">🔁 Regular · ${n}×</span>`;
+    return `<span class="ac-mini-badge ac-mini-badge-repeat">🔁 Repeat · ${n}×</span>`;
+  }
+
+  function _blockedBadgeHtml(blocked) {
+    return blocked ? `<span class="ac-mini-badge ac-mini-badge-blocked">🚫 Blocked</span>` : '';
+  }
+
+  function _skeletonRows(count = 5) {
+    return Array.from({ length: count }).map(() => `
+      <div class="ac-row" style="cursor:default;">
+        <div class="skeleton" style="width:40px;height:40px;border-radius:50%;flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="skeleton skeleton-text" style="width:55%;"></div>
+          <div class="skeleton skeleton-text" style="width:75%;height:9px;"></div>
+          <div class="skeleton skeleton-text" style="width:40%;height:9px;margin-bottom:0;"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
   // ────────── shell ──────────
 
   function _renderShell() {
@@ -142,6 +213,9 @@ const ActivityCenter = (() => {
         <div class="os-eyebrow" style="margin:10px 0 6px;">Status</div>
         <div id="ac-status-chips" class="ac-chip-row"></div>
 
+        <div class="os-eyebrow" style="margin:10px 0 6px;">Type</div>
+        <div id="ac-label-chips" class="ac-chip-row"></div>
+
         <div id="ac-result-count" style="font-size:0.68rem;color:rgba(255,255,255,0.35);margin:12px 0 6px;"></div>
         <div id="ac-feed-list"></div>
         <div id="ac-load-more-wrap" style="text-align:center;margin-top:10px;"></div>
@@ -163,6 +237,7 @@ const ActivityCenter = (() => {
     ];
     const dateEl = document.getElementById('ac-date-chips');
     const statusEl = document.getElementById('ac-status-chips');
+    const labelEl = document.getElementById('ac-label-chips');
     if (dateEl) {
       dateEl.innerHTML = dateChips.map(([val, label]) => `
         <div class="op-chip ${dateRange === val ? 'op-chip-active' : ''}" data-date-range="${val}" onclick="ActivityCenter.setDateRange('${val}')">${label}</div>
@@ -171,6 +246,11 @@ const ActivityCenter = (() => {
     if (statusEl) {
       statusEl.innerHTML = statusChips.map(([val, label]) => `
         <div class="op-chip ${status === val ? 'op-chip-active' : ''}" data-status="${val}" onclick="ActivityCenter.setStatus('${val}')">${label}</div>
+      `).join('');
+    }
+    if (labelEl) {
+      labelEl.innerHTML = TYPE_FILTER_CHIPS.map(([val, label]) => `
+        <div class="op-chip ${labelFilter === val ? 'op-chip-active' : ''}" data-label-filter="${val}" onclick="ActivityCenter.setLabelFilter('${val}')">${label}</div>
       `).join('');
     }
   }
@@ -254,6 +334,12 @@ const ActivityCenter = (() => {
     _loadFeed(true);
   }
 
+  function setLabelFilter(val) {
+    labelFilter = val;
+    _renderChips();
+    _loadFeed(true);
+  }
+
   async function _loadFeed(reset) {
     if (reset) page = 1;
     const oid = _ownerId();
@@ -262,10 +348,10 @@ const ActivityCenter = (() => {
 
     const listEl = document.getElementById('ac-feed-list');
     if (reset && listEl) {
-      listEl.innerHTML = `<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,0.35);font-size:0.82rem;">Loading…</div>`;
+      listEl.innerHTML = _skeletonRows(5);
     }
 
-    const res = await getActivityFeed({ ownerId: oid, search: search || null, dateRange, status, page, pageSize: PAGE_SIZE });
+    const res = await getActivityFeed({ ownerId: oid, search: search || null, dateRange, status, page, pageSize: PAGE_SIZE, label: labelFilter });
     loading = false;
 
     if (!res.success) {
@@ -287,7 +373,13 @@ const ActivityCenter = (() => {
     if (countEl) countEl.textContent = totalCount ? `${totalCount} visit${totalCount === 1 ? '' : 's'} found` : '';
 
     if (!rows.length) {
-      listEl.innerHTML = `<div style="text-align:center;padding:40px 12px;color:rgba(255,255,255,0.3);font-size:0.85rem;">No visitor activity found${search ? ` for "${_esc(search)}"` : ''}.</div>`;
+      const hasFilters = !!search || dateRange !== 'all' || status !== 'all' || labelFilter !== 'all';
+      listEl.innerHTML = `
+        <div style="text-align:center;padding:44px 16px;color:rgba(255,255,255,0.3);">
+          <div style="font-size:1.8rem;margin-bottom:8px;">${hasFilters ? '🔍' : '📭'}</div>
+          <div style="font-size:0.85rem;color:rgba(255,255,255,0.4);">${hasFilters ? `No visits match these filters${search ? ` for "${_esc(search)}"` : ''}.` : 'No visitor activity yet.'}</div>
+          ${hasFilters ? `<div style="font-size:0.72rem;margin-top:6px;color:rgba(255,255,255,0.25);">Try clearing a filter above.</div>` : `<div style="font-size:0.72rem;margin-top:6px;color:rgba(255,255,255,0.25);">Visits will appear here as soon as someone taps your Smart Door.</div>`}
+        </div>`;
       if (moreWrap) moreWrap.innerHTML = '';
       return;
     }
@@ -295,19 +387,23 @@ const ActivityCenter = (() => {
     listEl.innerHTML = rows.map((r) => {
       const st = _statusStyle(r.call_status);
       const name = r.visitor_name || 'Unknown Visitor';
+      const blocked = !!r.blocked;
       return `
-        <div class="ac-row" onclick="ActivityCenter.openDrawer('${r.visitor_profile_id}')">
-          <div class="ac-row-dot" style="background:${st.color};box-shadow:0 0 6px ${st.color}80;"></div>
+        <div class="ac-row ${blocked ? 'ac-row-blocked' : ''}" onclick="ActivityCenter.openDrawer('${r.visitor_profile_id}')">
+          ${_avatarHtml(name, r.photo_url, 40)}
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <span class="ac-row-name">${_esc(name)}</span>
+              ${_favStarHtml(r.visitor_profile_id, r.is_favorite)}
               ${_labelChip(r.label, r.label_color)}
+              ${_blockedBadgeHtml(blocked)}
             </div>
             <div class="ac-row-meta">
               ${r.phone ? `📞 ${_esc(r.phone)}` : ''}${r.plate_id ? ` · 🏷️ ${_esc(r.plate_id)}` : ''}
             </div>
-            <div class="ac-row-meta">
-              ${_formatDate(r.created_at)} · ${_formatTime(r.created_at)}${r.duration ? ` · ${_formatDuration(r.duration)}` : ''}
+            <div class="ac-row-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span>${_formatDate(r.created_at)} · ${_formatTime(r.created_at)}${r.duration ? ` · ${_formatDuration(r.duration)}` : ''}</span>
+              ${_visitBadgeHtml(r.visit_count)}
             </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
@@ -359,7 +455,14 @@ const ActivityCenter = (() => {
     const overlay = document.getElementById('ac-drawer-overlay');
     overlay.classList.add('ac-drawer-open');
     const body = document.getElementById('ac-drawer-body');
-    body.innerHTML = `<div style="text-align:center;padding:30px 0;color:rgba(255,255,255,0.35);font-size:0.82rem;">Loading…</div>`;
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:14px;">
+        <div class="skeleton" style="width:64px;height:64px;border-radius:50%;margin:0 auto 10px;"></div>
+        <div class="skeleton skeleton-text" style="width:50%;margin:0 auto 6px;"></div>
+        <div class="skeleton skeleton-text" style="width:35%;margin:0 auto;"></div>
+      </div>
+      <div class="skeleton skeleton-card" style="margin-bottom:14px;"></div>
+      <div class="skeleton skeleton-card"></div>`;
 
     drawerData = await getVisitorProfileSummary(oid, visitorProfileId);
     _renderDrawerBody();
@@ -403,11 +506,34 @@ const ActivityCenter = (() => {
         </div>`;
     }).join('') || `<div style="text-align:center;padding:20px 0;color:rgba(255,255,255,0.3);font-size:0.8rem;">No visits recorded yet.</div>`;
 
+    const phoneDigits = String(d.phone || '').replace(/\D/g, '');
+    const waHref = phoneDigits ? `https://wa.me/91${phoneDigits.slice(-10)}` : null;
+    const telHref = phoneDigits ? `tel:${phoneDigits.slice(-10)}` : null;
+
     body.innerHTML = `
       <div style="text-align:center;margin-bottom:14px;">
-        <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;">${_esc(d.name || 'Unknown Visitor')}</div>
+        <div style="position:relative;display:inline-block;">
+          ${_avatarHtml(d.name, d.photo_url, 72)}
+          <button type="button" class="ac-avatar-edit-btn" title="Change photo" onclick="ActivityCenter.triggerPhotoUpload()">📷</button>
+          <input type="file" id="ac-photo-input" accept="image/png,image/jpeg,image/webp" style="display:none;" onchange="ActivityCenter.onPhotoSelected(event)" />
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;">${_esc(d.name || 'Unknown Visitor')}</div>
+          ${_favStarHtml(d.id, !!d.is_favorite, 'lg')}
+        </div>
         <div style="font-size:0.78rem;color:rgba(255,255,255,0.4);margin-top:2px;">📞 ${_esc(d.phone || '—')}</div>
-        <div style="margin-top:8px;">${currentLabel ? _labelChip(currentLabel, currentColor) : ''}</div>
+        <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;">
+          ${currentLabel ? _labelChip(currentLabel, currentColor) : ''}
+          ${_visitBadgeHtml(d.visit_count)}
+          ${_blockedBadgeHtml(!!d.blocked)}
+        </div>
+
+        <div class="ac-quick-actions">
+          <button type="button" class="ac-quick-action-btn" ${telHref ? `onclick="window.location.href='${telHref}'"` : 'disabled'}>📞<span>Call</span></button>
+          <button type="button" class="ac-quick-action-btn" ${waHref ? `onclick="window.open('${waHref}','_blank')"` : 'disabled'}>💬<span>WhatsApp</span></button>
+          <button type="button" class="ac-quick-action-btn" ${phoneDigits ? `onclick="ActivityCenter.copyVisitorPhone('${phoneDigits.slice(-10)}')"` : 'disabled'}>📋<span>Copy</span></button>
+          <button type="button" class="ac-quick-action-btn ${d.blocked ? 'ac-quick-action-danger-active' : 'ac-quick-action-danger'}" onclick="ActivityCenter.toggleBlockedDrawer(${!d.blocked})">${d.blocked ? '✅' : '🚫'}<span>${d.blocked ? 'Unblock' : 'Block'}</span></button>
+        </div>
       </div>
 
       <div class="ac-stat-grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
@@ -435,6 +561,93 @@ const ActivityCenter = (() => {
       <div class="os-eyebrow" style="margin:18px 0 8px;">Full Timeline</div>
       <div>${timelineHtml}</div>
     `;
+  }
+
+  // ────────── favorites / blocked / photo ──────────
+
+  async function toggleFavoriteFromRow(profileId, nextFavorite) {
+    const oid = _ownerId();
+    if (!oid || !profileId) return;
+    const row = rows.find((r) => String(r.visitor_profile_id) === String(profileId));
+    if (row) row.is_favorite = nextFavorite; // optimistic
+    _renderFeedList();
+    const res = await toggleVisitorFavorite(oid, profileId, nextFavorite);
+    if (!res.success) {
+      if (row) row.is_favorite = !nextFavorite;
+      _renderFeedList();
+      _toast('Could not update favorite — try again.', 'danger');
+    } else {
+      _toast(nextFavorite ? 'Added to favorites' : 'Removed from favorites', 'success');
+    }
+  }
+
+  async function toggleFavoriteDrawer(nextFavorite) {
+    const oid = _ownerId();
+    if (!oid || !drawerProfileId) return;
+    const res = await toggleVisitorFavorite(oid, drawerProfileId, nextFavorite);
+    if (res.success) {
+      if (drawerData) drawerData.is_favorite = nextFavorite;
+      _renderDrawerBody();
+      const row = rows.find((r) => String(r.visitor_profile_id) === String(drawerProfileId));
+      if (row) { row.is_favorite = nextFavorite; _renderFeedList(); }
+    } else {
+      _toast('Could not update favorite — try again.', 'danger');
+    }
+  }
+
+  async function toggleBlockedDrawer(nextBlocked) {
+    const oid = _ownerId();
+    if (!oid || !drawerProfileId) return;
+    if (nextBlocked && !confirm('Block this visitor? You can unblock them anytime from their profile.')) return;
+    const res = await setVisitorBlocked(oid, drawerProfileId, nextBlocked);
+    if (res.success) {
+      if (drawerData) drawerData.blocked = nextBlocked;
+      _renderDrawerBody();
+      const row = rows.find((r) => String(r.visitor_profile_id) === String(drawerProfileId));
+      if (row) { row.blocked = nextBlocked; _renderFeedList(); }
+      _toast(nextBlocked ? 'Visitor blocked' : 'Visitor unblocked', nextBlocked ? 'warning' : 'success');
+    } else {
+      _toast('Could not update — try again.', 'danger');
+    }
+  }
+
+  function copyVisitorPhone(phone) {
+    if (!phone) return;
+    const done = () => _toast('Phone number copied', 'success');
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(phone).then(done).catch(() => _toast('Could not copy number', 'danger'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = phone;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch { _toast('Could not copy number', 'danger'); }
+      ta.remove();
+    }
+  }
+
+  function triggerPhotoUpload() {
+    document.getElementById('ac-photo-input')?.click();
+  }
+
+  async function onPhotoSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const oid = _ownerId();
+    if (!oid || !drawerProfileId) return;
+    if (file.size > 5 * 1024 * 1024) { _toast('Photo must be under 5 MB', 'danger'); return; }
+    _toast('Uploading photo…', 'info');
+    const res = await uploadVisitorPhoto({ ownerId: oid, visitorProfileId: drawerProfileId, file });
+    if (res.success) {
+      if (drawerData) drawerData.photo_url = res.photoUrl;
+      _renderDrawerBody();
+      const row = rows.find((r) => String(r.visitor_profile_id) === String(drawerProfileId));
+      if (row) { row.photo_url = res.photoUrl; _renderFeedList(); }
+      _toast('Photo updated', 'success');
+    } else {
+      _toast('Could not upload photo — try again.', 'danger');
+    }
   }
 
   async function saveNotes() {
@@ -569,6 +782,103 @@ const ActivityCenter = (() => {
     win.document.close();
   }
 
+  // ────────── Visitor Insights (dashboard card) ──────────
+
+  function _insightsSkeleton() {
+    return `
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <div class="skeleton" style="flex:1;height:52px;border-radius:10px;"></div>
+        <div class="skeleton" style="flex:1;height:52px;border-radius:10px;"></div>
+        <div class="skeleton" style="flex:1;height:52px;border-radius:10px;"></div>
+      </div>
+      <div class="skeleton skeleton-text" style="width:40%;"></div>
+      <div class="skeleton" style="height:60px;border-radius:8px;margin-bottom:10px;"></div>
+      <div class="skeleton skeleton-text" style="width:50%;"></div>
+      <div class="skeleton skeleton-card" style="height:52px;margin-bottom:6px;"></div>
+      <div class="skeleton skeleton-card" style="height:52px;"></div>`;
+  }
+
+  function _peakHoursHtml(hourly) {
+    const max = Math.max(...hourly, 1);
+    // Collapse 24 hourly buckets into 12 two-hour bars for a compact, legible chart.
+    const bars = [];
+    for (let i = 0; i < 24; i += 2) bars.push((hourly[i] || 0) + (hourly[i + 1] || 0));
+    const barMax = Math.max(...bars, 1);
+    const peakIdx = bars.indexOf(Math.max(...bars));
+    const peakLabel = bars[peakIdx] > 0 ? `${peakIdx * 2}:00–${peakIdx * 2 + 2}:00` : null;
+    return `
+      <div style="display:flex;align-items:flex-end;gap:3px;height:56px;margin-bottom:6px;">
+        ${bars.map((v, i) => {
+          const h = Math.max(4, (v / barMax) * 100);
+          const isPeak = i === peakIdx && v > 0;
+          return `<div class="tooltip" style="flex:1;height:100%;display:flex;align-items:flex-end;">
+            <div style="width:100%;height:${h}%;min-height:4px;border-radius:3px 3px 1px 1px;
+              background:${isPeak ? 'linear-gradient(180deg,#00D4FF,#0078D7)' : 'rgba(0,162,232,0.22)'};"></div>
+            <span class="tooltip-text">${i * 2}:00 · ${v} visits</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:0.68rem;color:rgba(255,255,255,0.4);">${peakLabel ? `⏰ Peak hours: <strong style="color:#fff;">${peakLabel}</strong>` : 'Not enough activity yet to spot a peak.'}</div>`;
+  }
+
+  function _topVisitorsHtml(topVisitors) {
+    if (!topVisitors.length) {
+      return `<div style="text-align:center;padding:14px 0;color:rgba(255,255,255,0.3);font-size:0.78rem;">No repeat visitors yet — they'll show up here once someone visits twice.</div>`;
+    }
+    return topVisitors.map((v) => `
+      <div class="ac-row" style="padding:8px 6px;" onclick="ActivityCenter.open();setTimeout(()=>ActivityCenter.openDrawer('${v.visitor_profile_id}'),150);">
+        ${_avatarHtml(v.name, v.photo_url, 32)}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="ac-row-name" style="font-size:0.8rem;">${_esc(v.name)}</span>
+            ${v.is_favorite ? '<span style="color:#F5C518;font-size:0.75rem;">★</span>' : ''}
+            ${_labelChip(v.label, v.label_color)}
+          </div>
+          <div class="ac-row-meta">${v.phone ? `📞 ${_esc(v.phone)}` : ''}</div>
+        </div>
+        <span class="ac-mini-badge ac-mini-badge-repeat" style="flex-shrink:0;">${v.visit_count}× visits</span>
+      </div>`).join('');
+  }
+
+  async function _renderInsightsInto(oid) {
+    const els = document.querySelectorAll('#visitor-insights-card');
+    if (!els.length) return;
+    els.forEach((el) => { if (!el.dataset.acLoaded) el.innerHTML = _insightsSkeleton(); });
+
+    const data = await getVisitorInsights(oid);
+    const html = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+        <div class="op-mini-stat"><div class="op-mini-stat-label">👥 Unique Visitors</div><div class="op-mini-stat-value">${data.totalUnique}</div></div>
+        <div class="op-mini-stat"><div class="op-mini-stat-label">🔁 Repeat Rate</div><div class="op-mini-stat-value" style="color:#22C55E;">${data.repeatPct}%</div></div>
+        <div class="op-mini-stat"><div class="op-mini-stat-label">🆕 New (7d)</div><div class="op-mini-stat-value" style="color:#00A2E8;">${data.newThisWeek}</div></div>
+      </div>
+      <div class="os-eyebrow" style="margin-bottom:6px;">Peak Visitor Hours <span style="font-weight:400;color:rgba(255,255,255,0.3);">· Last 30 days</span></div>
+      ${_peakHoursHtml(data.hourlyHistogram)}
+      <div class="os-eyebrow" style="margin:14px 0 6px;">Most Frequent Visitors</div>
+      ${_topVisitorsHtml(data.topVisitors)}
+    `;
+    els.forEach((el) => { el.innerHTML = html; el.dataset.acLoaded = '1'; });
+  }
+
+  function renderDashboardInsights() {
+    const oid = _ownerId();
+    if (!oid) return;
+    _renderInsightsInto(oid);
+    if (!insightsRealtimeUnsub) {
+      insightsRealtimeUnsub = subscribeToActivityFeed(oid, () => _renderInsightsInto(oid));
+    }
+  }
+
+  function _pollForInsightsInit() {
+    const els = document.querySelectorAll('#visitor-insights-card');
+    if (!els.length) return; // no such card on this page — nothing to do
+    const oid = _ownerId();
+    if (oid) { renderDashboardInsights(); return; }
+    insightsInitTries += 1;
+    if (insightsInitTries > 40) return; // ~20s of polling, then give up quietly
+    setTimeout(_pollForInsightsInit, 500);
+  }
+
   // ────────── init ──────────
 
   function init() {
@@ -577,15 +887,19 @@ const ActivityCenter = (() => {
       const wrap = e.target.closest?.('.ac-export-wrap');
       if (menu && !wrap) menu.style.display = 'none';
     });
+    _pollForInsightsInit();
   }
 
   document.addEventListener('DOMContentLoaded', init);
 
   return {
     open, close,
-    onSearchInput, setDateRange, setStatus, loadMore,
+    onSearchInput, setDateRange, setStatus, setLabelFilter, loadMore,
     openDrawer, closeDrawer, saveNotes, setLabel, promptCustomLabel, clearLabel,
     toggleExportMenu, exportCSV, exportPDF,
+    toggleFavoriteFromRow, toggleFavoriteDrawer, toggleBlockedDrawer, copyVisitorPhone,
+    triggerPhotoUpload, onPhotoSelected,
+    renderDashboardInsights,
   };
 })();
 
