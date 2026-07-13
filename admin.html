@@ -1047,6 +1047,24 @@
           </tbody>
         </table>
       </div>
+
+      <!-- ══ SaaS Launch: Invoices & Refunds (Admin Controls) ══ -->
+      <div class="section-header" style="margin-top:28px;">
+        <span class="section-title">📄 Invoices &amp; Refunds</span>
+        <button class="btn btn-ghost btn-sm" onclick="loadInvoicesAdmin()">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice #</th><th>Customer</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="invoicesTable">
+            <tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ══════════ SUPPORT PANEL ══════════ -->
@@ -1697,7 +1715,7 @@ function badgeHTML(s) {
 }
 function planBadge(p) {
   if (!p) return '<span class="badge badge-muted">—</span>';
-  return `<span class="badge badge-purple">${{smartdoor_care:'Care',hardware_only:'Hardware',premium:'Premium'}[p]||p}</span>`;
+  return `<span class="badge badge-purple">${{smartdoor_care:'Care',hardware_only:'Hardware',premium:'Premium',free:'Free',enterprise:'Enterprise'}[p]||p}</span>`;
 }
 function priorityBadge(p) {
   return `<span class="badge badge-${{critical:'danger',high:'warning',medium:'info',low:'muted'}[p]||'muted'}">${p||'—'}</span>`;
@@ -1845,7 +1863,7 @@ async function loadPanel(panelId) {
     case 'customers':     await loadCustomers(); break;
     case 'orders':        await loadOrders(); break;
     case 'manufacturing': await loadManufacturing(); break;
-    case 'subscriptions': await loadSubscriptions(); break;
+    case 'subscriptions': await loadSubscriptions(); await loadInvoicesAdmin(); break;
     case 'support':       await loadSupport(); break;
     case 'communication': await loadCommunication(); break;
     case 'analytics':     await loadAnalytics(); break;
@@ -2186,10 +2204,66 @@ async function loadSubscriptions(statusFilter) {
       <td>${badgeHTML(s.status)}</td>
       <td><div style="font-size:12px">${fmtDate(s.expiry_date)}</div><div style="font-size:10px;color:${ec}">${dl>0?dl+'d left':'Expired'}</div></td>
       <td style="font-weight:600;font-size:12px">${fmtMoney(s.renewal_price)}</td>
-      <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="extendSub('${s.id}')">Extend</button><button class="btn btn-danger btn-sm" onclick="cancelSub('${s.id}')">Cancel</button></div></td>
+      <td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-ghost btn-sm" onclick="extendSub('${s.id}')">Extend</button><button class="btn btn-ghost btn-sm" onclick="assignPlanAdmin('${s.owner_id}')">🎁 Assign Plan</button><button class="btn btn-ghost btn-sm" onclick="toggleSubEnabled('${s.id}','${s.status}')">${s.status==='suspended'?'✅ Enable':'⛔ Disable'}</button><button class="btn btn-danger btn-sm" onclick="cancelSub('${s.id}')">Cancel</button></div></td>
     </tr>`;
   }).join('');
 }
+window.assignPlanAdmin = async function(ownerId) {
+  const plan = prompt('Assign which plan? (free / premium / enterprise)', 'premium');
+  if (!plan || !['free','premium','enterprise'].includes(plan.trim())) { if(plan) showToast('Enter free, premium, or enterprise','error'); return; }
+  const cycle = prompt('Billing cycle? (monthly / yearly)', 'yearly') || 'yearly';
+  const notes = prompt('Notes (optional, e.g. reason for manual assignment)', '') || '';
+  const res = await adminCall('assign_plan', { owner_id: ownerId, plan_key: plan.trim(), billing_cycle: cycle.trim(), notes });
+  showToast(res.success ? `Assigned ${plan} plan` : 'Error: '+res.message, res.success?'success':'error');
+  if (res.success) loadSubscriptions();
+};
+window.toggleSubEnabled = async function(subId, currentStatus) {
+  const enabling = currentStatus === 'suspended';
+  if (!confirm(enabling ? 'Re-enable this subscription?' : 'Disable this subscription immediately?')) return;
+  const res = await adminCall('toggle_subscription_enabled', { sub_id: subId, enabled: enabling });
+  showToast(res.success ? (enabling?'Enabled':'Disabled') : 'Error: '+res.message, res.success?'success':'error');
+  if (res.success) loadSubscriptions();
+};
+
+// ── SaaS Launch: INVOICES & REFUNDS ──
+async function loadInvoicesAdmin() {
+  const tbody = document.getElementById('invoicesTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('invoice_list', { limit: 50 });
+  if (!res.success) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="text">Error: ${res.message}</div></div></td></tr>`; return; }
+  const invoices = res.invoices || [];
+  if (!invoices.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📄</div><div class="text">No invoices yet</div></div></td></tr>'; return; }
+  tbody.innerHTML = invoices.map(inv => {
+    const statusColor = inv.status==='paid'?'#22C55E':inv.status==='refunded'?'#94A3B8':inv.status==='failed'?'#EF4444':'#F59E0B';
+    return `<tr>
+      <td><span style="font-family:monospace;font-size:11px">${escapeHtml(inv.invoice_number)}</span></td>
+      <td><div style="font-weight:500;font-size:12px">${escapeHtml(inv.users?.full_name||'—')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(inv.users?.phone||'')}</div></td>
+      <td style="text-transform:capitalize;font-size:12px">${escapeHtml(inv.plan)} · ${escapeHtml(inv.billing_cycle)}</td>
+      <td style="font-weight:600;font-size:12px">${fmtMoney(inv.amount)}</td>
+      <td><span style="font-size:11px;font-weight:700;color:${statusColor};text-transform:capitalize">${escapeHtml(inv.status)}</span></td>
+      <td style="font-size:11px">${fmtDate(inv.created_at)}</td>
+      <td>${inv.status==='paid'?`<button class="btn btn-danger btn-sm" onclick="refundInvoiceAdmin('${inv.id}')">↩ Refund</button>`:'—'}</td>
+    </tr>`;
+  }).join('');
+}
+window.refundInvoiceAdmin = async function(invoiceId) {
+  if (!confirm('Refund this invoice via Razorpay? This also cancels the subscription it funded.')) return;
+  const s = getAdminSession();
+  try {
+    const res = await fetch(EDGE() + '/razorpay-refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s?.token || ''}` },
+      body: JSON.stringify({ invoice_id: invoiceId }),
+    });
+    const data = await res.json();
+    if (!data.success) { showToast('Refund error: '+data.message, 'error'); return; }
+    showToast('Refund initiated', 'success');
+    loadInvoicesAdmin();
+    loadSubscriptions();
+  } catch (err) {
+    showToast('Refund error: '+err.message, 'error');
+  }
+};
 window.filterSubs = function(status,el) {
   document.querySelectorAll('#panel-subscriptions .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
