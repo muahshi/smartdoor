@@ -43,6 +43,7 @@
 import { getLogs, formatLogForDisplay } from '../services/logs.js';
 import { getNotifications, markNotificationRead } from '../services/notifications.js';
 import { getAIInsights } from '../services/aiInsights.js';
+import { canUseFeature } from '../services/usageLimits.js';
 
 const OwnerPremium = (() => {
   let ownerId = null;
@@ -406,6 +407,23 @@ const OwnerPremium = (() => {
     const oid = _ownerId();
     const cards = document.querySelectorAll('#ai-insights-card');
     if (!oid || !cards.length) return;
+
+    // ── SaaS Launch: Feature Gating — AI Insights is a Premium/Enterprise
+    // feature. Free-plan owners see an upgrade prompt instead of the cards.
+    // Fails open (shows insights) if the plan lookup itself errors out, so
+    // a billing-infra hiccup never silently removes a feature someone paid for.
+    let aiAllowed = true;
+    try { aiAllowed = await canUseFeature(oid, 'aiFeaturesEnabled'); } catch (_e) { aiAllowed = true; }
+
+    if (!aiAllowed) {
+      const upgradeHtml = `
+        <div style="text-align:center;padding:18px 12px;border:1px dashed var(--brass-border,rgba(201,162,75,0.4));border-radius:10px;">
+          <div style="font-size:0.8rem;color:rgba(255,255,255,0.7);margin-bottom:10px;">🔒 AI Insights is a Premium feature.</div>
+          <button class="btn-primary" style="font-size:0.75rem;padding:8px 16px;" onclick="window.SubscriptionManager?.open()">Upgrade to unlock</button>
+        </div>`;
+      cards.forEach((c) => { c.innerHTML = upgradeHtml; });
+      return;
+    }
 
     const res = await getAIInsights(oid);
     const insights = res.success ? (res.insights || []) : [];
