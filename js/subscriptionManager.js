@@ -11,7 +11,7 @@
  * js/ownerPremium.js.
  */
 
-import { getSubscription } from '../services/subscriptions.js';
+import { getSubscription, isComplimentaryPremium } from '../services/subscriptions.js';
 import { getPlanCatalog, planFeatureList } from '../services/plans.js';
 import { getUsageSummary, formatUsageLine } from '../services/usageLimits.js';
 import { getInvoices, formatInvoiceStatus } from '../services/invoices.js';
@@ -105,14 +105,31 @@ const SubscriptionManager = (() => {
     const invoices = invoicesResult.status === 'fulfilled' && invoicesResult.value.success ? invoicesResult.value.invoices : [];
 
     const currentPlanKey = sub?.plan || 'free';
-    const normalizedCurrentKey = currentPlanKey === 'hardware_only' ? 'free' : currentPlanKey === 'smartdoor_care' ? 'premium' : currentPlanKey;
+    const normalizedCurrentKey = currentPlanKey === 'hardware_only'
+      ? (sub?.isExpired ? 'free' : 'premium')      // Premium Included, while active, behaves as Premium
+      : currentPlanKey === 'smartdoor_care' ? 'premium' : currentPlanKey;
 
     body.innerHTML = `
       ${_currentPlanCard(sub, usage)}
       ${_billingToggle()}
+      ${_renewalIntro(normalizedCurrentKey, sub)}
       ${_planCards(plans, normalizedCurrentKey)}
       ${_invoicesSection(invoices)}
     `;
+  }
+
+  // ────────── RENEWAL URGENCY (progressively stronger reminders) ──────────
+  // 30 → 15 → 7 → 3 → 1 days remaining. Purely presentational — does not
+  // gate any feature; used to color/word the "days remaining" reminder on
+  // the current-plan card as expiry approaches.
+  function _renewalUrgency(daysLeft) {
+    if (daysLeft === undefined || daysLeft === null) return null;
+    if (daysLeft <= 1)  return { label: daysLeft <= 0 ? 'Expires today' : '1 Day Remaining',  color: '#EF4444', bg: 'rgba(239,68,68,0.14)',  border: 'rgba(239,68,68,0.35)' };
+    if (daysLeft <= 3)  return { label: `${daysLeft} Days Remaining`, color: '#F87171', bg: 'rgba(239,68,68,0.10)',  border: 'rgba(239,68,68,0.25)' };
+    if (daysLeft <= 7)  return { label: `${daysLeft} Days Remaining`, color: '#F59E0B', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.25)' };
+    if (daysLeft <= 15) return { label: `${daysLeft} Days Remaining`, color: '#FBBF24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)'  };
+    if (daysLeft <= 30) return { label: `${daysLeft} Days Remaining`, color: 'var(--brass-bright,#E8C874)', bg: 'rgba(201,162,75,0.08)', border: 'rgba(201,162,75,0.25)' };
+    return null; // more than 30 days out — no reminder needed yet
   }
 
   function _bar(used, limit, label) {
@@ -130,36 +147,80 @@ const SubscriptionManager = (() => {
       </div>`;
   }
 
+  function _dateLabel(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
   function _currentPlanCard(sub, usage) {
-    const planName = usage?.planName || sub?.planName || 'Free';
-    const isFree = (usage?.plan || sub?.plan) === 'free' || (usage?.plan || sub?.plan) === 'hardware_only';
+    const planKey = usage?.plan || sub?.plan || 'free';
+    const isFree = planKey === 'free';
+    const isComplimentary = isComplimentaryPremium(planKey);
+    const planName = isComplimentary ? 'Premium Included' : (usage?.planName || sub?.planName || 'Free');
     const daysLeft = sub?.daysLeft;
     const cancelPending = sub?.cancel_at_period_end;
+    const urgency = !isFree ? _renewalUrgency(daysLeft) : null;
 
-    const usageBars = usage ? `
-      ${_bar(usage.calls?.used, usage.calls?.limit, 'Calls this month')}
-      ${_bar(usage.photos?.used, usage.photos?.limit, 'Photo uploads this month')}
-      ${_bar(usage.exports?.used, usage.exports?.limit, 'Exports this month')}
-      ${_bar(usage.family?.used, usage.family?.limit, 'Family members')}
-      ${_bar(usage.storage?.usedMb, usage.storage?.limitMb, 'Storage (MB)')}
-    ` : '<div style="font-size:0.8rem;color:rgba(255,255,255,0.4);">Usage data unavailable right now.</div>';
+    // ────────── Usage section ──────────
+    // During the complimentary Premium period (hardware_only, not yet
+    // expired), owners should never feel restricted or watched — no usage
+    // bars, no numbers approaching a limit. Show an elegant "benefits
+    // active" banner instead. Once expired (isExpired / moved to Free),
+    // fall through to the normal Free-tier usage bars below.
+    let usageSection;
+    if (isComplimentary && !sub?.isExpired) {
+      usageSection = `
+        <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-radius:10px; background:rgba(201,162,75,0.08); border:1px solid var(--brass-border,rgba(201,162,75,0.3));">
+          <span style="font-size:1.2rem;">✨</span>
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:0.85rem; color:var(--brass-bright,#E8C874);">Premium Benefits Active</div>
+            <div style="font-size:0.75rem; color:rgba(255,255,255,0.55); margin-top:2px;">Unlimited during your complimentary period — calls, photos, AI receptionist and analytics, all included.</div>
+          </div>
+        </div>`;
+    } else if (usage) {
+      usageSection = `
+        ${_bar(usage.calls?.used, usage.calls?.limit, 'Calls this month')}
+        ${_bar(usage.photos?.used, usage.photos?.limit, 'Photo uploads this month')}
+        ${_bar(usage.exports?.used, usage.exports?.limit, 'Exports this month')}
+        ${_bar(usage.family?.used, usage.family?.limit, 'Family members')}
+        ${_bar(usage.storage?.usedMb, usage.storage?.limitMb, 'Storage (MB)')}
+      `;
+    } else {
+      usageSection = '<div style="font-size:0.8rem;color:rgba(255,255,255,0.4);">Usage data unavailable right now.</div>';
+    }
+
+    // ────────── Dates row: Subscription Started / Premium Valid Until / Renewal Date ──────────
+    const datesRow = !isFree ? `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:14px 0;">
+        ${sub?.start_date ? `
+          <div style="padding:10px 12px; background:rgba(0,0,0,0.18); border-radius:10px;">
+            <div style="font-size:0.65rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.4px;">Subscription Started</div>
+            <div style="font-size:0.82rem; color:#fff; font-weight:600; margin-top:2px;">${_dateLabel(sub.start_date)}</div>
+          </div>` : ''}
+        <div style="padding:10px 12px; background:rgba(0,0,0,0.18); border-radius:10px;">
+          <div style="font-size:0.65rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.4px;">${isComplimentary ? 'Premium Valid Until' : 'Renewal Date'}</div>
+          <div style="font-size:0.82rem; color:#fff; font-weight:600; margin-top:2px;">${_dateLabel(sub?.expiry_date)}</div>
+        </div>
+        <div style="padding:10px 12px; border-radius:10px; ${urgency ? `background:${urgency.bg}; border:1px solid ${urgency.border};` : 'background:rgba(0,0,0,0.18);'}">
+          <div style="font-size:0.65rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.4px;">Days Remaining</div>
+          <div style="font-size:0.82rem; font-weight:700; margin-top:2px; color:${urgency ? urgency.color : '#fff'};">${urgency ? urgency.label : `${daysLeft ?? '—'} days`}</div>
+        </div>
+      </div>` : '';
 
     return `
       <div style="background:var(--dark-card-2,#112236); border:1px solid var(--glass-border,rgba(255,255,255,0.08)); border-radius:14px; padding:20px; margin-bottom:20px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:${isComplimentary ? '4px' : '14px'};">
           <div>
             <div style="font-size:0.7rem; color:var(--brass-bright,#E8C874); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Current Plan</div>
             <div style="font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:1.4rem; color:#fff;">${planName}</div>
           </div>
-          ${!isFree ? `
-            <div style="text-align:right;">
-              ${daysLeft !== undefined ? `<div style="font-size:0.85rem; color:rgba(255,255,255,0.6);">${daysLeft} days left</div>` : ''}
-              ${cancelPending ? `<div style="font-size:0.72rem; color:#F59E0B; margin-top:2px;">Cancels at period end</div>` : ''}
-            </div>` : ''}
+          ${cancelPending ? `<div style="font-size:0.72rem; color:#F59E0B; text-align:right;">Cancels at period end</div>` : ''}
         </div>
-        ${usageBars}
+        ${isComplimentary ? `<div style="font-size:0.76rem; color:rgba(255,255,255,0.5); margin-bottom:14px;">Included with your SmartDoor Purchase</div>` : ''}
+        ${datesRow}
+        ${usageSection}
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
-          ${!isFree ? (cancelPending
+          ${(!isFree && !isComplimentary) ? (cancelPending
             ? `<button onclick="SubscriptionManager.reactivate()" style="${_btnStyle('outline')}">Reactivate</button>`
             : `<button onclick="SubscriptionManager.cancel()" style="${_btnStyle('outline')}">Cancel Subscription</button>`
           ) : ''}
@@ -179,6 +240,20 @@ const SubscriptionManager = (() => {
     if (kind === 'active') return 'padding:8px 18px; border-radius:8px; font-size:0.8rem; font-weight:700; cursor:pointer; background:var(--brass-bright,#E8C874); color:#0E1B2A; border:1px solid var(--brass-bright,#E8C874);';
     if (kind === 'primary') return 'padding:10px 16px; border-radius:8px; font-size:0.8rem; font-weight:700; cursor:pointer; background:linear-gradient(135deg,var(--brass-bright,#E8C874),var(--brass,#C9A24B)); color:#0E1B2A; border:none; width:100%;';
     return 'padding:8px 18px; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; background:transparent; color:rgba(255,255,255,0.8); border:1px solid var(--glass-border,rgba(255,255,255,0.15));';
+  }
+
+  function _renewalIntro(currentKey, sub) {
+    if (currentKey !== 'free') return '';
+    const wasComplimentary = isComplimentaryPremium(sub?.plan);
+
+    const message = wasComplimentary
+      ? 'Your complimentary Premium year has ended, and you\u2019re currently on the Free plan. Nothing was lost — your visitor history, photos and settings are all still here. Renewing Premium restores everything below instantly.'
+      : 'You\u2019re on the Free plan. Upgrade any time to unlock AI Receptionist, deeper analytics and priority support — no pressure, no rush.';
+
+    return `
+      <div style="text-align:center; font-size:0.78rem; color:rgba(255,255,255,0.55); margin-bottom:16px; padding:0 8px;">
+        ${message}
+      </div>`;
   }
 
   function _planCards(plans, currentKey) {

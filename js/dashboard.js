@@ -1221,29 +1221,79 @@ const DashboardModule = (() => {
   }
 
   // ────────── SUBSCRIPTION: DAYS REMAINING + RENEWAL LINE ──────────
+  // [UPDATED — Premium Included business model] Every hardware purchase
+  // ships with a complimentary 12-month Premium membership (plan key
+  // 'hardware_only'). This card now: (1) badges that plan as "Premium
+  // Included" with an "Included with your SmartDoor Purchase" subtitle
+  // instead of a raw plan name/price, (2) shows Subscription Started
+  // alongside the existing days-remaining/renewal date, (3) applies
+  // progressively stronger reminder colors at the 30/15/7/3/1-day marks,
+  // and (4) surfaces a "Renew Now" button only once renewal is actually
+  // relevant (≤30 days left, or already expired) rather than all the time.
+  // All new element ids are optional — this function no-ops around any
+  // that don't exist in the current markup, so it's safe if app.html
+  // hasn't been updated with the corresponding hooks.
   function updateSubscriptionDays() {
-    const daysEl    = document.getElementById('sub-days-remaining');
-    const renewalEl = document.getElementById('sub-renewal-line');
+    const daysEl     = document.getElementById('sub-days-remaining');
+    const renewalEl  = document.getElementById('sub-renewal-line');
+    const badgeEl    = document.getElementById('sub-plan-badge');
+    const includedEl = document.getElementById('sub-included-line');
+    const startedEl  = document.getElementById('sub-started-line');
+    const renewBtn   = document.getElementById('sub-renew-now-btn');
 
     if (!daysEl) return;
 
-    if (state.subscription?.daysLeft !== undefined) {
-      daysEl.textContent = `${state.subscription.daysLeft} days`;
+    const sub = state.subscription;
+    const isComplimentary = sub?.plan === 'hardware_only';
 
-      // Renewal line update karo
-      if (renewalEl && state.subscription.expiry_date) {
-        const expiryDate  = new Date(state.subscription.expiry_date);
-        const price       = state.subscription.planPrice || 0;
-        const renewalText = `₹${price}/year · Renews ${expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
-        renewalEl.textContent = renewalText;
+    if (sub?.plan === 'free') {
+      // Free plan never "expires" — subscriptions.js/manage-subscription
+      // store a 100-year-out sentinel date so the shared daysLeft logic
+      // keeps working elsewhere, but showing that countdown here would be
+      // confusing. Show a calm, no-pressure state instead.
+      daysEl.textContent = 'No expiry';
+      daysEl.style.color = 'rgba(255,255,255,0.6)';
+      if (badgeEl) badgeEl.textContent = sub.planName || 'Free';
+      if (includedEl) includedEl.style.display = 'none';
+      if (startedEl) startedEl.style.display = 'none';
+      if (renewalEl) renewalEl.textContent = 'Upgrade anytime for Premium features';
+      if (renewBtn) renewBtn.style.display = 'none';
+    } else if (sub?.daysLeft !== undefined) {
+      const daysLeft = sub.daysLeft;
+      daysEl.textContent = `${daysLeft} days`;
+
+      // Plan badge — "Premium Included" for the complimentary hardware plan,
+      // otherwise the plan's real name.
+      if (badgeEl) badgeEl.textContent = isComplimentary ? '✨ Premium Included' : (sub.planName || 'Premium');
+      if (includedEl) includedEl.style.display = isComplimentary ? '' : 'none';
+      if (startedEl && sub.start_date) {
+        const startedDate = new Date(sub.start_date);
+        startedEl.textContent = `Started ${startedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        startedEl.style.display = '';
       }
 
-      // Expiry warning color
-      if (state.subscription.daysLeft <= 7) {
-        daysEl.style.color = '#EF4444';
-      } else if (state.subscription.daysLeft <= 30) {
-        daysEl.style.color = '#F59E0B';
+      // Renewal line
+      if (renewalEl && sub.expiry_date) {
+        const expiryDate = new Date(sub.expiry_date);
+        const dateLabel  = expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        renewalEl.textContent = isComplimentary
+          ? `Valid until ${dateLabel} · then ₹${sub.renewal_price || 299}/yr`
+          : `₹${sub.planPrice || 0}/year · Renews ${dateLabel}`;
       }
+
+      // Progressively stronger reminder color as expiry approaches —
+      // 30 → 15 → 7 → 3 → 1 day(s) remaining.
+      daysEl.style.color =
+        daysLeft <= 1  ? '#EF4444' :
+        daysLeft <= 3  ? '#F87171' :
+        daysLeft <= 7  ? '#F59E0B' :
+        daysLeft <= 15 ? '#FBBF24' :
+        daysLeft <= 30 ? 'var(--brass-bright,#E8C874)' :
+        'var(--brass-bright,#E8C874)';
+
+      // Renew Now — only surface once renewal is actually relevant.
+      if (renewBtn) renewBtn.style.display = (daysLeft <= 30 || sub.isExpired) ? '' : 'none';
+
     } else {
       // Fallback — no subscription yet (order pending)
       if (state.orderSummary) {
@@ -1254,6 +1304,9 @@ const DashboardModule = (() => {
         daysEl.textContent = '—';
         if (renewalEl) renewalEl.textContent = 'No active subscription';
       }
+      if (includedEl) includedEl.style.display = 'none';
+      if (startedEl) startedEl.style.display = 'none';
+      if (renewBtn) renewBtn.style.display = 'none';
     }
 
     // Order tracking section update karo
