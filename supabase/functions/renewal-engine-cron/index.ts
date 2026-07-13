@@ -176,6 +176,70 @@ serve(async (req) => {
       results.dispatched.push({ subId: sub.id, window: window.key, channels: channelResults });
     }
 
+    // ────────── SaaS billing: grace periods + expiry/cancellation transitions ──────────
+    const graceDays = 7;
+
+    const { data: justExpired } = await supabase
+      .from('subscriptions')
+      .select('id, owner_id, plan, cancel_at_period_end, expiry_date')
+      .eq('status', 'active')
+      .lt('expiry_date', now.toISOString());
+
+    for (const sub of justExpired ?? []) {
+      if (sub.plan === 'free' || sub.plan === 'hardware_only') continue;
+
+      if (sub.cancel_at_period_end) {
+        const farFuture = new Date(now);
+        farFuture.setFullYear(farFuture.getFullYear() + 100);
+        await supabase.from('subscriptions').update({
+          plan: 'free', status: 'active', billing_cycle: 'yearly',
+          expiry_date: farFuture.toISOString(), renewal_price: 0,
+          cancel_at_period_end: false, grace_until: null,
+          updated_at: now.toISOString(),
+        }).eq('id', sub.id);
+      } else {
+        const graceUntil = new Date(sub.expiry_date);
+        graceUntil.setDate(graceUntil.getDate() + graceDays);
+        await supabase.from('subscriptions').update({
+          status: 'expired', grace_until: graceUntil.toISOString(), updated_at: now.toISOString(),
+        }).eq('id', sub.id);
+
+        try {
+          await supabase.from('notifications').insert({
+            id: crypto.randomUUID(), owner_id: sub.owner_id, type: 'subscription_renewal',
+            title: '⏳ Grace period started', priority: 'high', channels: ['in_app'], delivery_status: {},
+            body: `Your plan expired. Renew within ${graceDays} days to avoid losing premium features.`,
+            action_url: '/app#renew',
+          });
+        } catch (_ne) { /* non-fatal */ }
+      }
+    }
+
+    const { data: graceLapsed } = await supabase
+      .from('subscriptions')
+      .select('id, owner_id, plan')
+      .eq('status', 'expired')
+      .lt('grace_until', now.toISOString());
+
+    for (const sub of graceLapsed ?? []) {
+      const farFuture = new Date(now);
+      farFuture.setFullYear(farFuture.getFullYear() + 100);
+      await supabase.from('subscriptions').update({
+        plan: 'free', status: 'active', billing_cycle: 'yearly',
+        expiry_date: farFuture.toISOString(), renewal_price: 0,
+        grace_until: null, updated_at: now.toISOString(),
+      }).eq('id', sub.id);
+
+      try {
+        await supabase.from('notifications').insert({
+          id: crypto.randomUUID(), owner_id: sub.owner_id, type: 'subscription_renewal',
+          title: '⬇️ Moved to Free plan', priority: 'normal', channels: ['in_app'], delivery_status: {},
+          body: 'Your grace period ended, so your account moved to the Free plan. Upgrade anytime to restore premium features.',
+          action_url: '/app#renew',
+        });
+      } catch (_ne) { /* non-fatal */ }
+    }
+
     // Log the run
     await supabase.from('renewal_engine_logs').insert({
       run_at:       now.toISOString(),
