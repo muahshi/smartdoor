@@ -186,7 +186,12 @@ serve(async (req) => {
       .lt('expiry_date', now.toISOString());
 
     for (const sub of justExpired ?? []) {
-      if (sub.plan === 'free' || sub.plan === 'hardware_only') continue;
+      // FIX: 'hardware_only' (Premium Included — the complimentary 12-month
+      // Premium membership bundled with every hardware purchase) must go
+      // through the same grace-period → auto-downgrade-to-Free transition
+      // as any paid plan once its complimentary year ends. Only 'free'
+      // itself has no expiry concept to act on.
+      if (sub.plan === 'free') continue;
 
       if (sub.cancel_at_period_end) {
         const farFuture = new Date(now);
