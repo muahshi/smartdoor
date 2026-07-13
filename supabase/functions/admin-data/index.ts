@@ -1118,6 +1118,156 @@ serve(async (req) => {
       return Response.json({ success: true, commission: data }, { headers });
     }
 
+    // ══════════════════════════════════════════════
+    // SAAS BILLING — PLAN CATALOG (public-ish, but routed through here so
+    // the admin panel's pricing editor and the owner pricing UI both read
+    // the exact same source of truth)
+    // ══════════════════════════════════════════════
+    if (type === 'plan_catalog_list') {
+      const { data, error } = await db.from('plan_catalog').select('*').order('sort_order', { ascending: true });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, plans: data || [] }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // SAAS BILLING — INVOICES (admin view across all owners)
+    // ══════════════════════════════════════════════
+    if (type === 'invoice_list') {
+      if (!adminCan(ctx, 'subscriptions', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { owner_id = null, status_filter = null, limit = 50, offset = 0 } = body as any;
+
+      let qb = db.from('invoices')
+        .select('*, users!owner_id(full_name, phone, email, plate_id)', { count: 'exact' })
+        .range(Number(offset), Number(offset) + Number(limit) - 1)
+        .order('created_at', { ascending: false });
+
+      if (owner_id) qb = qb.eq('owner_id', owner_id);
+      if (status_filter && status_filter !== 'all') qb = qb.eq('status', status_filter);
+
+      const { data, error, count } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      return Response.json({ success: true, invoices: data || [], total: count || 0 }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // SAAS BILLING — USAGE SUMMARY (admin lookup for one owner)
+    // ══════════════════════════════════════════════
+    if (type === 'subscription_usage') {
+      if (!adminCan(ctx, 'subscriptions', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { owner_id } = body as any;
+      if (!owner_id) return Response.json({ success: false, message: 'owner_id required' }, { status: 400, headers });
+
+      const { data, error } = await db.rpc('get_usage_summary', { p_owner_id: owner_id });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      return Response.json({ success: true, usage: data }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // SAAS BILLING — ADMIN: MANUAL PLAN ASSIGNMENT
+    // Enable/disable subscriptions, manual upgrades/downgrades, comps, and
+    // plan assignment for a customer — no payment involved. Fully audited.
+    // ══════════════════════════════════════════════
+    if (type === 'assign_plan') {
+      if (!adminCan(ctx, 'subscriptions', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { owner_id, plan_key, billing_cycle = 'yearly', duration_days = null, notes = '' } = body as any;
+      if (!owner_id || !plan_key) {
+        return Response.json({ success: false, message: 'owner_id and plan_key required' }, { status: 400, headers });
+      }
+
+      const { data: plan } = await db.from('plan_catalog').select('*').eq('plan_key', plan_key).maybeSingle();
+      if (!plan) return Response.json({ success: false, message: 'Unknown plan_key' }, { status: 400, headers });
+
+      const startDate  = new Date();
+      const expiryDate = new Date(startDate);
+      if (duration_days) {
+        expiryDate.setDate(expiryDate.getDate() + Number(duration_days));
+      } else if (plan_key === 'free' || plan_key === 'hardware_only') {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 100); // effectively never expires
+      } else if (billing_cycle === 'monthly') {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      } else {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      }
+
+      const { data: existing } = await db.from('subscriptions')
+        .select('id').eq('owner_id', owner_id).eq('status', 'active').maybeSingle();
+
+      const renewalPrice = billing_cycle === 'monthly' ? plan.price_monthly : plan.price_yearly;
+
+      if (existing) {
+        const { error } = await db.from('subscriptions').update({
+          plan: plan_key, status: 'active', billing_cycle,
+          expiry_date: expiryDate.toISOString(), renewal_price: renewalPrice,
+          cancel_at_period_end: false, grace_until: null,
+          is_admin_assigned: true, admin_notes: notes, source: 'admin_manual',
+          updated_at: startDate.toISOString(),
+        }).eq('id', existing.id);
+        if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      } else {
+        const { error } = await db.from('subscriptions').insert({
+          owner_id, plan: plan_key, status: 'active', billing_cycle,
+          start_date: startDate.toISOString(), expiry_date: expiryDate.toISOString(),
+          renewal_price: renewalPrice, is_admin_assigned: true, admin_notes: notes,
+          source: 'admin_manual',
+        });
+        if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      }
+
+      try {
+        await db.from('notifications').insert({
+          id: crypto.randomUUID(), owner_id, type: 'status_change',
+          title: '✨ Plan Updated', body: `An admin moved your account to the ${plan.name} plan.`,
+          priority: 'normal', channels: ['in_app'], delivery_status: {}, payload: { plan: plan_key },
+        });
+      } catch (_ne) { /* non-fatal */ }
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'assign_plan',
+        resource: 'subscriptions', resource_id: owner_id,
+        metadata: { plan_key, billing_cycle, duration_days, notes },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true, plan: plan_key, expiryDate: expiryDate.toISOString() }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // SAAS BILLING — ADMIN: ENABLE / DISABLE A SUBSCRIPTION
+    // Distinct from 'cancel' (which is owner self-service, end-of-period).
+    // This is an immediate admin suspend/restore — e.g. abuse, chargebacks.
+    // ══════════════════════════════════════════════
+    if (type === 'toggle_subscription_enabled') {
+      if (!adminCan(ctx, 'subscriptions', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { sub_id, enabled } = body as any;
+      if (!sub_id || typeof enabled !== 'boolean') {
+        return Response.json({ success: false, message: 'sub_id and enabled (boolean) required' }, { status: 400, headers });
+      }
+      const { error } = await db.from('subscriptions').update({
+        status: enabled ? 'active' : 'suspended',
+        updated_at: new Date().toISOString(),
+      }).eq('id', sub_id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email,
+        action: enabled ? 'enable_subscription' : 'disable_subscription',
+        resource: 'subscriptions', resource_id: sub_id,
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
+    }
+
     return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });
 
   } catch (err) {
