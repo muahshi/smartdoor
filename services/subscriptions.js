@@ -13,7 +13,13 @@
 import { supabase } from './supabase.js';
 
 const PLANS = {
-  hardware_only:   { name: 'Hardware Only',   price: 0,   renewal_price: 0,   features: ['1 Plate', 'Basic Visitor Log', 'QR Access'] },
+  // ────────── [UPDATED — Premium Included business model, sql/47] ──────────
+  // hardware_only = the complimentary 12-month Premium membership that ships
+  // free with every SmartDoor hardware purchase. Same feature set as
+  // 'premium' below (kept in sync with the plan_catalog row sql/47 updates);
+  // renewal_price reflects what it costs to continue AFTER the complimentary
+  // year ends, not what the owner is paying now (that's ₹0 — it's included).
+  hardware_only:   { name: 'Premium Included', price: 0,   renewal_price: 299, features: ['500 calls/mo', '90-day history', 'AI Receptionist', 'Analytics', '5 family members', 'Priority Support'] },
   smartdoor_care:  { name: 'SmartDoor Care',  price: 299, renewal_price: 299, features: ['1 Plate', 'AI Receptionist', 'Visitor Logs', '5 Family Members', 'Voice Notes', 'Analytics', 'Priority Support'] },
   // ────────── [NEW — SaaS Launch] 3-tier plan names, kept in sync with
   // plan_catalog (sql/46_saas_billing_schema.sql). This local copy exists
@@ -249,6 +255,16 @@ export async function reactivateSubscription(ownerId) {
   });
   if (error) return { success: false, error: error.message };
   return data?.success ? { success: true, ...data } : { success: false, error: data?.message || 'Could not reactivate.' };
+}
+
+// ────────── [NEW] IS COMPLIMENTARY PREMIUM ──────────
+/**
+ * True for the 12-month Premium membership that ships free with a SmartDoor
+ * hardware purchase (plan key 'hardware_only'). Single place that defines
+ * this so dashboard/subscription UI never has to hardcode the plan key.
+ */
+export function isComplimentaryPremium(planKey) {
+  return planKey === 'hardware_only';
 }
 
 export { PLANS };

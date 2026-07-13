@@ -83,7 +83,27 @@ export async function getPlanCatalog({ force = false } = {}) {
 /** Convenience: fetch a single plan's definition (from cache if warm). */
 export async function getPlan(planKey) {
   const { plans } = await getPlanCatalog();
-  return plans.find((p) => p.plan_key === planKey) || null;
+  const found = plans.find((p) => p.plan_key === planKey);
+  if (found) return found;
+
+  // FIX: getPlanCatalog() only returns is_active=true rows (free/premium/
+  // enterprise), so legacy/complimentary keys like 'hardware_only' or
+  // 'smartdoor_care' never matched here and silently fell back to Free's
+  // limits everywhere canUseFeature()/usage checks call getPlan() — exactly
+  // the "artificial limit during complimentary Premium" bug. Legacy keys are
+  // intentionally few and static, so a direct single-row lookup (bypassing
+  // the is_active filter) is enough — no caching needed for this rare path.
+  try {
+    const { data } = await supabase
+      .from('plan_catalog')
+      .select('*')
+      .eq('plan_key', planKey)
+      .maybeSingle();
+    return data || null;
+  } catch (err) {
+    console.warn('[Plans] getPlan legacy lookup failed:', err);
+    return null;
+  }
 }
 
 /** Human-friendly feature bullet list for a plan, for pricing/upgrade UI. */
