@@ -15,6 +15,15 @@ import { supabase } from './supabase.js';
 const PLANS = {
   hardware_only:   { name: 'Hardware Only',   price: 0,   renewal_price: 0,   features: ['1 Plate', 'Basic Visitor Log', 'QR Access'] },
   smartdoor_care:  { name: 'SmartDoor Care',  price: 299, renewal_price: 299, features: ['1 Plate', 'AI Receptionist', 'Visitor Logs', '5 Family Members', 'Voice Notes', 'Analytics', 'Priority Support'] },
+  // ────────── [NEW — SaaS Launch] 3-tier plan names, kept in sync with
+  // plan_catalog (sql/46_saas_billing_schema.sql). This local copy exists
+  // only so getSubscription()/getRenewalInfo() below can render a name/
+  // price/feature-list synchronously without an extra network round trip;
+  // services/plans.js's getPlanCatalog() remains the source of truth for
+  // anything price-sensitive (checkout, pricing page). ──────────
+  free:        { name: 'Free',       price: 0,   renewal_price: 0,   features: ['30 calls/mo', '7-day history', '20 photos/mo', '2 family members'] },
+  premium:     { name: 'Premium',    price: 299, renewal_price: 299, features: ['500 calls/mo', '90-day history', 'AI Receptionist', 'Analytics', '5 family members', 'Priority Support'] },
+  enterprise:  { name: 'Enterprise', price: 9999, renewal_price: 9999, features: ['Unlimited calls', '365-day history', 'AI Receptionist', 'Analytics', '20 family members', 'Dedicated Support'] },
 };
 
 // ────────── GET SUBSCRIPTION (UNCHANGED) ──────────
@@ -141,7 +150,8 @@ export async function getRenewalInfo(ownerId) {
 
   const sub         = subResult.subscription;
   const expiryDate  = new Date(sub.expiry_date);
-  const renewalText = `₹${sub.planPrice || 0}/year · Renews ${_formatDate(expiryDate)}`;
+  const cycleLabel  = sub.billing_cycle === 'monthly' ? 'month' : 'year';
+  const renewalText = `₹${sub.planPrice || 0}/${cycleLabel} · Renews ${_formatDate(expiryDate)}`;
 
   return {
     success:     true,
@@ -149,6 +159,8 @@ export async function getRenewalInfo(ownerId) {
     planName:    sub.planName,
     planKey:     sub.plan,
     planPrice:   sub.planPrice,
+    billingCycle: sub.billing_cycle || 'yearly',
+    cancelAtPeriodEnd: sub.cancel_at_period_end || false,
     daysLeft:    sub.daysLeft,
     expiryDate:  expiryDate.toISOString(),
     renewalText,
@@ -177,6 +189,66 @@ export async function getDashboardCommerceData(ownerId) {
 // ────────── HELPER ──────────
 function _formatDate(date) {
   return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// ══════════════════════════════════════════════════════════════
+// [NEW — SaaS Launch] Subscription Plans, Billing, Dashboard actions
+// Additive only — everything above this line is unchanged.
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Starts a paid plan purchase/upgrade (Premium or Enterprise, monthly or
+ * yearly). Creates a Razorpay order + pending invoice via the
+ * create-subscription-order Edge Function. Caller opens Razorpay Checkout
+ * with the returned order, then calls verifySubscriptionPayment() on
+ * success.
+ *
+ * For downgrading to Free, use downgradeToFree() instead — no payment step.
+ */
+export async function changePlan(ownerId, planKey, billingCycle = 'yearly') {
+  const { data, error } = await supabase.functions.invoke('create-subscription-order', {
+    body: { ownerId, planKey, billingCycle },
+  });
+  if (error) return { success: false, error: error.message };
+  if (!data?.success) return { success: false, error: data?.message || 'Could not start checkout.' };
+  return { success: true, ...data };
+}
+
+/** Verifies a Razorpay payment for a plan purchase/upgrade and activates it. */
+export async function verifySubscriptionPayment(ownerId, { invoiceId, razorpayPaymentId, razorpayOrderId, razorpaySignature }) {
+  const { data, error } = await supabase.functions.invoke('verify-subscription-payment', {
+    body: { ownerId, invoiceId, razorpayPaymentId, razorpayOrderId, razorpaySignature },
+  });
+  if (error) return { success: false, error: error.message };
+  if (!data?.success) return { success: false, error: data?.message || 'Payment verification failed.' };
+  return { success: true, ...data };
+}
+
+/** Immediately moves the owner to the Free plan — no payment involved. */
+export async function downgradeToFree(ownerId) {
+  const { data, error } = await supabase.functions.invoke('manage-subscription', {
+    body: { ownerId, action: 'downgrade' },
+  });
+  if (error) return { success: false, error: error.message };
+  return data?.success ? { success: true, ...data } : { success: false, error: data?.message || 'Downgrade failed.' };
+}
+
+/** Schedules cancellation — current paid plan stays active until expiry_date, then auto-moves to Free. */
+export async function cancelSubscription(ownerId) {
+  const { data, error } = await supabase.functions.invoke('manage-subscription', {
+    body: { ownerId, action: 'cancel' },
+  });
+  if (error) return { success: false, error: error.message };
+  return data?.success ? { success: true, ...data } : { success: false, error: data?.message || 'Could not cancel.' };
+}
+
+/** Reverses a scheduled cancellation. */
+export async function reactivateSubscription(ownerId) {
+  const { data, error } = await supabase.functions.invoke('manage-subscription', {
+    body: { ownerId, action: 'reactivate' },
+  });
+  if (error) return { success: false, error: error.message };
+  return data?.success ? { success: true, ...data } : { success: false, error: data?.message || 'Could not reactivate.' };
 }
 
 export { PLANS };
