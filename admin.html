@@ -844,7 +844,7 @@
               <label class="form-label">Subscription Plan</label>
               <select class="form-select" id="cc-plan">
                 <option value="">No subscription (hardware only)</option>
-                <option value="hardware_only">Hardware Only — ₹0/yr renewal</option>
+                <option value="hardware_only">Premium Included — Free 12mo, then ₹299/yr</option>
                 <option value="smartdoor_care">SmartDoor Care — ₹299/yr</option>
               </select>
             </div>
@@ -1715,7 +1715,7 @@ function badgeHTML(s) {
 }
 function planBadge(p) {
   if (!p) return '<span class="badge badge-muted">—</span>';
-  return `<span class="badge badge-purple">${{smartdoor_care:'Care',hardware_only:'Hardware',premium:'Premium',free:'Free',enterprise:'Enterprise'}[p]||p}</span>`;
+  return `<span class="badge badge-purple">${{smartdoor_care:'Care',hardware_only:'Premium Included',premium:'Premium',free:'Free',enterprise:'Enterprise'}[p]||p}</span>`;
 }
 function priorityBadge(p) {
   return `<span class="badge badge-${{critical:'danger',high:'warning',medium:'info',low:'muted'}[p]||'muted'}">${p||'—'}</span>`;
