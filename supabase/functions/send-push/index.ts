@@ -205,6 +205,43 @@ serve(async (req: Request) => {
       }
     }
 
+    // Notification Center integration (sql/48_notification_center.sql):
+    // quiet hours only ever suppress the non-urgent 'status_reminder' push
+    // (subscription renewal nudges). Every other type here (bell_ring,
+    // qr_scan, voice, text, sos, ai_escalation) is a real-time, visitor-at-
+    // -the-door event and always rings through — same "emergencies bypass
+    // DND" convention this codebase already applies elsewhere (see
+    // services/notifications.js#triggerEmergencyBroadcast). This is a
+    // read-only check against notification_preferences; it never writes
+    // anything and fails open (send the push) on any lookup error.
+    if (type === 'status_reminder') {
+      try {
+        const { data: prefs } = await supabase
+          .from('notification_preferences')
+          .select('quiet_hours_enabled, quiet_hours_start, quiet_hours_end')
+          .eq('owner_id', ownerId)
+          .maybeSingle();
+
+        if (prefs?.quiet_hours_enabled) {
+          const nowIst = new Date(Date.now() + 5.5 * 60 * 60 * 1000); // UTC -> IST
+          const nowMins = nowIst.getUTCHours() * 60 + nowIst.getUTCMinutes();
+          const [startH, startM] = String(prefs.quiet_hours_start || '22:00').split(':').map(Number);
+          const [endH, endM] = String(prefs.quiet_hours_end || '07:00').split(':').map(Number);
+          const startMins = startH * 60 + startM;
+          const endMins = endH * 60 + endM;
+          const withinQuietHours = startMins < endMins
+            ? (nowMins >= startMins && nowMins < endMins)
+            : (nowMins >= startMins || nowMins < endMins);
+
+          if (withinQuietHours) {
+            return new Response(JSON.stringify({ success: true, skipped: 'quiet_hours' }), { status: 200, headers: corsHeaders });
+          }
+        }
+      } catch (_prefsErr) {
+        // Fail open — never let a preferences lookup error block a real push.
+      }
+    }
+
     const throttleMs = THROTTLE_MS[type];
     if (throttleMs) {
       const key = `${ownerId}:${plateId || '-'}:${type}`;
