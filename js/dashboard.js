@@ -529,7 +529,12 @@ const DashboardModule = (() => {
       state._realtimeUnsubs.push(unsubCallUI);
     }).catch(() => {});
 
-    state._realtimeUnsubs = [unsubLogs, unsubComms, unsubNotifications, unsubDispatcher];
+    // PRODUCTION FIX (leak): this used to be `state._realtimeUnsubs = [...]`,
+    // which REASSIGNS the array — silently discarding any unsub already
+    // pushed onto it earlier in init() (e.g. the order-tracking subscription
+    // at the top of init(), which runs before _setupRealtime()). Push
+    // instead of overwrite so nothing registered before this point is lost.
+    state._realtimeUnsubs.push(unsubLogs, unsubComms, unsubNotifications, unsubDispatcher);
 
     // ────────── NOTIFICATION CLICK → OPEN EXACT CONVERSATION (Req 6) ──────────
     // sw.js posts { type:'notification_click', notifData } to this window on
@@ -2022,6 +2027,29 @@ const DashboardModule = (() => {
     const audio = new Audio(result.url);
     audio.play().catch(() => showToast('Playback failed', 'danger'));
   }
+
+  // PRODUCTION FIX (realtime cleanup leak): every subscribeTo*() call in
+  // _setupRealtime() (visitor logs, notifications, comms, inbox, order
+  // tracking, presence, WebRTC ring channel, typing/thread channels) was
+  // pushing its unsubscribe function into state._realtimeUnsubs, but
+  // nothing in the app ever called any of them — the array was
+  // write-only. In practice logout/inactivity-timeout navigate to a new
+  // URL, which tears the page (and every open Realtime socket) down for
+  // free, but that's not true for iOS/Android bfcache (back-forward
+  // cache) restores or a tab moved to the background and never
+  // navigated away from — the sockets and postgres_changes/broadcast
+  // subscriptions stay open and accumulate for as long as the tab
+  // exists. Idempotent teardown, run once on pagehide.
+  let _torndown = false;
+  function _teardownRealtime() {
+    if (_torndown) return;
+    _torndown = true;
+    state._realtimeUnsubs.forEach((unsub) => {
+      try { unsub && unsub(); } catch (_) {}
+    });
+    state._realtimeUnsubs = [];
+  }
+  window.addEventListener('pagehide', _teardownRealtime, { once: true });
 
   // ────────── PUBLIC API ──────────
   return {
