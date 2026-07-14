@@ -163,5 +163,51 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # ── PRODUCTION-STABILITY FIX: these functions existed in the repo
+      # (fully implemented) but were never added to this workflow, so they
+      # were never deployed. Root cause of: get-turn-credentials 404s
+      # (WebRTC TURN always fell back to STUN-only), background FCM push
+      # never sending (send-push), Razorpay payment webhooks never landing
+      # (razorpay-webhook — payments could show "pending" forever), and the
+      # whole SaaS subscription billing flow (create/verify/manage/cancel)
+      # being unreachable in production. Matched each to the JWT model its
+      # own file header documents (owner sessions here are Plate ID + PIN,
+      # not Supabase Auth, so these follow the same convention as the
+      # already-deployed activate-subscription/initiate-call).
+      - name: Deploy get-turn-credentials (no-verify-jwt)
+        run: supabase functions deploy get-turn-credentials --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-push (no-verify-jwt)
+        run: supabase functions deploy send-push --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy razorpay-webhook (no-verify-jwt)
+        run: supabase functions deploy razorpay-webhook --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy create-subscription-order
+        run: supabase functions deploy create-subscription-order --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy verify-subscription-payment
+        run: supabase functions deploy verify-subscription-payment --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy manage-subscription
+        run: supabase functions deploy manage-subscription --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy cancel-pending-order
+        run: supabase functions deploy cancel-pending-order --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deployment complete
-        run: echo "✅ All 26 Edge Functions deployed successfully (including admin-data)"
+        run: echo "✅ All 33 Edge Functions deployed successfully (including admin-data)"
