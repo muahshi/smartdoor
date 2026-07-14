@@ -560,12 +560,11 @@
 
     <div style="width:1px;height:22px;background:rgba(255,255,255,0.08);"></div>
 
-    <!-- Notification Bell (desktop) -->
+    <!-- Notification Bell (desktop) — opens the full Notification Center drawer (js/notificationCenter.js) -->
     <div style="position:relative;">
-      <button class="sd-icon-btn" id="sd-bell-btn-d" aria-label="Notifications" onclick="SDHeader.toggle('d','notif')">
-        🔔<span class="sd-badge-dot" id="sd-bell-dot-d" style="display:none;"></span>
+      <button class="sd-icon-btn" id="sd-bell-btn-d" aria-label="Notifications" onclick="NotificationCenter.toggle()">
+        🔔<span class="nc-badge" id="nc-bell-badge-d" style="display:none;"></span>
       </button>
-      <div class="sd-dropdown" id="sd-notif-panel-d" style="display:none;"></div>
     </div>
 
     <!-- Profile Menu (desktop) -->
@@ -607,12 +606,11 @@
           Secured
         </div>
 
-        <!-- Notification Bell (mobile) -->
+        <!-- Notification Bell (mobile) — opens the full Notification Center drawer (js/notificationCenter.js) -->
         <div style="position:relative;">
-          <button class="sd-icon-btn" id="sd-bell-btn-m" aria-label="Notifications" onclick="SDHeader.toggle('m','notif')">
-            🔔<span class="sd-badge-dot" id="sd-bell-dot-m" style="display:none;"></span>
+          <button class="sd-icon-btn" id="sd-bell-btn-m" aria-label="Notifications" onclick="NotificationCenter.toggle()">
+            🔔<span class="nc-badge" id="nc-bell-badge-m" style="display:none;"></span>
           </button>
-          <div class="sd-dropdown" id="sd-notif-panel-m" style="display:none;"></div>
         </div>
 
         <!-- Profile Menu (mobile) -->
@@ -673,7 +671,7 @@
           <div class="quick-action-icon">📋</div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
-        <div class="quick-action-tile" onclick="OwnerPremium.openNotifications()">
+        <div class="quick-action-tile" onclick="NotificationCenter.open()">
           <div class="quick-action-icon">🔔</div>
           <div class="quick-action-label">Notifications</div>
         </div>
@@ -1226,7 +1224,7 @@
           <div class="quick-action-icon">📋</div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
-        <div class="quick-action-tile" onclick="OwnerPremium.openNotifications()">
+        <div class="quick-action-tile" onclick="NotificationCenter.open()">
           <div class="quick-action-icon">🔔</div>
           <div class="quick-action-label">Notifications</div>
         </div>
@@ -1710,6 +1708,8 @@
 <!-- SaaS Launch: Subscription Dashboard (additive only — reads DashboardModule.getState(), never modifies dashboard.js) -->
 <script type="module" src="js/subscriptionManager.js"></script>
 <script type="module" src="js/activityCenter.js"></script>
+<!-- Production Notification Center (additive only — reads DashboardModule.getState(), never modifies dashboard.js or WebRTC) -->
+<script type="module" src="js/notificationCenter.js"></script>
 
 <script>
   // ── Mobile tab switcher ──
