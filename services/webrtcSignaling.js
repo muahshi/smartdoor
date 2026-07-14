@@ -73,6 +73,32 @@ async function _ensureRealtimeAuth() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// TEMPORARY DIAGNOSTIC — RTC-TRACE auth-context probe (REMOVE AFTER
+// ROOT-CAUSE CONFIRMATION). Not a fix. Captures, at the exact moment a
+// client attempts to join `rtc:ring:{ownerId}` or `rtc:call:{callId}`,
+// whether that client is `anon` or `authenticated`, and if authenticated,
+// which user — so a working-phone vs failing-phone console log can be
+// compared side by side. Read-only: never mutates auth state, never
+// blocks or delays the join, never changes RLS or channel config.
+// ═══════════════════════════════════════════════════════════════════════
+async function _describeAuthContext() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { role: 'unknown', reason: `getSession error: ${error.message}` };
+    const session = data?.session;
+    if (!session) return { role: 'anon', userId: null, hasAccessToken: false };
+    return {
+      role: 'authenticated',
+      userId: session.user?.id || null,
+      hasAccessToken: !!session.access_token,
+      expiresAt: session.expires_at || null,
+    };
+  } catch (err) {
+    return { role: 'unknown', reason: err?.message || String(err) };
+  }
+}
+
 /**
  * PRODUCTION FIX — root cause of the "Maximum call stack size exceeded"
  * recursive channel-cleanup bug (RTC-TRACE evidence: repeated
@@ -132,6 +158,10 @@ function _safeRemoveChannel(channel) {
 export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, private: isPrivate = true } = {}) {
   if (isPrivate) await _ensureRealtimeAuth();
 
+  // TEMPORARY DIAGNOSTIC — see _describeAuthContext() header comment.
+  const _authCtx = await _describeAuthContext();
+  console.log(`[RTC-TRACE][AUTH-CHECK] pre-join auth context | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} hasAccessToken=${_authCtx.hasAccessToken ?? 'n/a'} reason=${_authCtx.reason || 'n/a'}`);
+
   return new Promise((resolve, reject) => {
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false, ack: false }, private: isPrivate },
@@ -139,6 +169,7 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
 
     const timer = setTimeout(() => {
       _safeRemoveChannel(channel);
+      console.error(`[RTC-TRACE][FAIL][AUTH-CHECK] channel join TIMED OUT (client-side timer, no status ever received) | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} timeoutMs=${timeoutMs}`);
       reject(new Error('Signaling channel join timed out'));
     }, timeoutMs);
 
@@ -146,11 +177,13 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
       if (status === 'SUBSCRIBED') {
         clearTimeout(timer);
         console.log(`[RTC-TRACE] channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
+        console.log(`[RTC-TRACE][AUTH-CHECK] join SUCCEEDED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status}`);
         resolve(channel);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timer);
         _safeRemoveChannel(channel);
         console.error(`[RTC-TRACE][FAIL] channel join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
+        console.error(`[RTC-TRACE][FAIL][AUTH-CHECK] join REJECTED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status} errMessage=${err?.message || 'n/a'} errFull=${JSON.stringify(err || {})}`);
         reject(new Error(`Signaling channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
       }
     });
@@ -217,6 +250,10 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
 } = {}) {
   if (isPrivate) await _ensureRealtimeAuth();
 
+  // TEMPORARY DIAGNOSTIC — see _describeAuthContext() header comment.
+  const _authCtx = await _describeAuthContext();
+  console.log(`[RTC-TRACE][AUTH-CHECK] pre-join auth context (owner/persistent) | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} hasAccessToken=${_authCtx.hasAccessToken ?? 'n/a'} reason=${_authCtx.reason || 'n/a'}`);
+
   const RECONNECT_BASE_DELAY_MS = 1000;
   const RECONNECT_MAX_DELAY_MS = 15000;
 
@@ -261,6 +298,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
           reconnectAttempt = 0;
           isSubscribed = true;
           console.log(`[RTC-TRACE] persistent channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
+          console.log(`[RTC-TRACE][AUTH-CHECK] persistent join SUCCEEDED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status}`);
           onSubscribed(channel);
           if (!firstSettled) {
             firstSettled = true;
@@ -277,6 +315,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
             firstSettled = true;
             _safeRemoveChannel(channel);
             console.error(`[RTC-TRACE][FAIL] persistent channel initial join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
+            console.error(`[RTC-TRACE][FAIL][AUTH-CHECK] persistent join REJECTED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status} errMessage=${err?.message || 'n/a'} errFull=${JSON.stringify(err || {})}`);
             rejectFirst(new Error(`Persistent channel failed: ${status}${err?.message ? ` (${err.message})` : ''}`));
             return;
           }
