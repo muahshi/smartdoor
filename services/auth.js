@@ -197,26 +197,44 @@ export async function isAuthenticated() {
 
 // ────────── AUTO LOGOUT (inactivity) ──────────
 let _inactivityTimer = null;
+let _activityListenersAttached = false;
 const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutes
 
 export function startInactivityTimer() {
   clearInactivityTimer();
+  _armInactivityTimeout();
+
+  // PRODUCTION FIX (perf): this used to be inside _resetInactivityTimer,
+  // which ran on EVERY click/keydown/touchstart/scroll — meaning every
+  // single scroll frame (which can fire dozens of times per second on
+  // mobile) was doing 4x removeEventListener + 4x addEventListener on
+  // `document`. That's pure listener churn for no behavioral gain: the
+  // listeners themselves never need to change, only the timeout does.
+  // Attach them exactly once per session instead.
+  if (!_activityListenersAttached) {
+    _activityListenersAttached = true;
+    ['click', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, _resetInactivityTimer, { passive: true });
+    });
+  }
+}
+
+function _resetInactivityTimer() {
+  // PRODUCTION FIX (perf): only re-arm the timeout, don't touch listeners
+  // — see startInactivityTimer's comment. Listeners stay attached for the
+  // life of the session; clearInactivityTimer() (real logout/teardown) is
+  // still the one place that removes them.
+  if (_inactivityTimer) clearTimeout(_inactivityTimer);
+  _armInactivityTimeout();
+}
+
+function _armInactivityTimeout() {
   _inactivityTimer = setTimeout(() => {
     console.warn('[Auth] Auto-logout due to inactivity');
     logoutOwner().then(() => {
       window.location.href = '/login';
     });
   }, INACTIVITY_MS);
-
-  // Reset on any user activity
-  ['click', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
-    document.addEventListener(evt, _resetInactivityTimer, { passive: true });
-  });
-}
-
-function _resetInactivityTimer() {
-  clearInactivityTimer();
-  startInactivityTimer();
 }
 
 export function clearInactivityTimer() {
@@ -224,6 +242,7 @@ export function clearInactivityTimer() {
     clearTimeout(_inactivityTimer);
     _inactivityTimer = null;
   }
+  _activityListenersAttached = false;
   ['click', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
     document.removeEventListener(evt, _resetInactivityTimer);
   });

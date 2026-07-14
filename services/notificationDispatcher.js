@@ -271,8 +271,19 @@ export async function ensureNotificationPermission() {
 // sw.js posts { type: 'notification_click', notifData } to the focused/opened
 // window on click. notifData carries the same `id`/`type` we passed as
 // `data` above, so we can mark the exact log entry as clicked.
+// PRODUCTION HARDENING (duplicate listeners): initNotificationDispatcher()
+// has exactly one caller today (js/dashboard.js, guarded by its own
+// _initialized flag), but that guard lives in a different module and
+// nothing here enforced the invariant locally. Make _wireClickTracking's
+// serviceWorker 'message' listener attach at most once regardless of how
+// many times initNotificationDispatcher() ever gets called, so a future
+// caller (or a dashboard re-init path) can't stack a second listener that
+// would double-record every click/push event.
+let _clickTrackingWired = false;
 function _wireClickTracking() {
+  if (_clickTrackingWired) return;
   if (!('serviceWorker' in navigator)) return;
+  _clickTrackingWired = true;
   navigator.serviceWorker.addEventListener('message', (event) => {
     const msg = event.data;
     if (msg?.type === 'notification_click' && msg?.notifData?.id) {

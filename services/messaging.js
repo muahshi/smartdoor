@@ -315,6 +315,30 @@ export async function setConversationStatus(conversationId, status) {
 }
 
 export async function deleteConversation(conversationId) {
+  // PRODUCTION FIX (storage cleanup): the DB side was already correct —
+  // ON DELETE CASCADE on messages.conversation_id removes the thread rows
+  // — but that cascade only ever touches Postgres. Every voice message's
+  // actual audio blob lives in Storage (VOICE_BUCKET, path stored in
+  // messages.voice_url — see sendVoiceMessage above) and Storage objects
+  // are NOT part of any DB cascade, so every deleted voice thread was
+  // leaving its .webm/.mp4 files behind in the bucket forever. Look up
+  // and remove those objects first; best-effort — a storage hiccup here
+  // must never block the (higher-priority) conversation delete itself.
+  try {
+    const { data: voiceMsgs } = await supabase
+      .from('messages')
+      .select('voice_url')
+      .eq('conversation_id', conversationId)
+      .not('voice_url', 'is', null);
+    const paths = (voiceMsgs || []).map((m) => m.voice_url).filter(Boolean);
+    if (paths.length) {
+      await supabase.storage.from(VOICE_BUCKET).remove(paths);
+    }
+  } catch (_) {
+    // Non-fatal — orphaned storage objects are a cleanup concern, not a
+    // reason to block the owner from deleting the conversation.
+  }
+
   // ON DELETE CASCADE on messages.conversation_id removes the thread too.
   const { error } = await supabase.from('conversations').delete().eq('id', conversationId);
   return { success: !error, error: error?.message };
