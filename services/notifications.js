@@ -273,26 +273,131 @@ export async function triggerEmergencyBroadcast(ownerId, plateId, familyMembers 
   };
 }
 
-// ────────── READ / MARK READ ──────────
-export async function getNotifications(ownerId, { limit = 30, unreadOnly = false } = {}) {
+// ────────── NOTIFICATION CENTER — CATEGORIES ──────────
+// Mirrors sql/48_notification_center.sql's sd_notification_category()
+// mapping — kept in sync manually since the source of truth for what gets
+// WRITTEN is the DB trigger (covers rows this client never sees, e.g. the
+// missed-visitor/payment/admin observer triggers), but the UI needs the
+// same vocabulary client-side for labels/icons.
+export const NOTIFICATION_CATEGORIES = [
+  { id: 'visitor_calls',    label: 'Visitor Calls',    icon: '📞' },
+  { id: 'missed_visitors',  label: 'Missed Visitors',  icon: '📵' },
+  { id: 'visitor_activity', label: 'Visitor Activity', icon: '🔔' },
+  { id: 'subscription',     label: 'Subscription',     icon: '⏳' },
+  { id: 'payments',         label: 'Payments',         icon: '💳' },
+  { id: 'admin',            label: 'Admin',            icon: '🛠️' },
+  { id: 'security',         label: 'Security',         icon: '🛡️' },
+];
+
+const CATEGORY_IDS = NOTIFICATION_CATEGORIES.map((c) => c.id);
+
+export function categoryLabel(categoryId) {
+  return NOTIFICATION_CATEGORIES.find((c) => c.id === categoryId)?.label || 'Notification';
+}
+
+export function categoryIcon(categoryId) {
+  return NOTIFICATION_CATEGORIES.find((c) => c.id === categoryId)?.icon || '🔔';
+}
+
+// ────────── READ / MARK READ / DELETE / PAGINATION ──────────
+/**
+ * @param {string} ownerId
+ * @param {object} [opts]
+ * @param {number} [opts.limit]      page size (default 20)
+ * @param {number} [opts.offset]     for pagination (default 0)
+ * @param {boolean} [opts.unreadOnly]
+ * @param {string} [opts.category]   one of NOTIFICATION_CATEGORIES ids, or 'all'
+ */
+export async function getNotifications(ownerId, { limit = 20, offset = 0, unreadOnly = false, category = 'all' } = {}) {
   let query = supabase
     .from('notifications')
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('owner_id', ownerId)
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (unreadOnly) query = query.eq('is_read', false);
+  if (category && category !== 'all' && CATEGORY_IDS.includes(category)) {
+    query = query.eq('category', category);
+  }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return { success: false, error: error.message };
-  return { success: true, notifications: data };
+  return {
+    success: true,
+    notifications: data || [],
+    total: count ?? (data ? data.length : 0),
+    hasMore: typeof count === 'number' ? offset + (data ? data.length : 0) < count : false,
+  };
+}
+
+/** Unread count, optionally scoped to one category — drives the bell badge + per-tab counts. */
+export async function getUnreadCount(ownerId, category = 'all') {
+  let query = supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_id', ownerId)
+    .eq('is_read', false);
+
+  if (category && category !== 'all' && CATEGORY_IDS.includes(category)) {
+    query = query.eq('category', category);
+  }
+
+  const { count, error } = await query;
+  if (error) return { success: false, error: error.message };
+  return { success: true, count: count || 0 };
+}
+
+/** Unread count broken down per category in one round trip — used to badge each drawer tab. */
+export async function getUnreadCountsByCategory(ownerId) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('category')
+    .eq('owner_id', ownerId)
+    .eq('is_read', false);
+
+  if (error) return { success: false, error: error.message };
+  const counts = {};
+  CATEGORY_IDS.forEach((c) => { counts[c] = 0; });
+  (data || []).forEach((row) => {
+    const c = row.category && CATEGORY_IDS.includes(row.category) ? row.category : 'admin';
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  return { success: true, counts, total: (data || []).length };
 }
 
 export async function markNotificationRead(notificationId, ownerId) {
   const { error } = await supabase
     .from('notifications')
     .update({ is_read: true })
+    .eq('id', notificationId)
+    .eq('owner_id', ownerId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+/** Marks every (optionally category-scoped) unread notification as read in one call. */
+export async function markAllNotificationsRead(ownerId, category = 'all') {
+  let query = supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('owner_id', ownerId)
+    .eq('is_read', false);
+
+  if (category && category !== 'all' && CATEGORY_IDS.includes(category)) {
+    query = query.eq('category', category);
+  }
+
+  const { error } = await query;
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function deleteNotification(notificationId, ownerId) {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
     .eq('id', notificationId)
     .eq('owner_id', ownerId);
 
@@ -312,6 +417,110 @@ export function subscribeToNotifications(ownerId, callback) {
     .subscribe();
 
   return () => supabase.removeChannel(channel);
+}
+
+/**
+ * Full Notification Center realtime feed — INSERT (new item), UPDATE (read/
+ * unread toggled from another tab/device), DELETE (removed elsewhere).
+ * Kept as a separate subscription from subscribeToNotifications() above so
+ * that existing callers (dashboard.js doorbell sound, etc.) are unaffected.
+ * @param {string} ownerId
+ * @param {{onInsert?:Function,onUpdate?:Function,onDelete?:Function}} handlers
+ */
+export function subscribeToNotificationCenter(ownerId, { onInsert, onUpdate, onDelete } = {}) {
+  const channel = supabase
+    .channel(`notification-center:${ownerId}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `owner_id=eq.${ownerId}` },
+      (payload) => onInsert && onInsert(payload.new))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `owner_id=eq.${ownerId}` },
+      (payload) => onUpdate && onUpdate(payload.new))
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notifications', filter: `owner_id=eq.${ownerId}` },
+      (payload) => onDelete && onDelete(payload.old))
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}
+
+// ────────── NOTIFICATION PREFERENCES (quiet hours, sound, per-category) ──────
+export const DEFAULT_CATEGORY_PREFS = Object.freeze(
+  CATEGORY_IDS.reduce((acc, id) => {
+    acc[id] = { in_app: true, push: true };
+    return acc;
+  }, {})
+);
+
+const DEFAULT_PREFERENCES = Object.freeze({
+  sound_enabled: true,
+  quiet_hours_enabled: false,
+  quiet_hours_start: '22:00',
+  quiet_hours_end: '07:00',
+  category_prefs: DEFAULT_CATEGORY_PREFS,
+});
+
+export async function getNotificationPreferences(ownerId) {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('owner_id', ownerId)
+    .maybeSingle();
+
+  if (error) return { success: false, error: error.message };
+  if (!data) {
+    return { success: true, preferences: { owner_id: ownerId, ...DEFAULT_PREFERENCES } };
+  }
+  return {
+    success: true,
+    preferences: {
+      ...data,
+      category_prefs: { ...DEFAULT_CATEGORY_PREFS, ...(data.category_prefs || {}) },
+    },
+  };
+}
+
+/** Upserts whichever fields are passed — callers only send the field(s) that changed. */
+export async function saveNotificationPreferences(ownerId, updates = {}) {
+  const payload = { owner_id: ownerId, ...updates };
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .upsert(payload, { onConflict: 'owner_id' })
+    .select()
+    .maybeSingle();
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, preferences: data };
+}
+
+/**
+ * True if `atDate` (default: now) falls within the owner's configured quiet
+ * hours window. Handles overnight windows (e.g. 22:00 → 07:00) correctly.
+ * Client-side only — used to silence in-tab sound/toast. Server-side push
+ * respects the same window for the non-urgent 'status_reminder' event only
+ * (supabase/functions/send-push) — visitor-at-the-door alerts (bell/SOS/
+ * voice/text) intentionally always ring through, matching this codebase's
+ * existing "emergencies bypass DND" convention (see triggerEmergencyBroadcast).
+ */
+export function isWithinQuietHours(preferences, atDate = new Date()) {
+  if (!preferences || !preferences.quiet_hours_enabled) return false;
+  const [startH, startM] = (preferences.quiet_hours_start || '22:00').split(':').map(Number);
+  const [endH, endM] = (preferences.quiet_hours_end || '07:00').split(':').map(Number);
+  const nowMins = atDate.getHours() * 60 + atDate.getMinutes();
+  const startMins = startH * 60 + startM;
+  const endMins = endH * 60 + endM;
+
+  if (startMins === endMins) return false; // zero-width window = disabled
+  if (startMins < endMins) {
+    // Same-day window, e.g. 13:00 → 18:00
+    return nowMins >= startMins && nowMins < endMins;
+  }
+  // Overnight window, e.g. 22:00 → 07:00
+  return nowMins >= startMins || nowMins < endMins;
+}
+
+/** Whether a given category should show/sound in-app right now, per preferences. */
+export function isCategoryEnabled(preferences, categoryId, channel = 'in_app') {
+  const prefs = preferences?.category_prefs?.[categoryId];
+  if (!prefs) return true;
+  return prefs[channel] !== false;
 }
 
 // ────────── LIFECYCLE NOTIFICATIONS ──────────
@@ -402,6 +611,39 @@ export async function notifySubscriptionExpiry(ownerId, plateId, daysLeft) {
   });
 }
 
+// ────────── MANUAL WRAPPERS — Payments / Admin / Security ──────────
+// The SQL triggers in sql/48_notification_center.sql already populate these
+// three categories automatically from payments/activation_events/
+// rtc_call_attempts rows. These wrappers exist for any future client-side
+// caller (e.g. an admin console action) that wants to raise the same kind
+// of notification without waiting on a DB row write.
+export async function notifyPaymentEvent(ownerId, { status, amount, currency = 'INR', orderId } = {}) {
+  const titles = {
+    captured: '✅ Payment received',
+    failed: '❌ Payment failed',
+    refunded: '↩️ Payment refunded',
+  };
+  return dispatch({
+    ownerId, type: 'payment',
+    title: titles[status] || 'Payment update',
+    body: `${currency} ${amount ?? ''}`.trim(),
+    payload: { orderId, status, amount, currency }, priority: status === 'failed' ? 'high' : 'normal',
+    channels: ['in_app'],
+  });
+}
+
+export async function notifyAdminAction(ownerId, title, body, payload = {}) {
+  return dispatch({
+    ownerId, type: 'admin_action', title, body, payload, priority: 'normal', channels: ['in_app'],
+  });
+}
+
+export async function notifySecurityAlert(ownerId, title, body, payload = {}) {
+  return dispatch({
+    ownerId, type: 'security_alert', title, body, payload, priority: 'high', channels: ['in_app'],
+  });
+}
+
 export default {
   createNotification,
   dispatch,
@@ -411,9 +653,25 @@ export default {
   notifyNewConversationMessage,
   notifyStatusChange,
   triggerEmergencyBroadcast,
+  NOTIFICATION_CATEGORIES,
+  categoryLabel,
+  categoryIcon,
   getNotifications,
+  getUnreadCount,
+  getUnreadCountsByCategory,
   markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
   subscribeToNotifications,
+  subscribeToNotificationCenter,
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  isWithinQuietHours,
+  isCategoryEnabled,
+  DEFAULT_CATEGORY_PREFS,
+  notifyPaymentEvent,
+  notifyAdminAction,
+  notifySecurityAlert,
   notifyOrderCreated,
   notifyQRGenerated,
   notifyManufacturingStarted,
