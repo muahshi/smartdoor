@@ -495,6 +495,8 @@
   import { visitorCallUI } from './js/visitorCallUI.js';
   import { runCallScreening } from './js/aiCallScreeningUI.js';
   import { classifyCallPurpose, saveCallScreening } from './services/aiReceptionist.js';
+  import { runVoiceScreening } from './js/aiVoiceReceptionistUI.js';
+  import { getRulesForPlate, evaluateRules } from './services/aiReceptionistRules.js';
 
   const shell = document.getElementById('shell');
 
@@ -1598,29 +1600,69 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       document.getElementById('call-sub').textContent = 'AI receptionist answering…';
 
       // ── AI Receptionist — answers first ──────────────────────────────
-      // A short, structured Q&A runs BEFORE the (unmodified) WebRTC ring
-      // or masked-call fallback below. Visitor can cancel here without
-      // ever placing a call. Pure additive layer: services/webrtcCall.js,
-      // attemptTapToTalk(), and the masked-call path are untouched.
+      // Voice-first: the visitor talks to the AI Voice Receptionist
+      // (STT+TTS, natural conversation, minimum follow-ups). Falls back
+      // automatically and transparently to the original chip-based
+      // screening whenever speech APIs are unavailable/denied/fail
+      // mid-conversation — js/aiVoiceReceptionistUI.js never throws, it
+      // resolves { useFallback: true } instead. Visitor can cancel here
+      // without ever placing a call. Pure additive layer:
+      // services/webrtcCall.js, attemptTapToTalk(), and the masked-call
+      // path below are untouched either way.
       const aiName = s.owner.profile?.aiName || 'Priya';
       const ownerLabel = s.owner.profile?.familyName || s.owner.profile?.residenceName || s.owner.name || 'the resident';
-      const screening = await runCallScreening({ aiName, ownerLabel });
-      if (screening.cancelled) {
+      const ownerStatusNow = s.securityRules?.current_status || 'available';
+
+      let screening, classification, conversationMode, transcript;
+      const voiceResult = await runVoiceScreening({
+        aiName, ownerLabel, ownerStatus: ownerStatusNow,
+        aiVoiceGender: s.owner.profile?.aiVoiceGender,
+      }).catch(() => ({ cancelled: false, useFallback: true, mode: 'voice_error' }));
+
+      if (voiceResult.cancelled) {
         document.getElementById('call-sub').textContent = 'Connect with the family';
         btnCall.disabled = !s.access?.allowCall;
         return;
       }
 
-      const classification = await classifyCallPurpose(screening.answers || {}, {
-        aiName, ownerLabel, ownerStatus: s.securityRules?.current_status || 'available',
-      }).catch(() => null) || {
-        visitorType: 'Unknown Visitor', confidence: 0.6, suggestedAction: 'Notify Owner',
-        aiSummary: 'Visitor at the door', priority: 'Normal',
-      };
+      if (!voiceResult.useFallback) {
+        screening = { cancelled: false, answers: voiceResult.answers || {} };
+        classification = voiceResult.classification;
+        conversationMode = voiceResult.mode === 'voice_manual_fallback' ? 'voice_manual_fallback' : 'voice';
+        transcript = Array.isArray(voiceResult.transcript) ? voiceResult.transcript : [];
+      } else {
+        // Chip fallback — original, unmodified screening flow.
+        screening = await runCallScreening({ aiName, ownerLabel });
+        if (screening.cancelled) {
+          document.getElementById('call-sub').textContent = 'Connect with the family';
+          btnCall.disabled = !s.access?.allowCall;
+          return;
+        }
+        classification = await classifyCallPurpose(screening.answers || {}, {
+          aiName, ownerLabel, ownerStatus: ownerStatusNow,
+        }).catch(() => null) || {
+          visitorType: 'Unknown Visitor', confidence: 0.6, suggestedAction: 'Notify Owner',
+          aiSummary: 'Visitor at the door', priority: 'Normal',
+        };
+        conversationMode = 'chip';
+        transcript = [{ question: 'Purpose of visit', answer: screening.answers?.purposeChip || null }];
+      }
+
+      // Owner Rules Engine — configurable, extensible rules (e.g. "Amazon
+      // -> Auto Allow", "Sales Person -> Recommend Reject") layered on top
+      // of the AI's own classification. Best-effort read; on any failure
+      // rules evaluate to the same "ring_owner" default as today, so a
+      // missing/misconfigured rules table never blocks a call.
+      let ruleOutcome = { action: 'ring_owner', matchedRule: null };
+      if (ownerId && plateId) {
+        const rules = await getRulesForPlate(plateId).catch(() => []);
+        ruleOutcome = evaluateRules(classification, screening.answers || {}, rules);
+      }
 
       if (ownerId && plateId) {
-        // Persist the structured summary the owner's ring card reads
-        // (js/webrtcCallUI.js) — best-effort, never blocks the call.
+        // Persist the structured summary + full transcript the owner's
+        // ring card reads (js/webrtcCallUI.js) — best-effort, never
+        // blocks the call.
         saveCallScreening({
           ownerId, plateId, visitorName: vName,
           visitorType: classification.visitorType,
@@ -1632,7 +1674,9 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           confidence: classification.confidence,
           suggestedAction: classification.suggestedAction,
           aiSummary: classification.aiSummary,
-          transcript: [{ question: 'Purpose of visit', answer: screening.answers?.purposeChip || null }],
+          transcript,
+          conversationMode,
+          ruleMatched: ruleOutcome.matchedRule?.label || null,
         }).catch(() => {});
 
         // Mirror into visitor_logs (Activity Center/Inbox timeline —
@@ -1661,6 +1705,7 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
             metadata: {
               intent: classification.visitorType, priority: classification.priority,
               confidence: classification.confidence, suggestedAction: classification.suggestedAction,
+              ruleMatched: ruleOutcome.matchedRule?.label || null,
             },
           }).then((res) => {
             if (res?.success && res.id && classification.priority !== 'Low') {
@@ -1669,7 +1714,26 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           }).catch(() => {});
         }).catch(() => {});
       }
-      // ── End AI Receptionist screening — proceeding to ring ───────────
+      // ── End AI Receptionist screening ────────────────────────────────
+
+      // Owner rule says decline automatically — the call never reaches
+      // the owner's ring UI. Emergencies can never land here:
+      // evaluateRules() always forces 'auto_connect' for them, above any
+      // owner-configured rule. This is the only place a rule can skip
+      // ringing entirely; every other outcome (auto_allow, auto_connect,
+      // ask_more, ring_owner) still proceeds through the exact same
+      // WebRTC ring / masked-call path below, untouched.
+      if (ruleOutcome.action === 'auto_decline') {
+        const declineMsg = classification.visitorType === 'Sales Person'
+          ? 'Thanks for stopping by — we\'re not accepting sales visits right now.'
+          : 'Thanks — this has been noted, no need to wait.';
+        document.getElementById('call-sub').textContent = declineMsg;
+        showToast('🚫 Auto-declined by an AI Receptionist rule', 'info');
+        btnCall.disabled = !s.access?.allowCall;
+        recordVisitorVisit({ ownerId, plateId, phone: vPhone, callType: 'webrtc', accepted: false, name: vName, callStatus: 'rejected', networkType: _getNetworkType() }).catch(() => {});
+        return;
+      }
+
 
       document.getElementById('call-sub').textContent = 'Connecting…';
       _logVisitorEvent(ownerId, plateId, 'call_attempt');

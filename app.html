@@ -1000,6 +1000,9 @@
           <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:4px;">Applies to the AI receptionist's spoken replies on your visitor page</div>
         </div>
         <div class="settings-field-group">
+          <button type="button" class="settings-input" style="cursor:pointer;text-align:left;background:rgba(0,162,232,0.1);border-color:rgba(0,162,232,0.3);color:#7DD3FC;font-weight:600;" onclick="window.AIReceptionistRules?.open()">🤖 AI Receptionist Rules — Amazon Auto Allow, Family Auto Connect…</button>
+        </div>
+        <div class="settings-field-group">
           <label class="settings-label">Greeting Style</label>
           <select id="set-greeting-style" class="settings-input">
             <option value="warm">Warm & Friendly</option>
@@ -1413,6 +1416,9 @@
             </select>
           </div>
           <div class="settings-field-group">
+            <button type="button" class="settings-input" style="cursor:pointer;text-align:left;background:rgba(0,162,232,0.1);border-color:rgba(0,162,232,0.3);color:#7DD3FC;font-weight:600;" onclick="window.AIReceptionistRules?.open()">🤖 AI Receptionist Rules — Amazon Auto Allow, Family Auto Connect…</button>
+          </div>
+          <div class="settings-field-group">
             <label class="settings-label">Greeting Style</label>
             <select id="set-greeting-style-d" class="settings-input">
               <option value="warm">Warm & Friendly</option>
@@ -1708,6 +1714,7 @@
 <!-- SaaS Launch: Subscription Dashboard (additive only — reads DashboardModule.getState(), never modifies dashboard.js) -->
 <script type="module" src="js/subscriptionManager.js"></script>
 <script type="module" src="js/activityCenter.js"></script>
+<script type="module" src="js/aiReceptionistRulesUI.js"></script>
 <!-- Production Notification Center (additive only — reads DashboardModule.getState(), never modifies dashboard.js or WebRTC) -->
 <script type="module" src="js/notificationCenter.js"></script>
 
