@@ -87,6 +87,18 @@ function _ensureDom() {
     }
     #sd-rtc-card-plate { font-size: 15px; font-weight: 700; color: #fff; }
     #sd-rtc-card-purpose { font-size: 12px; color: #9CA3AF; margin-top: 2px; }
+    #sd-rtc-transcript-toggle {
+      display: none; margin-top: 8px; background: none; border: none;
+      color: #00A2E8; font-size: 11px; font-weight: 600; cursor: pointer; padding: 0;
+    }
+    #sd-rtc-transcript-panel {
+      display: none; margin-top: 8px; max-height: 140px; overflow-y: auto;
+      border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;
+    }
+    #sd-rtc-transcript-panel.sd-rtc-tp-show { display: block; }
+    .sd-rtc-tp-row { font-size: 11px; margin-bottom: 6px; line-height: 1.4; }
+    .sd-rtc-tp-q { color: #9CA3AF; }
+    .sd-rtc-tp-a { color: #E2ECF4; font-style: italic; }
 
     #sd-rtc-title { font-size: 19px; font-weight: 700; margin: 4px 0 2px; }
     #sd-rtc-sub { font-size: 13px; color: #9CA3AF; margin-bottom: 18px; }
@@ -128,6 +140,8 @@ function _ensureDom() {
       <div id="sd-rtc-card-box">
         <div id="sd-rtc-card-plate">Someone's at the door</div>
         <div id="sd-rtc-card-purpose">Incoming Tap to Talk call</div>
+        <button type="button" id="sd-rtc-transcript-toggle">🗒️ View conversation</button>
+        <div id="sd-rtc-transcript-panel"></div>
       </div>
       <div id="sd-rtc-title">Ringing…</div>
       <div id="sd-rtc-sub"></div>
@@ -159,6 +173,10 @@ function _setRinging(plateId) {
   _overlayEl.querySelector('#sd-rtc-avatar').textContent = '📞';
   _overlayEl.querySelector('#sd-rtc-card-plate').textContent = plateId ? `Door ${plateId}` : "Someone's at the door";
   _overlayEl.querySelector('#sd-rtc-card-purpose').textContent = 'Incoming Tap to Talk call';
+  const toggleEl = _overlayEl.querySelector('#sd-rtc-transcript-toggle');
+  const panelEl = _overlayEl.querySelector('#sd-rtc-transcript-panel');
+  if (toggleEl) { toggleEl.style.display = 'none'; toggleEl.onclick = null; }
+  if (panelEl) { panelEl.classList.remove('sd-rtc-tp-show'); panelEl.innerHTML = ''; }
   _overlayEl.querySelector('#sd-rtc-title').textContent = "Someone's at the door";
   _overlayEl.querySelector('#sd-rtc-sub').textContent = 'Incoming Tap to Talk call…';
   _banner(false);
@@ -199,11 +217,39 @@ function _renderScreeningOnCard(callId, getCurrentCallId, screening) {
 
   const confidencePct = Number.isFinite(screening.confidence) ? `${Math.round(screening.confidence * 100)}%` : null;
   const actionBadge = _ACTION_BADGE[screening.suggestedAction] || '';
+  const modeBadge = screening.conversationMode === 'voice' ? '🎙️ Voice AI' : screening.conversationMode === 'voice_manual_fallback' ? '🎙️→⌨️ Voice (typed)' : '⌨️ Quick-select';
   purposeLine.innerHTML = `
     ${screening.aiSummary || screening.visitorType}
+    <br/><span style="opacity:0.6;">${modeBadge}</span>
     ${confidencePct ? `<br/><span style="opacity:0.75;">Confidence ${confidencePct}</span>` : ''}
     ${actionBadge ? `<br/><span style="color:#D4AF37;">${actionBadge}</span>` : ''}
+    ${screening.ruleMatched ? `<br/><span style="color:#7DD3FC;">⚙️ Rule: ${screening.ruleMatched}</span>` : ''}
   `;
+
+  // Full conversation transcript — collapsed by default, expandable.
+  // Purely additive: if there's no transcript (or an older row predating
+  // migration 53), the toggle simply stays hidden.
+  const toggleEl = _overlayEl.querySelector('#sd-rtc-transcript-toggle');
+  const panelEl = _overlayEl.querySelector('#sd-rtc-transcript-panel');
+  const transcript = Array.isArray(screening.transcript) ? screening.transcript.filter((t) => t && (t.question || t.answer)) : [];
+  if (toggleEl && panelEl && transcript.length) {
+    toggleEl.style.display = 'inline-block';
+    panelEl.innerHTML = transcript.map((t) => `
+      <div class="sd-rtc-tp-row">
+        <div class="sd-rtc-tp-q">${t.question ? `🤖 ${_escHtml(t.question)}` : ''}</div>
+        <div class="sd-rtc-tp-a">${t.answer ? `🙋 ${_escHtml(t.answer)}` : '🙋 (no response)'}</div>
+      </div>
+    `).join('');
+    toggleEl.onclick = () => {
+      const show = !panelEl.classList.contains('sd-rtc-tp-show');
+      panelEl.classList.toggle('sd-rtc-tp-show', show);
+      toggleEl.textContent = show ? '🗒️ Hide conversation' : '🗒️ View conversation';
+    };
+  }
+}
+
+function _escHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function _setConnected() {
