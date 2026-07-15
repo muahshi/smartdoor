@@ -166,6 +166,10 @@ export async function saveCallScreening({
   visitingWhom = null, purpose = null, flatNumber = null, hasPackage = null,
   expectedByOwner = null, confidence = 0.7, suggestedAction = 'Notify Owner',
   aiSummary = null, transcript = [],
+  // Additive (sql/53_ai_voice_receptionist.sql) — safe defaults so every
+  // existing caller (the chip-based screening flow) keeps working
+  // unchanged without passing these.
+  conversationMode = 'chip', durationSeconds = null, ruleMatched = null,
 }) {
   if (!ownerId || !plateId || !visitorType) return { success: false };
   try {
@@ -175,6 +179,7 @@ export async function saveCallScreening({
       purpose, flat_number: flatNumber, has_package: hasPackage,
       expected_by_owner: expectedByOwner, confidence, suggested_action: suggestedAction,
       ai_summary: aiSummary, transcript,
+      conversation_mode: conversationMode, duration_seconds: durationSeconds, rule_matched: ruleMatched,
     }).select('id').single();
     if (error) {
       console.error('[AIReceptionist] saveCallScreening failed:', error);
@@ -201,7 +206,7 @@ export async function getRecentCallScreening(ownerId, plateId, freshnessMs = 3 *
     const since = new Date(Date.now() - freshnessMs).toISOString();
     const { data, error } = await supabase
       .from('ai_call_screenings')
-      .select('visitor_name, visitor_type, company, visiting_whom, purpose, confidence, suggested_action, ai_summary, created_at')
+      .select('visitor_name, visitor_type, company, visiting_whom, purpose, confidence, suggested_action, ai_summary, transcript, conversation_mode, rule_matched, created_at')
       .eq('owner_id', ownerId)
       .eq('plate_id', plateId)
       .gte('created_at', since)
@@ -218,6 +223,9 @@ export async function getRecentCallScreening(ownerId, plateId, freshnessMs = 3 *
       confidence: Number(data.confidence),
       suggestedAction: data.suggested_action,
       aiSummary: data.ai_summary,
+      transcript: Array.isArray(data.transcript) ? data.transcript : [],
+      conversationMode: data.conversation_mode || 'chip',
+      ruleMatched: data.rule_matched || null,
     };
   } catch (_) {
     return null;
