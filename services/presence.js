@@ -213,7 +213,7 @@ function _startPresence(ownerId) {
       _logPresenceEvent(ownerId, 'disconnect', _deviceCount(), deviceId).catch(() => {});
     });
 
-    channel.subscribe(async (status) => {
+    channel.subscribe(async (status, err) => {
       if (torndown) return;
 
       if (status === 'SUBSCRIBED') {
@@ -232,6 +232,13 @@ function _startPresence(ownerId) {
       }
 
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        // DIAGNOSTIC ADDITION (presence reconnect-loop investigation): this
+        // branch previously reconnected silently with no log line, so the
+        // console only ever showed repeated SUBSCRIBED/track()-succeeded
+        // pairs and never the actual reason the channel kept dropping.
+        // Logging here does not change the reconnect/backoff behavior at
+        // all — same delay, same retry — it only makes the cause visible.
+        console.warn(`[RTC-TRACE][FAIL] presence channel dropped, reconnecting | File=services/presence.js ownerId=${ownerId} deviceId=${deviceId} channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=disconnected Expected=SUBSCRIBED attempt=${reconnectAttempt + 1}`);
         // Graceful reconnect: exponential backoff, capped, so a network
         // blip retries quickly but a persistent outage doesn't hammer
         // the realtime service.
