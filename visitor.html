@@ -467,6 +467,12 @@
 
 <script src="config/env.generated.js?v=2"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
+<!-- TEMPORARY — forensic debug overlay for third-party-visitor WebRTC
+     signaling investigation. Enabled only via ?debug=1 or
+     localStorage.sd_debug="1"; otherwise renders nothing. Diagnostics
+     only — does not touch WebRTC/signaling logic. Safe to remove this
+     one line + js/debugOverlay.js once the investigation is done. -->
+<script src="js/debugOverlay.js"></script>
 
 <div class="shell" id="shell">
   <div class="loading-wrap" id="loading-state">
