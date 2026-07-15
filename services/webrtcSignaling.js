@@ -140,6 +140,78 @@ function _safeRemoveChannel(channel) {
   }, 0);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// TEMPORARY DIAGNOSTIC — raw Realtime failure dump (REMOVE AFTER ROOT-
+// CAUSE CONFIRMATION). Called only when channel.subscribe()'s callback
+// reports a status other than SUBSCRIBED. Read-only: never mutates
+// channel/socket state, never touches timers, never changes join
+// behavior, retry logic, or what gets resolved/rejected — it runs
+// alongside the existing console.error calls in each failure branch,
+// purely to capture the complete, unsummarized payload Supabase Realtime
+// returns on failure. Does not log the raw access token value itself
+// (only whether one is present and its length), everything else is
+// printed as-is.
+// ═══════════════════════════════════════════════════════════════════════
+function _dumpRealtimeFailure(channel, channelName, status, err) {
+  const timestamp = new Date().toISOString();
+  try {
+    console.error(`[RTC-TRACE][RAW-DUMP] ══════ non-SUBSCRIBED status ══════ timestamp=${timestamp} topic=${channelName}`);
+
+    console.error('[RTC-TRACE][RAW-DUMP] status (raw):', status);
+
+    console.error('[RTC-TRACE][RAW-DUMP] err (raw object, console-inspected):', err);
+    console.error('[RTC-TRACE][RAW-DUMP] err (JSON.stringify):', JSON.stringify(err));
+    try {
+      console.error(
+        '[RTC-TRACE][RAW-DUMP] err (JSON.stringify with own property names, catches non-enumerable fields like .message/.stack):',
+        JSON.stringify(err, Object.getOwnPropertyNames(err || {}))
+      );
+    } catch (nestedStringifyErr) {
+      console.error('[RTC-TRACE][RAW-DUMP] err JSON.stringify(ownPropertyNames) FAILED:', nestedStringifyErr);
+    }
+    try {
+      console.error('[RTC-TRACE][RAW-DUMP] err own property names:', Object.getOwnPropertyNames(err || {}));
+      console.error('[RTC-TRACE][RAW-DUMP] err own property descriptors:', Object.getOwnPropertyDescriptors(err || {}));
+    } catch (nestedDescErr) {
+      console.error('[RTC-TRACE][RAW-DUMP] err property introspection FAILED:', nestedDescErr);
+    }
+    console.error('[RTC-TRACE][RAW-DUMP] err?.message:', err?.message);
+    console.error('[RTC-TRACE][RAW-DUMP] err?.code:', err?.code);
+    console.error('[RTC-TRACE][RAW-DUMP] err?.reason:', err?.reason);
+    console.error('[RTC-TRACE][RAW-DUMP] err?.status:', err?.status);
+    console.error('[RTC-TRACE][RAW-DUMP] err?.type:', err?.type);
+    console.error('[RTC-TRACE][RAW-DUMP] err?.stack:', err?.stack);
+
+    console.error('[RTC-TRACE][RAW-DUMP] channel.topic:', channel?.topic);
+    console.error('[RTC-TRACE][RAW-DUMP] channel.state:', channel?.state);
+    console.error('[RTC-TRACE][RAW-DUMP] channel.joinedOnce:', channel?.joinedOnce);
+    console.error('[RTC-TRACE][RAW-DUMP] channel._state (internal, if present):', channel?._state);
+    console.error('[RTC-TRACE][RAW-DUMP] channel (raw object, console-inspected):', channel);
+
+    const socket = channel?.socket;
+    console.error('[RTC-TRACE][RAW-DUMP] socket present:', !!socket);
+    if (socket) {
+      console.error(
+        '[RTC-TRACE][RAW-DUMP] socket.connectionState():',
+        typeof socket.connectionState === 'function' ? socket.connectionState() : 'n/a (method not present)'
+      );
+      console.error(
+        '[RTC-TRACE][RAW-DUMP] socket.isConnected():',
+        typeof socket.isConnected === 'function' ? socket.isConnected() : 'n/a (method not present)'
+      );
+      console.error('[RTC-TRACE][RAW-DUMP] socket.readyState (underlying transport, if present):', socket?.conn?.readyState ?? socket?.transport?.readyState ?? 'n/a');
+      console.error('[RTC-TRACE][RAW-DUMP] socket.accessToken present:', !!socket.accessToken);
+      console.error('[RTC-TRACE][RAW-DUMP] socket.accessToken length:', socket.accessToken ? String(socket.accessToken).length : 0);
+      console.error('[RTC-TRACE][RAW-DUMP] socket.endPoint / endpointURL:', socket?.endPoint || socket?.endpointURL?.() || 'n/a');
+      console.error('[RTC-TRACE][RAW-DUMP] socket (raw object, console-inspected):', socket);
+    }
+
+    console.error(`[RTC-TRACE][RAW-DUMP] ══════ end dump for topic=${channelName} ══════`);
+  } catch (dumpErr) {
+    console.error('[RTC-TRACE][RAW-DUMP] the diagnostic dump itself threw:', dumpErr);
+  }
+}
+
 /**
  * Joins a broadcast channel and resolves once SUBSCRIBED (or rejects on
  * timeout), so callers never broadcast into a channel that isn't ready
@@ -181,6 +253,7 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
         resolve(channel);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timer);
+        _dumpRealtimeFailure(channel, channelName, status, err);
         _safeRemoveChannel(channel);
         console.error(`[RTC-TRACE][FAIL] channel join failed | File=services/webrtcSignaling.js Channel=${channelName} Reason=${status}${err?.message ? ` (${err.message})` : ''} Current=not-subscribed Expected=SUBSCRIBED`);
         console.error(`[RTC-TRACE][FAIL][AUTH-CHECK] join REJECTED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status} errMessage=${err?.message || 'n/a'} errFull=${JSON.stringify(err || {})}`);
@@ -309,6 +382,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
 
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           clearTimeout(initialTimer);
+          _dumpRealtimeFailure(channel, channelName, status, err);
 
           if (!firstSettled) {
             // Genuine initial-join failure — no channel was ever live.
