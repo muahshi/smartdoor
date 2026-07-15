@@ -25,6 +25,7 @@
  */
 
 import { listenForIncomingCalls } from '../services/webrtcOwnerCall.js';
+import { getRecentCallScreening } from '../services/aiReceptionist.js';
 
 let _overlayEl = null;
 let _remoteAudioEl = null;
@@ -167,6 +168,44 @@ function _setRinging(plateId) {
   `;
 }
 
+// AI Receptionist enrichment — purely additive. Called after _setRinging()
+// once (if) a fresh pre-call screening is found for this owner+plate
+// (services/aiReceptionist.js). Never touches accept()/reject()/hangUp()
+// or any signaling — it only replaces the static "Incoming Tap to Talk
+// call" line with the structured summary the visitor's screening produced.
+const _ACTION_BADGE = {
+  Accept: '✅ Recommended: Accept',
+  Decline: '🚫 Recommended: Decline',
+  Blocked: '🚫 Likely spam',
+  'Ask Owner': '❓ Ask before accepting',
+  'Notify Owner': 'ℹ️ For your awareness',
+};
+
+function _renderScreeningOnCard(callId, getCurrentCallId, screening) {
+  // Guard against a stale async response landing after this call ended
+  // or a different call started ringing.
+  if (!_overlayEl || getCurrentCallId() !== callId || !screening) return;
+  const plateLine = _overlayEl.querySelector('#sd-rtc-card-plate');
+  const purposeLine = _overlayEl.querySelector('#sd-rtc-card-purpose');
+  if (!plateLine || !purposeLine) return;
+
+  if (screening.visitorName) {
+    plateLine.textContent = screening.visitorName;
+  } else if (screening.company) {
+    plateLine.textContent = `${screening.visitorType} (${screening.company})`;
+  } else {
+    plateLine.textContent = screening.visitorType;
+  }
+
+  const confidencePct = Number.isFinite(screening.confidence) ? `${Math.round(screening.confidence * 100)}%` : null;
+  const actionBadge = _ACTION_BADGE[screening.suggestedAction] || '';
+  purposeLine.innerHTML = `
+    ${screening.aiSummary || screening.visitorType}
+    ${confidencePct ? `<br/><span style="opacity:0.75;">Confidence ${confidencePct}</span>` : ''}
+    ${actionBadge ? `<br/><span style="color:#D4AF37;">${actionBadge}</span>` : ''}
+  `;
+}
+
 function _setConnected() {
   _stopTimer();
   _startedAt = Date.now();
@@ -284,6 +323,14 @@ export async function initOwnerCallUI(ownerId) {
       _ensureDom();
       _setRinging(plateId);
       _show();
+
+      // AI Receptionist enrichment — best-effort, never delays the ring
+      // itself (overlay is already shown above with the generic card).
+      // Looks up the freshest pre-call screening for this owner+plate;
+      // a stale/missing result silently leaves the generic card as-is.
+      getRecentCallScreening(ownerId, plateId).then((screening) => {
+        _renderScreeningOnCard(callId, () => _currentCallId, screening);
+      }).catch(() => {});
 
       const acceptBtn = document.getElementById('sd-rtc-accept');
       const rejectBtn = document.getElementById('sd-rtc-reject');
