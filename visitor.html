@@ -493,6 +493,8 @@
   import { attemptTapToTalk } from './services/webrtcCall.js';
   import { recordVisitorVisit, getVisitorRecognition } from './services/visitorMemory.js';
   import { visitorCallUI } from './js/visitorCallUI.js';
+  import { runCallScreening } from './js/aiCallScreeningUI.js';
+  import { classifyCallPurpose, saveCallScreening } from './services/aiReceptionist.js';
 
   const shell = document.getElementById('shell');
 
@@ -1593,6 +1595,82 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
       const vName = cachedName;
       const netType = _getNetworkType();
       btnCall.disabled = true;
+      document.getElementById('call-sub').textContent = 'AI receptionist answering…';
+
+      // ── AI Receptionist — answers first ──────────────────────────────
+      // A short, structured Q&A runs BEFORE the (unmodified) WebRTC ring
+      // or masked-call fallback below. Visitor can cancel here without
+      // ever placing a call. Pure additive layer: services/webrtcCall.js,
+      // attemptTapToTalk(), and the masked-call path are untouched.
+      const aiName = s.owner.profile?.aiName || 'Priya';
+      const ownerLabel = s.owner.profile?.familyName || s.owner.profile?.residenceName || s.owner.name || 'the resident';
+      const screening = await runCallScreening({ aiName, ownerLabel });
+      if (screening.cancelled) {
+        document.getElementById('call-sub').textContent = 'Connect with the family';
+        btnCall.disabled = !s.access?.allowCall;
+        return;
+      }
+
+      const classification = await classifyCallPurpose(screening.answers || {}, {
+        aiName, ownerLabel, ownerStatus: s.securityRules?.current_status || 'available',
+      }).catch(() => null) || {
+        visitorType: 'Unknown Visitor', confidence: 0.6, suggestedAction: 'Notify Owner',
+        aiSummary: 'Visitor at the door', priority: 'Normal',
+      };
+
+      if (ownerId && plateId) {
+        // Persist the structured summary the owner's ring card reads
+        // (js/webrtcCallUI.js) — best-effort, never blocks the call.
+        saveCallScreening({
+          ownerId, plateId, visitorName: vName,
+          visitorType: classification.visitorType,
+          company: screening.answers?.company || null,
+          visitingWhom: screening.answers?.visitingWhom || null,
+          purpose: screening.answers?.freeText || null,
+          hasPackage: screening.answers?.hasPackage || null,
+          expectedByOwner: screening.answers?.expected ?? null,
+          confidence: classification.confidence,
+          suggestedAction: classification.suggestedAction,
+          aiSummary: classification.aiSummary,
+          transcript: [{ question: 'Purpose of visit', answer: screening.answers?.purposeChip || null }],
+        }).catch(() => {});
+
+        // Mirror into visitor_logs (Activity Center/Inbox timeline —
+        // same insert path bell/SOS already use).
+        _logVisitorEvent(ownerId, plateId, 'ai_call_screening');
+
+        // Emergency bypasses everything else — reuses the existing SOS
+        // pipeline (services/communication.js#triggerEmergency), not a
+        // new one.
+        if (classification.visitorType === 'Emergency' || classification.priority === 'Critical') {
+          getFamilyMembersForSos(plateId).then(({ members }) => {
+            triggerEmergency({ ownerId, plateId, familyMembers: members }).catch(() => {});
+          }).catch(() => {});
+        }
+
+        // Mirror the AI's decision into the unified conversation (same
+        // Inbox thread the AI Chat Receptionist already writes to) and
+        // push-alert the owner ahead of the ring for anything above Low
+        // priority — reuses the existing conversation + push helpers.
+        ensureConversation(ownerId, plateId).then((cr) => {
+          if (!cr.success) return;
+          sendConvMessage({
+            conversationId: cr.conversationId, ownerId, plateId, senderType: 'ai',
+            senderName: aiName, text: `📞 Incoming call — ${classification.aiSummary}`,
+            aiGenerated: true,
+            metadata: {
+              intent: classification.visitorType, priority: classification.priority,
+              confidence: classification.confidence, suggestedAction: classification.suggestedAction,
+            },
+          }).then((res) => {
+            if (res?.success && res.id && classification.priority !== 'Low') {
+              _triggerPush(ownerId, plateId, 'ai_escalation', res.id, cr.conversationId);
+            }
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+      // ── End AI Receptionist screening — proceeding to ring ───────────
+
       document.getElementById('call-sub').textContent = 'Connecting…';
       _logVisitorEvent(ownerId, plateId, 'call_attempt');
 
