@@ -218,11 +218,16 @@ function _renderScreeningOnCard(callId, getCurrentCallId, screening) {
   const confidencePct = Number.isFinite(screening.confidence) ? `${Math.round(screening.confidence * 100)}%` : null;
   const actionBadge = _ACTION_BADGE[screening.suggestedAction] || '';
   const modeBadge = screening.conversationMode === 'voice' ? '🎙️ Voice AI' : screening.conversationMode === 'voice_manual_fallback' ? '🎙️→⌨️ Voice (typed)' : '⌨️ Quick-select';
+  // Urgency badge — only shown for High/Critical so a routine delivery
+  // card doesn't get cluttered with a "Normal"/"Low" badge nobody needs.
+  const urgencyColor = { Critical: '#EF4444', High: '#F59E0B' }[screening.priority];
+  const urgencyBadge = urgencyColor ? `⏱️ ${screening.priority} priority` : '';
   purposeLine.innerHTML = `
     ${screening.aiSummary || screening.visitorType}
     <br/><span style="opacity:0.6;">${modeBadge}</span>
     ${confidencePct ? `<br/><span style="opacity:0.75;">Confidence ${confidencePct}</span>` : ''}
     ${actionBadge ? `<br/><span style="color:#D4AF37;">${actionBadge}</span>` : ''}
+    ${urgencyBadge ? `<br/><span style="color:${urgencyColor};font-weight:700;">${urgencyBadge}</span>` : ''}
     ${screening.ruleMatched ? `<br/><span style="color:#7DD3FC;">⚙️ Rule: ${screening.ruleMatched}</span>` : ''}
   `;
 

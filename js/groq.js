@@ -119,9 +119,24 @@ const GroqService = (() => {
     const lower = text.toLowerCase();
 
     // Spam patterns
-    const spamKeywords = ['sell', 'insurance', 'loan', 'offer', 'discount', 'free', 'investment', 'policy', 'promote', 'advertisement', 'leaflet', 'flyer', 'market'];
+    const spamKeywords = ['sell', 'insurance', 'loan', 'offer', 'discount', 'free', 'investment', 'policy', 'promote', 'advertisement', 'leaflet', 'flyer', 'market', 'scheme', 'bechna'];
     const deliveryKeywords = ['deliver', 'parcel', 'package', 'courier', 'amazon', 'flipkart', 'order', 'shipment', 'drop', 'box', 'swiggy', 'zomato', 'food'];
-    const urgentKeywords = ['emergency', 'urgent', 'help', 'accident', 'fire', 'police', 'ambulance', 'sos', 'critical', 'immediately', 'flood'];
+    const urgentKeywords = ['emergency', 'urgent', 'help', 'accident', 'fire', 'police emergency', 'ambulance', 'sos', 'critical', 'immediately', 'flood', 'aapatkal', 'bachao'];
+    // Phase 4 — additive, more specific categories checked before the
+    // generic family/guest catch-all so "I'm his uncle" classifies as
+    // Relative (not the old generic "Known Guest / Family"), etc.
+    const relativeKeywords = ['uncle', 'aunt', 'cousin', 'nephew', 'niece', 'in-law', 'chacha', 'mama', 'mausi', 'bua', 'rishtedar'];
+    const neighbourKeywords = ['neighbour', 'neighbor', 'padosi', 'padoshi', 'next door'];
+    const friendKeywords = ['friend', 'college friend', 'classmate', 'colleague', 'dost', 'yaar'];
+    const houseHelpKeywords = ['maid', 'house help', 'domestic help', 'cook', 'cleaner', 'kaam wali', 'bai'];
+    const driverKeywords = ['driver', 'cab', 'taxi driver', 'chalak'];
+    const maintenanceKeywords = ['ac servicing', 'ac service', 'plumb', 'carpenter', 'repair', 'servicing', 'marammat', 'appliance'];
+    const technicianKeywords = ['technician', 'electrician', 'mechanic', 'internet installation', 'wifi installation', 'mistri'];
+    const societyStaffKeywords = ['society staff', 'watchman', 'security guard', 'building staff', 'housekeeping'];
+    const utilityKeywords = ['electricity department', 'electricity board', 'water department', 'water board', 'gas department', 'gas connection', 'meter reading', 'power department', 'bijli'];
+    const governmentKeywords = ['government', 'municipal', 'municipality', 'nagar nigam', 'police department', 'postal department', 'election', 'census', 'sarkari'];
+    const businessKeywords = ['business meeting', 'sales visit', 'vendor', 'client meeting', 'work meeting', 'appointment with'];
+    const medicalKeywords = ['doctor', 'nurse', 'physiotherapist', 'medical', 'clinic', 'hospital', 'health check'];
     const familyKeywords = ['family', 'relative', 'friend', 'guest', 'visit', 'meet', 'know', 'neighbour'];
 
     let intent = 'Unknown';
@@ -132,46 +147,56 @@ const GroqService = (() => {
     let emoji = '👤';
     let response = '';
 
+    const _set = (i, p, a, c, e, r, conf) => { intent = i; priority = p; action = a; color = c; emoji = e; response = r; confidence = conf; };
+
     if (spamKeywords.some(k => lower.includes(k))) {
-      intent = 'Spam / Promotional';
-      priority = 'Low';
-      action = 'Blocked';
-      color = '#EF4444';
-      emoji = '🚫';
-      response = 'We do not accept promotional or sales requests. Please contact through official channels. Thank you!';
-      confidence = 0.93;
+      _set('Spam / Promotional', 'Low', 'Blocked', '#EF4444', '🚫',
+        'We do not accept promotional or sales requests. Please contact through official channels. Thank you!', 0.93);
     } else if (urgentKeywords.some(k => lower.includes(k))) {
-      intent = 'Emergency / SOS';
-      priority = 'Critical';
-      action = 'Bypass All Rules';
-      color = '#EF4444';
-      emoji = '🚨';
-      response = 'EMERGENCY DETECTED. Alerting the owner and all family members immediately. Please stay calm.';
-      confidence = 0.98;
+      _set('Emergency / SOS', 'Critical', 'Bypass All Rules', '#EF4444', '🚨',
+        'EMERGENCY DETECTED. Alerting the owner and all family members immediately. Please stay calm.', 0.98);
     } else if (deliveryKeywords.some(k => lower.includes(k))) {
-      intent = 'Delivery';
-      priority = 'Normal';
-      action = 'Notify Owner';
-      color = '#F59E0B';
-      emoji = '📦';
-      response = 'Please leave the parcel at the security gate. The owner has been notified and will arrange collection. Thank you!';
-      confidence = 0.91;
-    } else if (familyKeywords.some(k => lower.includes(k))) {
-      intent = 'Known Guest / Family';
-      priority = 'High';
-      action = 'Ring Bell + Notify';
-      color = '#22C55E';
-      emoji = '👨‍👩‍👧';
-      response = 'Welcome! I\'ve notified the owner of your arrival. They should be with you shortly. You can also ring the digital bell.';
-      confidence = 0.88;
+      _set('Delivery', 'Normal', 'Notify Owner', '#F59E0B', '📦',
+        'Please leave the parcel at the security gate. The owner has been notified and will arrange collection. Thank you!', 0.91);
+    } else if (relativeKeywords.some(k => lower.includes(k))) {
+      _set('Relative', 'High', 'Ring Bell + Notify', '#22C55E', '🧑‍🤝‍🧑',
+        'Welcome! I\'ve notified the owner of your arrival. They should be with you shortly.', 0.85);
+    } else if (neighbourKeywords.some(k => lower.includes(k))) {
+      _set('Neighbour', 'Normal', 'Notify Owner', '#22C55E', '🏘️',
+        'Thanks for stopping by! The owner has been notified.', 0.85);
+    } else if (houseHelpKeywords.some(k => lower.includes(k))) {
+      _set('House Help', 'Normal', 'Ask Owner', '#00A2E8', '🧹',
+        'The owner has been notified of your arrival. Please wait a moment.', 0.82);
+    } else if (driverKeywords.some(k => lower.includes(k))) {
+      _set('Driver', 'Normal', 'Ask Owner', '#00A2E8', '🚗',
+        'The owner has been notified. Please wait a moment.', 0.8);
+    } else if (maintenanceKeywords.some(k => lower.includes(k))) {
+      _set('Maintenance', 'Normal', 'Ask Owner', '#00A2E8', '🛠️',
+        'The owner has been notified about the maintenance visit. Please wait a moment.', 0.82);
+    } else if (technicianKeywords.some(k => lower.includes(k))) {
+      _set('Technician', 'Normal', 'Ask Owner', '#00A2E8', '🔧',
+        'The owner has been notified about the technician visit. Please wait a moment.', 0.82);
+    } else if (societyStaffKeywords.some(k => lower.includes(k))) {
+      _set('Society Staff', 'Normal', 'Notify Owner', '#00A2E8', '🏢',
+        'The owner has been notified. Please wait a moment.', 0.8);
+    } else if (utilityKeywords.some(k => lower.includes(k))) {
+      _set('Utility', 'Normal', 'Ask Owner', '#00A2E8', '💡',
+        'The owner has been notified about the utility department visit. Please wait a moment.', 0.78);
+    } else if (governmentKeywords.some(k => lower.includes(k))) {
+      _set('Government', 'Normal', 'Ask Owner', '#00A2E8', '🏛️',
+        'The owner has been notified about the visit. Please wait a moment.', 0.76);
+    } else if (businessKeywords.some(k => lower.includes(k))) {
+      _set('Business Visitor', 'Normal', 'Ask Owner', '#00A2E8', '💼',
+        'The owner has been notified of your visit. Please wait a moment.', 0.75);
+    } else if (medicalKeywords.some(k => lower.includes(k))) {
+      _set('Medical', 'High', 'Notify Owner', '#22C55E', '⚕️',
+        'The owner has been notified. Please wait a moment.', 0.85);
+    } else if (friendKeywords.some(k => lower.includes(k)) || familyKeywords.some(k => lower.includes(k))) {
+      _set('Known Guest / Family', 'High', 'Ring Bell + Notify', '#22C55E', '👨‍👩‍👧',
+        'Welcome! I\'ve notified the owner of your arrival. They should be with you shortly. You can also ring the digital bell.', 0.88);
     } else {
-      intent = 'General Visitor';
-      priority = 'Normal';
-      action = 'Notify Owner';
-      color = '#00A2E8';
-      emoji = '👋';
-      response = 'Thank you for visiting! The owner has been notified of your arrival. Please wait a moment or ring the digital bell.';
-      confidence = 0.82;
+      _set('General Visitor', 'Normal', 'Notify Owner', '#00A2E8', '👋',
+        'Thank you for visiting! The owner has been notified of your arrival. Please wait a moment or ring the digital bell.', 0.82);
     }
 
     return {
@@ -239,16 +264,19 @@ const GroqService = (() => {
     const messages = [
       {
         role: 'system',
-        content: `You are an AI security assistant for Smart Door, a smart nameplate system. 
-Analyze the visitor's message and classify their intent.
+        content: `You are an AI security assistant for Smart Door, a smart nameplate system. You understand Hindi, Hinglish (Hindi in Latin script), English, and natural code-mixing — classify correctly regardless of the visitor's language.
+Analyze the visitor's message and classify their intent into ONE of: Delivery, Courier, Family, Relative, Friend, Guest, Neighbour, House Help, Driver, Technician, Maintenance, Society Staff, Government, Utility, Business Visitor, Medical, "Emergency / SOS", "Spam / Promotional", "General Visitor".
+Examples: "I'm from Amazon" → Delivery. "I'm your neighbour" → Neighbour. "I'm his college friend" → Friend. "I've come for AC servicing" → Maintenance. "I'm from the electricity department" → Utility. "I'm his uncle" → Relative. "I need urgent help" → "Emergency / SOS".
 Respond ONLY with a JSON object containing:
-- intent: string (e.g., "Delivery", "Emergency / SOS", "Spam / Promotional", "Known Guest", "General Visitor")
+- intent: string (one of the categories above — keep the exact spelling/spacing shown)
 - priority: string ("Low", "Normal", "High", "Critical")
-- action: string ("Blocked", "Notify Owner", "Ring Bell + Notify", "Bypass All Rules")
-- color: hex color (#EF4444 for danger, #F59E0B for delivery, #22C55E for known, #00A2E8 for general)
+- action: string ("Blocked", "Notify Owner", "Ask Owner", "Ring Bell + Notify", "Bypass All Rules")
+- color: hex color (#EF4444 for danger/spam, #F59E0B for delivery/logistics, #22C55E for known people, #00A2E8 for general/services)
 - emoji: single emoji representing the intent
-- response: string (polite visitor-facing response message in 1-2 sentences)
-- confidence: number between 0 and 1`,
+- response: string (polite visitor-facing response message in 1-2 sentences, in the visitor's own language/mix)
+- confidence: number between 0 and 1
+PRIVACY: never invent or restate a family member's name, phone number, or relationship detail beyond a category — only classify the visit.
+An unsolicited sales/survey/promotional message, or a vague/evasive answer to why they're here, is always "Spam / Promotional" with action "Blocked" — do not give it the benefit of the doubt.`,
       },
       { role: 'user', content: visitorMessage },
     ];

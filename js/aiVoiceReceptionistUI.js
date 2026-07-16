@@ -411,7 +411,7 @@ async function _runConversation({ aiName, ownerLabel, ownerStatus }) {
     aiSummary: 'Visitor at the door', priority: 'Normal',
   };
 
-  _finish({ cancelled: false, useFallback: false, answers, classification, transcript, mode: 'voice' });
+  _finish({ cancelled: false, useFallback: false, answers, classification, transcript, mode: 'voice', languageDetected: langHint });
 }
 
 export default { runVoiceScreening, isVoiceReceptionistSupported };
