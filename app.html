@@ -748,6 +748,15 @@
         <span style="font-size:0.6rem;padding:2px 7px;border-radius:5px;background:rgba(201,162,75,0.14);color:#E8C874;font-weight:700;">BETA</span>
       </div>
       <div class="dash-card" id="ai-insights-card"></div>
+
+      <!-- Visitor Intelligence (Phase 4 — AI Receptionist category analytics,
+           weekly trend, and quality metrics; own container id, separate from
+           ai-insights-card above) -->
+      <div class="os-eyebrow" style="margin-top:14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+        <span>Visitor Intelligence</span>
+        <span style="font-size:0.6rem;padding:2px 7px;border-radius:5px;background:rgba(201,162,75,0.14);color:#E8C874;font-weight:700;">BETA</span>
+      </div>
+      <div class="dash-card" id="ai-category-insights-card"></div>
     </div>
     <!-- END DASHBOARD TAB -->
 
@@ -1584,6 +1593,15 @@
         </div>
         <div class="dash-card" id="ai-insights-card" style="margin-bottom:16px;"></div>
 
+        <!-- Visitor Intelligence (Phase 4 — AI Receptionist category analytics,
+             weekly trend, and quality metrics; own container id, separate
+             from ai-insights-card above) -->
+        <div class="dash-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Visitor Intelligence</span>
+          <span style="font-size:0.6rem;padding:2px 7px;border-radius:5px;background:rgba(201,162,75,0.14);color:#E8C874;font-weight:700;">BETA</span>
+        </div>
+        <div class="dash-card" id="ai-category-insights-card" style="margin-bottom:16px;"></div>
+
         <!-- Weekly/Monthly Chart -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <div class="dash-section-title" style="margin-bottom:0;">Visitor Activity</div>
@@ -1715,6 +1733,8 @@
 <script type="module" src="js/subscriptionManager.js"></script>
 <script type="module" src="js/activityCenter.js"></script>
 <script type="module" src="js/aiReceptionistRulesUI.js"></script>
+<!-- AI Receptionist Analytics (Phase 4 — additive only — reads DashboardModule.getState(), never modifies dashboard.js) -->
+<script type="module" src="js/aiReceptionistAnalyticsUI.js"></script>
 <!-- Production Notification Center (additive only — reads DashboardModule.getState(), never modifies dashboard.js or WebRTC) -->
 <script type="module" src="js/notificationCenter.js"></script>
 

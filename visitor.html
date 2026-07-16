@@ -1677,6 +1677,8 @@ Always reply ONLY with this valid JSON (no markdown, no backticks):
           transcript,
           conversationMode,
           ruleMatched: ruleOutcome.matchedRule?.label || null,
+          priority: classification.priority || 'Normal',
+          languageDetected: voiceResult.languageDetected || classification.languageDetected || null,
         }).catch(() => {});
 
         // Mirror into visitor_logs (Activity Center/Inbox timeline —
