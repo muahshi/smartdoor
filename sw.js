@@ -1,7 +1,7 @@
 // Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
-const CACHE_NAME = 'smartdoor-v8'; // bumped: Phase 3 — accurate event timestamp + optional notification image
+const CACHE_NAME = 'smartdoor-v9'; // bumped: Phase 6 — production hardening (badge count reliability, fetch timeouts, diagnostic log gating)
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -81,18 +81,42 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// ── Badge counter (persisted across SW restarts) ──
-let badgeCount = 0;
-
-async function incrementBadge() {
-  badgeCount++;
-  if ('setAppBadge' in self.navigator) {
-    try { await self.navigator.setAppBadge(badgeCount); } catch (_) {}
+// ── Badge counter ──
+// PRODUCTION FIX (Service Worker reliability): this was `let badgeCount = 0`
+// incremented in memory. A service worker is routinely terminated by the
+// browser/OS after ~30s of idle (especially on mobile, exactly this app's
+// primary platform) and restarted fresh on the next event — so this
+// counter silently reset to 0 on almost every push, making the OS app
+// badge wrong (usually stuck at 1, or under-counting) for real users far
+// more often than it was ever correct.
+//
+// Fix: derive the badge count from something that actually survives a SW
+// restart — the browser's own persisted notification tray — instead of an
+// in-memory variable. self.registration.getNotifications() reflects every
+// currently-shown notification for this origin regardless of whether this
+// SW instance is the one that created it, so the count is correct even
+// right after a cold SW restart.
+async function _recalculateBadge() {
+  try {
+    const active = await self.registration.getNotifications();
+    const count = active.length;
+    if ('setAppBadge' in self.navigator) {
+      if (count > 0) await self.navigator.setAppBadge(count);
+      else await self.navigator.clearAppBadge();
+    }
+    return count;
+  } catch (_) {
+    return 0;
   }
 }
 
+async function incrementBadge() {
+  // Notification is already shown by the time this is called (see the
+  // push handler below), so the tray already reflects the new count.
+  await _recalculateBadge();
+}
+
 async function clearBadge() {
-  badgeCount = 0;
   if ('clearAppBadge' in self.navigator) {
     try { await self.navigator.clearAppBadge(); } catch (_) {}
   }
@@ -198,9 +222,12 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil(
     (async () => {
-      await incrementBadge();
       try {
         await self.registration.showNotification(title, options);
+        // Recalculate from the live tray AFTER showing, so a collapsible
+        // (renotify) type correctly doesn't inflate the count, and a new
+        // distinct notification correctly does.
+        await incrementBadge();
         await _broadcast({ type: 'push_delivered', notifData: options.data });
       } catch (err) {
         await _broadcast({ type: 'push_failed', notifData: options.data, error: String(err) });
@@ -231,7 +258,16 @@ self.addEventListener('notificationclick', (event) => {
   // actually focuses the reply textbox once the thread is open, driven off
   // the `action:'reply'` it receives below.
   if (event.action === 'reply') targetUrl = notifData.conversationId ? '/app.html?tab=inbox' : targetUrl;
-  if (event.action === 'dismiss') { clearBadge(); return; }
+  if (event.action === 'dismiss') {
+    // PRODUCTION FIX: was clearBadge() (hard reset to 0) fired-and-forgotten
+    // outside event.waitUntil — under-counted if other notifications were
+    // still pending, and could be killed mid-write since nothing held the
+    // event alive for it. Recalculate from the tray (already one shorter,
+    // since event.notification.close() above already ran) and keep the
+    // event alive until that finishes.
+    event.waitUntil(_recalculateBadge());
+    return;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
@@ -249,7 +285,15 @@ self.addEventListener('notificationclick', (event) => {
 
 // ── Message from page ──
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'CLEAR_BADGE') clearBadge();
+  if (event.data?.type === 'CLEAR_BADGE') {
+    // Explicit "mark everything read" signal from the dashboard (see
+    // js/dashboard.js) — genuinely clear to 0, not a tray recalculation.
+    // PRODUCTION FIX: previously fired-and-forgotten (not awaited via
+    // waitUntil), so the SW could be terminated before the async
+    // clearAppBadge() call completed on a background/backgrounding tab.
+    if (event.waitUntil) event.waitUntil(clearBadge());
+    else clearBadge();
+  }
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
