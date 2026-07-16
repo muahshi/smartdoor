@@ -39,6 +39,7 @@ import { generatePlateId as previewPlateId, getQrUrl } from './plates.js';
 import { generateQrDataUrl, generateQrSvg } from './qr.js';
 import { sendEmail, EMAIL_TEMPLATES } from './email.js';
 import { sendWhatsApp } from './whatsapp.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 // ────────── INTERNAL: AUTHENTICATED EDGE FUNCTION CALL ──────────
 /**
@@ -57,14 +58,17 @@ async function callAdminFunction(name, body) {
   if (!token) return { success: false, error: 'Your admin session has expired. Please sign in again.' };
 
   try {
-    const res = await fetch(`${_edgeBase()}/${name}`, {
+    // PRODUCTION HARDENING (API timeout consistency): was a bare fetch()
+    // with no timeout — a stalled connection left the admin UI's spinner
+    // stuck forever. See services/httpClient.js header for full context.
+    const res = await fetchWithTimeout(`${_edgeBase()}/${name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(body),
-    });
+    }, 20000); // bulk provisioning / print-pack can legitimately take longer
     const data = await res.json();
     if (!data?.success) {
       return { success: false, error: data?.message || 'Request failed.' };
@@ -72,7 +76,10 @@ async function callAdminFunction(name, body) {
     return data;
   } catch (err) {
     console.error(`[adminProvisioning] ${name} error:`, err);
-    return { success: false, error: 'Connection error. Please try again.' };
+    return {
+      success: false,
+      error: err?.isTimeout ? 'Request timed out. Please check your connection and try again.' : 'Connection error. Please try again.',
+    };
   }
 }
 

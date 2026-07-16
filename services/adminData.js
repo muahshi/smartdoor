@@ -23,6 +23,8 @@
  *   getSystemHealth()         → replaces services/analytics.js getSystemHealth
  */
 
+import { fetchWithTimeout } from './httpClient.js';
+
 function _edgeBase() { return `${window.__SD_CONFIG__?.supabaseUrl || ""}/functions/v1`; }
 
 async function _call(type, extra = {}) {
@@ -37,14 +39,15 @@ async function _call(type, extra = {}) {
   if (!token) return { success: false, error: 'Admin session expired. Please sign in again.' };
 
   try {
-    const res = await fetch(`${_edgeBase()}/admin-data`, {
+    // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js
+    const res = await fetchWithTimeout(`${_edgeBase()}/admin-data`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ type, ...extra }),
-    });
+    }, 15000);
 
     if (!res.ok && res.status === 401) {
       // Session expired server-side — clear local session and redirect
@@ -60,7 +63,10 @@ async function _call(type, extra = {}) {
     return data;
   } catch (err) {
     console.error('[adminData]', type, 'error:', err);
-    return { success: false, error: 'Connection error. Please try again.' };
+    return {
+      success: false,
+      error: err?.isTimeout ? 'Request timed out. Please check your connection and try again.' : 'Connection error. Please try again.',
+    };
   }
 }
 

@@ -11,8 +11,7 @@
  */
 
 import { supabase } from './supabase.js';
-
-// ────────── CONSTANTS ──────────
+import { fetchWithTimeout } from './httpClient.js';
 const ADMIN_SESSION_KEY = 'sd_admin_session';
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
 
@@ -147,7 +146,8 @@ export async function adminLogin(email, password, totpCode = null) {
     const supabaseUrl = window.__SD_CONFIG__?.supabaseUrl;
     if (!supabaseUrl) throw new Error('Supabase URL not configured');
 
-    const res = await fetch(`${supabaseUrl}/functions/v1/admin-login`, {
+    // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js
+    const res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/admin-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -155,7 +155,7 @@ export async function adminLogin(email, password, totpCode = null) {
         password,
         totp_code: totpCode,
       }),
-    });
+    }, 15000);
 
     const data = await res.json().catch(() => ({}));
 
@@ -175,7 +175,10 @@ export async function adminLogin(email, password, totpCode = null) {
     return { success: true, session };
   } catch (err) {
     console.error('[Admin] Login error:', err);
-    return { success: false, error: 'Connection error. Try again.' };
+    return {
+      success: false,
+      error: err?.isTimeout ? 'Request timed out. Please check your connection and try again.' : 'Connection error. Try again.',
+    };
   }
 }
 

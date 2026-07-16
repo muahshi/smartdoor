@@ -24,6 +24,7 @@
  */
 
 import { classifyCallPurpose, VISITOR_TYPES } from './aiReceptionist.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 // Ask only the minimum required follow-up questions — hard cap, matches
 // the "answers first, minimum Q&A" product requirement.
@@ -94,7 +95,11 @@ Respond in the visitor's language (Hindi/Hinglish if they spoke Hindi/Hinglish, 
       ? visitorUtterance
       : '[visitor was silent / no speech detected]';
 
-    const res = await fetch(`${url}/functions/v1/groq-proxy`, {
+    // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js.
+    // Live voice-turn latency budget: bounded so a stalled request falls
+    // back to _fallbackTurn() (below) instead of leaving the visitor's
+    // voice receptionist silently stuck mid-conversation.
+    const res = await fetchWithTimeout(`${url}/functions/v1/groq-proxy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
       body: JSON.stringify({
@@ -107,7 +112,7 @@ Respond in the visitor's language (Hindi/Hinglish if they spoke Hindi/Hinglish, 
           { role: 'user', content: userContent },
         ],
       }),
-    });
+    }, 10000);
     const data = await res.json();
     if (data?.success && data.content) {
       const clean = data.content.replace(/```json|```/g, '').trim();

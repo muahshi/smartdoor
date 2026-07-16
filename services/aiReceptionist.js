@@ -18,6 +18,7 @@
  */
 
 import { supabase } from './supabase.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 // Canonical visitor-type taxonomy the AI classifies into.
 // PHASE 4 — additive superset only. The original 12 types are unchanged
@@ -113,7 +114,13 @@ Visiting: ${visitingWhom || 'n/a'}
 Expected by owner: ${expected === null ? 'unknown' : expected ? 'yes' : 'no'}
 Additional notes: ${freeText || 'n/a'}`;
 
-      const res = await fetch(`${url}/functions/v1/groq-proxy`, {
+      // PRODUCTION HARDENING (API timeout consistency): this call sits in
+      // the live visitor-facing screening flow — a stalled request used to
+      // leave the visitor staring at nothing with no fallback. See
+      // services/httpClient.js. Callers already treat any thrown error as
+      // "fall back to the non-AI path" (see the catch block below), so a
+      // bounded timeout makes that fallback actually reachable.
+      const res = await fetchWithTimeout(`${url}/functions/v1/groq-proxy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
         body: JSON.stringify({
@@ -125,7 +132,7 @@ Additional notes: ${freeText || 'n/a'}`;
             { role: 'user', content: userContent },
           ],
         }),
-      });
+      }, 10000);
       const data = await res.json();
       if (data?.success && data.content) {
         const clean = data.content.replace(/```json|```/g, '').trim();

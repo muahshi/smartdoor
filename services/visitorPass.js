@@ -10,6 +10,7 @@
  */
 
 import { supabase } from './supabase.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 // ────────── CREATE PASSES ──────────
 
@@ -179,7 +180,8 @@ export async function lookupPassByCode(passCode) {
 
 async function _generatePassQrUrl(passCode) {
   try {
-    const response = await fetch('/api/generate-qr', {
+    // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js
+    const response = await fetchWithTimeout('/api/generate-qr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -187,7 +189,7 @@ async function _generatePassQrUrl(passCode) {
         content: `${window.location.origin}/gate/verify/${passCode}`,
         label:   passCode,
       }),
-    });
+    }, 10000);
 
     if (!response.ok) return null;
     const result = await response.json();

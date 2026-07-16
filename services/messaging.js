@@ -22,6 +22,7 @@
 import { supabase } from './supabase.js';
 import { gate } from './rateLimiter.js';
 import { notifyNewConversationMessage } from './notifications.js';
+import { fetchWithTimeout } from './httpClient.js';
 
 const VOICE_BUCKET = 'voice-notes';
 
@@ -372,7 +373,10 @@ export async function getAISuggestedReplies({ lastVisitorText, intent }) {
     const anonKey = window.__SD_CONFIG__?.supabaseAnon || '';
     if (!supabaseUrl || !anonKey || !lastVisitorText) return { success: false, replies: STATIC_QUICK_REPLIES.slice(0, 3) };
 
-    const res = await fetch(`${supabaseUrl}/functions/v1/groq-proxy`, {
+    // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js.
+    // Bounded shorter here (8s) since this feeds a UI suggestion chip and
+    // has a static fallback ready — no reason to make the owner wait long.
+    const res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/groq-proxy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
       body: JSON.stringify({
@@ -386,7 +390,7 @@ export async function getAISuggestedReplies({ lastVisitorText, intent }) {
           },
         ],
       }),
-    });
+    }, 8000);
     const data = await res.json();
     if (data?.success && data.content) {
       const clean = data.content.replace(/```json|```/g, '').trim();
@@ -414,7 +418,8 @@ export async function generateAISummary(conversationId, ownerId, plateId) {
     let summary = null;
 
     if (supabaseUrl && anonKey) {
-      const res = await fetch(`${supabaseUrl}/functions/v1/groq-proxy`, {
+      // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js
+      const res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/groq-proxy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
         body: JSON.stringify({
@@ -429,7 +434,7 @@ export async function generateAISummary(conversationId, ownerId, plateId) {
             { role: 'user', content: transcript },
           ],
         }),
-      });
+      }, 12000);
       const data = await res.json();
       if (data?.success && data.content) summary = data.content.trim();
     }

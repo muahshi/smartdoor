@@ -54,6 +54,30 @@
 
 import { supabase } from './supabase.js';
 
+// ═══════════════════════════════════════════════════════════════════════
+// PRODUCTION HARDENING (logging) — the diagnostic instrumentation below
+// (_describeAuthContext, _dumpRealtimeFailure, and the per-join
+// [RTC-TRACE][AUTH-CHECK] lines) was added for a specific root-cause
+// investigation and left permanently wired in. In production that meant
+// EVERY visitor Tap-to-Talk attempt and EVERY owner dashboard session
+// logged the caller's auth role, userId, and access-token presence to the
+// browser console on every single channel join — and any failure dumped
+// the full raw channel/socket object (including token length) via
+// JSON.stringify. That's unnecessary console noise for every real user
+// and needlessly exposes internal auth/session details to anyone with
+// devtools open on a shared/public device.
+//
+// Fix (additive, no behavior change): gate the verbose/raw diagnostics
+// behind the SAME production/staging/development signal
+// scripts/build-env.js already bakes into window.__SD_CONFIG__.env for
+// this exact purpose. Staging/dev keep full RTC-TRACE diagnostics
+// unchanged for debugging; production keeps only the concise
+// status/reason error lines that were already present alongside them.
+// ═══════════════════════════════════════════════════════════════════════
+function _debugLoggingEnabled() {
+  return (window.__SD_CONFIG__?.env || 'development') !== 'production';
+}
+
 export function ringChannelName(ownerId) {
   return `rtc:ring:${ownerId}`;
 }
@@ -83,6 +107,11 @@ async function _ensureRealtimeAuth() {
 // blocks or delays the join, never changes RLS or channel config.
 // ═══════════════════════════════════════════════════════════════════════
 async function _describeAuthContext() {
+  // PRODUCTION HARDENING: this function's only consumer is the
+  // [RTC-TRACE][AUTH-CHECK] debug log lines below — skip the extra
+  // supabase.auth.getSession() round-trip entirely in production instead
+  // of doing the work just to log a role/userId nobody will read.
+  if (!_debugLoggingEnabled()) return { role: 'n/a', userId: null, hasAccessToken: null };
   try {
     const { data, error } = await supabase.auth.getSession();
     if (error) return { role: 'unknown', reason: `getSession error: ${error.message}` };
@@ -153,6 +182,13 @@ function _safeRemoveChannel(channel) {
 // printed as-is.
 // ═══════════════════════════════════════════════════════════════════════
 function _dumpRealtimeFailure(channel, channelName, status, err) {
+  // PRODUCTION HARDENING: the raw object/socket dump below is verbose
+  // diagnostic-only output (channel internals, socket state, token
+  // length). The existing console.error(...Reason=${status}...) calls at
+  // each call site already surface the actionable signal in production;
+  // this function now only runs in non-production so it can't spam or
+  // leak internals to a real user's console.
+  if (!_debugLoggingEnabled()) return;
   const timestamp = new Date().toISOString();
   try {
     console.error(`[RTC-TRACE][RAW-DUMP] ══════ non-SUBSCRIBED status ══════ timestamp=${timestamp} topic=${channelName}`);
@@ -232,7 +268,7 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
 
   // TEMPORARY DIAGNOSTIC — see _describeAuthContext() header comment.
   const _authCtx = await _describeAuthContext();
-  console.log(`[RTC-TRACE][AUTH-CHECK] pre-join auth context | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} hasAccessToken=${_authCtx.hasAccessToken ?? 'n/a'} reason=${_authCtx.reason || 'n/a'}`);
+  if (_debugLoggingEnabled()) console.log(`[RTC-TRACE][AUTH-CHECK] pre-join auth context | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} hasAccessToken=${_authCtx.hasAccessToken ?? 'n/a'} reason=${_authCtx.reason || 'n/a'}`);
 
   return new Promise((resolve, reject) => {
     const channel = supabase.channel(channelName, {
@@ -249,7 +285,7 @@ export async function joinBroadcastChannel(channelName, { timeoutMs = 5000, priv
       if (status === 'SUBSCRIBED') {
         clearTimeout(timer);
         console.log(`[RTC-TRACE] channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
-        console.log(`[RTC-TRACE][AUTH-CHECK] join SUCCEEDED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status}`);
+        if (_debugLoggingEnabled()) console.log(`[RTC-TRACE][AUTH-CHECK] join SUCCEEDED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status}`);
         resolve(channel);
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         clearTimeout(timer);
@@ -325,7 +361,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
 
   // TEMPORARY DIAGNOSTIC — see _describeAuthContext() header comment.
   const _authCtx = await _describeAuthContext();
-  console.log(`[RTC-TRACE][AUTH-CHECK] pre-join auth context (owner/persistent) | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} hasAccessToken=${_authCtx.hasAccessToken ?? 'n/a'} reason=${_authCtx.reason || 'n/a'}`);
+  if (_debugLoggingEnabled()) console.log(`[RTC-TRACE][AUTH-CHECK] pre-join auth context (owner/persistent) | File=services/webrtcSignaling.js Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} hasAccessToken=${_authCtx.hasAccessToken ?? 'n/a'} reason=${_authCtx.reason || 'n/a'}`);
 
   const RECONNECT_BASE_DELAY_MS = 1000;
   const RECONNECT_MAX_DELAY_MS = 15000;
@@ -371,7 +407,7 @@ export async function joinPersistentBroadcastChannel(channelName, registerHandle
           reconnectAttempt = 0;
           isSubscribed = true;
           console.log(`[RTC-TRACE] persistent channel SUBSCRIBED | File=services/webrtcSignaling.js Channel=${channelName}`);
-          console.log(`[RTC-TRACE][AUTH-CHECK] persistent join SUCCEEDED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status}`);
+          if (_debugLoggingEnabled()) console.log(`[RTC-TRACE][AUTH-CHECK] persistent join SUCCEEDED | Channel=${channelName} role=${_authCtx.role} userId=${_authCtx.userId || 'n/a'} status=${status}`);
           onSubscribed(channel);
           if (!firstSettled) {
             firstSettled = true;
