@@ -23,7 +23,7 @@
  * trap a visitor in a loop.
  */
 
-import { classifyCallPurpose } from './aiReceptionist.js';
+import { classifyCallPurpose, VISITOR_TYPES } from './aiReceptionist.js';
 
 // Ask only the minimum required follow-up questions — hard cap, matches
 // the "answers first, minimum Q&A" product requirement.
@@ -65,12 +65,18 @@ export async function conductVoiceTurn({ history = [], visitorUtterance = '', tu
 
 Owner's current status: ${ownerStatus}.
 
+LANGUAGE: You understand and speak Hindi, Hinglish (Hindi in Latin script), English, and natural code-mixing between them. Match the visitor's own language/mix — if they speak Hinglish, reply in Hinglish; if they switch mid-conversation, follow the switch. Never ask them to repeat themselves in a different language.
+
+PRIVACY: You classify the visit — you do not build a record of who the visitor is related to, their name, or their phone number. "visitingWhom" may capture a role/first-name the visitor themselves offers unprompted, but never press for surname, relationship detail, or contact info beyond what is needed to route this one visit.
+
 From the visitor's latest utterance, extract into "answers" (merge with what's already known, never discard known fields):
-- purposeChip: best-guess category — Delivery Partner, Courier, Family, Friend, Guest, Maid, Driver, Technician, Society Staff, Sales Person, Unknown Visitor, or Emergency
+- purposeChip: best-guess category — one of: ${VISITOR_TYPES.join(', ')}
 - company: delivery/courier company name if mentioned
 - visitingWhom: who they're here to see, if mentioned
 - freeText: a short free-text reason, if given
 - expected: true/false/null — whether they claim to be expected
+
+SPAM/SALES: an unsolicited pitch, survey, or vague/evasive answer to "why are you here" is Sales Person or Unknown Visitor — do not give it the benefit of the doubt.
 
 Decide "done": true if you have enough to classify the visitor (most visitors need only 0-1 follow-up), or if turn ${turnIndex + 1} has reached the ${MAX_VOICE_TURNS}-turn cap. Emergencies are always "done" immediately.
 
@@ -143,13 +149,23 @@ function _fallbackTurn({ visitorUtterance, answers, reachedCap, langHint }) {
   if (!merged.freeText && visitorUtterance) merged.freeText = visitorUtterance.slice(0, 160);
 
   const KEYWORDS = [
-    { k: 'emergency', v: 'Emergency' }, { k: 'aapat', v: 'Emergency' },
+    { k: 'emergency', v: 'Emergency' }, { k: 'aapat', v: 'Emergency' }, { k: 'bachao', v: 'Emergency' },
     { k: 'amazon', v: 'Delivery Partner' }, { k: 'flipkart', v: 'Delivery Partner' },
     { k: 'parcel', v: 'Delivery Partner' }, { k: 'delivery', v: 'Delivery Partner' },
     { k: 'courier', v: 'Courier' }, { k: 'swiggy', v: 'Delivery Partner' }, { k: 'zomato', v: 'Delivery Partner' },
-    { k: 'family', v: 'Family' }, { k: 'friend', v: 'Friend' }, { k: 'guest', v: 'Guest' },
-    { k: 'maid', v: 'Maid' }, { k: 'driver', v: 'Driver' }, { k: 'technician', v: 'Technician' },
-    { k: 'electrician', v: 'Technician' }, { k: 'plumber', v: 'Technician' },
+    { k: 'relative', v: 'Relative' }, { k: 'rishtedar', v: 'Relative' }, { k: 'chacha', v: 'Relative' }, { k: 'mama', v: 'Relative' },
+    { k: 'family', v: 'Family' }, { k: 'parivaar', v: 'Family' },
+    { k: 'friend', v: 'Friend' }, { k: 'dost', v: 'Friend' },
+    { k: 'neighbour', v: 'Neighbour' }, { k: 'neighbor', v: 'Neighbour' }, { k: 'padosi', v: 'Neighbour' },
+    { k: 'guest', v: 'Guest' },
+    { k: 'house help', v: 'House Help' }, { k: 'maid', v: 'Maid' }, { k: 'kaam wali', v: 'Maid' },
+    { k: 'driver', v: 'Driver' },
+    { k: 'maintenance', v: 'Maintenance' }, { k: 'plumber', v: 'Maintenance' }, { k: 'ac service', v: 'Maintenance' },
+    { k: 'technician', v: 'Technician' }, { k: 'electrician', v: 'Technician' }, { k: 'mistri', v: 'Technician' },
+    { k: 'government', v: 'Government' }, { k: 'municipal', v: 'Government' }, { k: 'police', v: 'Government' },
+    { k: 'electricity', v: 'Utility' }, { k: 'water board', v: 'Utility' }, { k: 'gas connection', v: 'Utility' }, { k: 'bijli', v: 'Utility' },
+    { k: 'business', v: 'Business Visitor' }, { k: 'meeting', v: 'Business Visitor' },
+    { k: 'doctor', v: 'Medical' }, { k: 'nurse', v: 'Medical' }, { k: 'medical', v: 'Medical' },
     { k: 'sales', v: 'Sales Person' }, { k: 'offer', v: 'Sales Person' }, { k: 'insurance', v: 'Sales Person' },
   ];
   if (!merged.purposeChip) {

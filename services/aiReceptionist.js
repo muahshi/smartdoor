@@ -20,11 +20,45 @@
 import { supabase } from './supabase.js';
 
 // Canonical visitor-type taxonomy the AI classifies into.
+// PHASE 4 — additive superset only. The original 12 types are unchanged
+// (existing rows in ai_call_screenings, ai_receptionist_rules templates,
+// and RULE_TEMPLATES in services/aiReceptionistRules.js all still match
+// exactly) — 8 new categories are appended so the classifier can
+// distinguish visits that used to collapse into "Unknown Visitor" or an
+// approximate neighbor (e.g. a relative was previously "Family", an
+// electricity-board visit was previously "Unknown Visitor").
 export const VISITOR_TYPES = [
   'Delivery Partner', 'Courier', 'Family', 'Friend', 'Guest', 'Maid',
   'Driver', 'Technician', 'Society Staff', 'Unknown Visitor',
   'Sales Person', 'Emergency',
+  // Additive (Phase 4):
+  'Relative', 'Neighbour', 'Government', 'Utility', 'Maintenance',
+  'House Help', 'Business Visitor', 'Medical',
 ];
+
+// One-line disambiguation shown to the model so near-duplicate categories
+// (Maid vs House Help, Family vs Relative, Technician vs Maintenance,
+// Government vs Utility) get classified consistently rather than randomly.
+const VISITOR_TYPE_GUIDE = `
+- Delivery Partner: e-commerce/food delivery (Amazon, Flipkart, Swiggy, Zomato, Blinkit, courier apps)
+- Courier: postal/document/parcel courier not tied to an e-commerce brand
+- Family: immediate household member (spouse, parent, child, sibling)
+- Relative: extended family (uncle, aunt, cousin, in-law) — do not ask which specific relative, category is enough
+- Friend: personal friend of a resident
+- Guest: invited visitor not otherwise categorized
+- Neighbour: lives in the same building/society/street
+- Maid / House Help: domestic help (cleaning, cooking, childcare) — use whichever the visitor's own word maps to
+- Driver: personal/cab/hired driver
+- Technician: appliance/electronics/IT repair or installation
+- Maintenance: building/plumbing/carpentry/AC servicing, society-arranged repair work
+- Society Staff: building security, watchman, society office staff
+- Government: municipal, police, postal department, government office visit
+- Utility: electricity/water/gas board, meter reading, utility company staff
+- Business Visitor: professional/work meeting, vendor, sales call to a home office
+- Medical: doctor, nurse, medical equipment, pharmacy delivery, health check-up
+- Sales Person: unsolicited sales, promotions, surveys, insurance/loan pitches
+- Emergency: any distress, accident, urgent help request — always highest priority
+- Unknown Visitor: purpose could not be determined from the visitor's answers`;
 
 function _cfg() {
   return {
@@ -59,15 +93,19 @@ export async function classifyCallPurpose(answers = {}, context = {}) {
   const { url, anonKey } = _cfg();
   if (url && anonKey) {
     try {
-      const systemPrompt = `You are ${aiName}, an AI receptionist for Smart Door screening a visitor BEFORE connecting their call to ${ownerLabel}.
+      const systemPrompt = `You are ${aiName}, an AI receptionist for Smart Door screening a visitor BEFORE connecting their call to ${ownerLabel}. You understand Hindi, Hinglish (Hindi written in Latin script, e.g. "main uske dost hoon"), English, and natural code-mixing between them — classify correctly regardless of which language or mix the visitor used, and never ask the visitor to switch languages.
 
-Classify the visitor into exactly one of these types:
-${VISITOR_TYPES.join(', ')}
+Classify the visitor into exactly one of these types, using this guide to disambiguate close categories:
+${VISITOR_TYPE_GUIDE}
 
 Owner's current status: ${ownerStatus}.
 
+PRIVACY — do not extract or restate any family member's personal name, phone number, or relationship detail in your output. "visitingWhom" and "aiSummary" may reference a role/category (e.g. "visiting a family member") but must never fabricate or repeat identifying household details beyond what the visitor themselves already volunteered as free text.
+
+SPAM/SALES: unsolicited sales, surveys, promotions, or vague/evasive answers to a direct purpose question are "Sales Person" or "Unknown Visitor" with suggestedAction "Decline" or "Blocked" — do not give the benefit of the doubt to a generic pitch.
+
 Given the visitor's short answers, respond ONLY with this valid JSON (no markdown, no backticks):
-{"visitorType":"<one of the exact types above>","confidence":0.0-1.0,"suggestedAction":"Accept|Decline|Ask Owner|Notify Owner|Blocked","aiSummary":"<one short sentence for the owner, e.g. 'Amazon Delivery — package expected'>","priority":"Low|Normal|High|Critical"}`;
+{"visitorType":"<one of the exact types above>","confidence":0.0-1.0,"suggestedAction":"Accept|Decline|Ask Owner|Notify Owner|Blocked","aiSummary":"<one short sentence for the owner, e.g. 'Amazon Delivery — package expected'>","priority":"Low|Normal|High|Critical","languageDetected":"hi-IN|en-IN|mixed"}`;
 
       const userContent = `Purpose selected: ${purposeChip || 'not specified'}
 Company: ${company || 'n/a'}
@@ -80,7 +118,7 @@ Additional notes: ${freeText || 'n/a'}`;
         headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
-          max_tokens: 200,
+          max_tokens: 220,
           temperature: 0.3,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -99,6 +137,7 @@ Additional notes: ${freeText || 'n/a'}`;
             suggestedAction: parsed.suggestedAction || 'Notify Owner',
             aiSummary: parsed.aiSummary || `${parsed.visitorType} — awaiting owner response`,
             priority: parsed.priority || 'Normal',
+            languageDetected: parsed.languageDetected || null,
           };
         }
       }
@@ -110,28 +149,79 @@ Additional notes: ${freeText || 'n/a'}`;
   return _fallbackClassify({ purposeChip, company, visitingWhom, freeText, expected });
 }
 
+// Hindi/Hinglish keyword hints layered onto the English chip/keyword map
+// below — covers the common Devanagari + romanized words visitors type
+// into the free-text field when the chip flow (not voice) is used.
+const _HI_KEYWORDS = {
+  emergency: ['aapatkal', 'madad', 'bachao', 'जरूरी', 'आपातकाल'],
+  family: ['parivaar', 'ghar wale', 'परिवार'],
+  friend: ['dost', 'yaar', 'दोस्त'],
+  relative: ['rishtedar', 'chacha', 'mama', 'mausi', 'bua', 'रिश्तेदार'],
+  neighbour: ['padosi', 'पड़ोसी'],
+  maid: ['kaam wali', 'bai', 'नौकरानी'],
+  driver: ['driver', 'chalak'],
+  technician: ['mistri', 'मिस्त्री'],
+  maintenance: ['plumber', 'electrician', 'ac service', 'repair', 'marammat', 'मरम्मत'],
+  government: ['sarkari', 'nagar nigam', 'सरकारी', 'police', 'पुलिस'],
+  utility: ['bijli', 'बिजली', 'meter reading', 'gas connection', 'paani', 'पानी'],
+  sales: ['bechna', 'offer', 'scheme'],
+  medical: ['doctor', 'nurse', 'dawai', 'दवाई', 'clinic'],
+};
+
 /** Deterministic, offline-safe fallback — never blocks the call flow. */
 function _fallbackClassify({ purposeChip, company, visitingWhom, freeText, expected }) {
   const chip = (purposeChip || '').toLowerCase();
   const text = (freeText || '').toLowerCase();
+  const combined = `${chip} ${text}`;
 
   const map = [
     { key: 'emergency', type: 'Emergency', action: 'Accept', priority: 'Critical', confidence: 0.98 },
     { key: 'delivery', type: 'Delivery Partner', action: 'Notify Owner', priority: 'Normal', confidence: 0.9 },
     { key: 'courier', type: 'Courier', action: 'Notify Owner', priority: 'Normal', confidence: 0.9 },
+    { key: 'relative', type: 'Relative', action: 'Accept', priority: 'High', confidence: 0.82 },
     { key: 'family', type: 'Family', action: 'Accept', priority: 'High', confidence: 0.85 },
     { key: 'friend', type: 'Friend', action: 'Accept', priority: 'High', confidence: 0.85 },
+    { key: 'neighbour', type: 'Neighbour', action: 'Accept', priority: 'Normal', confidence: 0.8 },
+    { key: 'neighbor', type: 'Neighbour', action: 'Accept', priority: 'Normal', confidence: 0.8 },
     { key: 'guest', type: 'Guest', action: 'Ask Owner', priority: 'Normal', confidence: 0.8 },
+    { key: 'house help', type: 'House Help', action: 'Ask Owner', priority: 'Normal', confidence: 0.82 },
     { key: 'maid', type: 'Maid', action: 'Ask Owner', priority: 'Normal', confidence: 0.82 },
     { key: 'driver', type: 'Driver', action: 'Ask Owner', priority: 'Normal', confidence: 0.8 },
+    { key: 'maintenance', type: 'Maintenance', action: 'Ask Owner', priority: 'Normal', confidence: 0.8 },
     { key: 'technician', type: 'Technician', action: 'Ask Owner', priority: 'Normal', confidence: 0.8 },
     { key: 'society', type: 'Society Staff', action: 'Notify Owner', priority: 'Normal', confidence: 0.78 },
+    { key: 'government', type: 'Government', action: 'Ask Owner', priority: 'Normal', confidence: 0.75 },
+    { key: 'municipal', type: 'Government', action: 'Ask Owner', priority: 'Normal', confidence: 0.75 },
+    { key: 'utility', type: 'Utility', action: 'Ask Owner', priority: 'Normal', confidence: 0.75 },
+    { key: 'electricity', type: 'Utility', action: 'Ask Owner', priority: 'Normal', confidence: 0.78 },
+    { key: 'water board', type: 'Utility', action: 'Ask Owner', priority: 'Normal', confidence: 0.78 },
+    { key: 'gas', type: 'Utility', action: 'Ask Owner', priority: 'Normal', confidence: 0.7 },
+    { key: 'business', type: 'Business Visitor', action: 'Ask Owner', priority: 'Normal', confidence: 0.75 },
+    { key: 'meeting', type: 'Business Visitor', action: 'Ask Owner', priority: 'Normal', confidence: 0.72 },
+    { key: 'doctor', type: 'Medical', action: 'Notify Owner', priority: 'High', confidence: 0.85 },
+    { key: 'nurse', type: 'Medical', action: 'Notify Owner', priority: 'High', confidence: 0.85 },
+    { key: 'medical', type: 'Medical', action: 'Notify Owner', priority: 'High', confidence: 0.82 },
     { key: 'sales', type: 'Sales Person', action: 'Decline', priority: 'Low', confidence: 0.85 },
   ];
 
+  // Hindi/Hinglish keyword pass — reuses the same category → chip.key
+  // mapping above so a Hindi answer classifies exactly as its English
+  // equivalent would, satisfying the multilingual requirement without a
+  // second parallel taxonomy.
+  const hiHit = Object.entries(_HI_KEYWORDS).find(([, words]) =>
+    words.some((w) => combined.includes(w.toLowerCase()))
+  );
+
   let match = map.find((m) => chip.includes(m.key) || text.includes(m.key));
+  if (!match && hiHit) {
+    const [hiKey] = hiHit;
+    match = map.find((m) => m.key === hiKey) || (hiKey === 'relative' ? { type: 'Relative', action: 'Accept', priority: 'High', confidence: 0.78 } : null);
+  }
   if (!match) {
-    if (['sell', 'offer', 'insurance', 'loan', 'discount', 'promote'].some((k) => text.includes(k))) {
+    // Spam/sales patterns not caught by the chip/keyword map — treat a
+    // vague or evasive free-text answer to a direct purpose question the
+    // same as an explicit sales pitch rather than defaulting it to Unknown.
+    if (['sell', 'offer', 'insurance', 'loan', 'discount', 'promote', 'scheme', 'investment'].some((k) => text.includes(k))) {
       match = map.find((m) => m.key === 'sales');
     }
   }
@@ -152,6 +242,7 @@ function _fallbackClassify({ purposeChip, company, visitingWhom, freeText, expec
     suggestedAction: match.action,
     aiSummary,
     priority: match.priority,
+    languageDetected: /[\u0900-\u097F]/.test(combined) || !!hiHit ? 'hi-IN' : 'en-IN',
   };
 }
 
@@ -170,6 +261,11 @@ export async function saveCallScreening({
   // existing caller (the chip-based screening flow) keeps working
   // unchanged without passing these.
   conversationMode = 'chip', durationSeconds = null, ruleMatched = null,
+  // Additive (sql/54_ai_receptionist_intelligence.sql) — the urgency and
+  // detected language classifyCallPurpose()/finalizeVoiceScreening()
+  // already compute on every call; previously discarded before this
+  // migration, now persisted for the owner's category/quality analytics.
+  priority = 'Normal', languageDetected = null,
 }) {
   if (!ownerId || !plateId || !visitorType) return { success: false };
   try {
@@ -180,6 +276,7 @@ export async function saveCallScreening({
       expected_by_owner: expectedByOwner, confidence, suggested_action: suggestedAction,
       ai_summary: aiSummary, transcript,
       conversation_mode: conversationMode, duration_seconds: durationSeconds, rule_matched: ruleMatched,
+      priority: priority || 'Normal', language_detected: languageDetected,
     }).select('id').single();
     if (error) {
       console.error('[AIReceptionist] saveCallScreening failed:', error);
@@ -206,7 +303,7 @@ export async function getRecentCallScreening(ownerId, plateId, freshnessMs = 3 *
     const since = new Date(Date.now() - freshnessMs).toISOString();
     const { data, error } = await supabase
       .from('ai_call_screenings')
-      .select('visitor_name, visitor_type, company, visiting_whom, purpose, confidence, suggested_action, ai_summary, transcript, conversation_mode, rule_matched, created_at')
+      .select('visitor_name, visitor_type, company, visiting_whom, purpose, confidence, suggested_action, ai_summary, transcript, conversation_mode, rule_matched, priority, language_detected, created_at')
       .eq('owner_id', ownerId)
       .eq('plate_id', plateId)
       .gte('created_at', since)
@@ -226,6 +323,8 @@ export async function getRecentCallScreening(ownerId, plateId, freshnessMs = 3 *
       transcript: Array.isArray(data.transcript) ? data.transcript : [],
       conversationMode: data.conversation_mode || 'chip',
       ruleMatched: data.rule_matched || null,
+      priority: data.priority || 'Normal',
+      languageDetected: data.language_detected || null,
     };
   } catch (_) {
     return null;
