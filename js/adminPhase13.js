@@ -13,6 +13,7 @@
  */
 
 import { getAdminSession, hasPermission, PERMISSIONS } from '../services/admin.js';
+import { fetchWithTimeout } from '../services/httpClient.js';
 
 function getEdgeBase() { return `${window.__SD_CONFIG__?.supabaseUrl || ''}/functions/v1`; }
 
@@ -24,17 +25,23 @@ async function callAdmin(fn, body) {
   const token = session?.token;
   if (!token) return { success: false, error: 'Session expired' };
   try {
-    const res = await fetch(`${getEdgeBase()}/${fn}`, {
+    // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js.
+    // 25s: bulk CSV provisioning / print-pack PDF generation can legitimately
+    // take longer than a typical admin call.
+    const res = await fetchWithTimeout(`${getEdgeBase()}/${fn}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(body),
-    });
+    }, 25000);
     return await res.json();
   } catch (err) {
-    return { success: false, error: err.message || 'Connection error' };
+    return {
+      success: false,
+      error: err?.isTimeout ? 'Request timed out. Please check your connection and try again.' : (err.message || 'Connection error'),
+    };
   }
 }
 
