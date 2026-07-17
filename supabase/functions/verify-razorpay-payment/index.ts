@@ -135,6 +135,20 @@ serve(async (req) => {
       })
       .eq("id", orderId);
 
+    // ── Phase 8A Commerce Engine: confirm any reserved coupon/pricing-rule
+    // discounts now that payment has actually captured (flips
+    // order_discounts rows from 'reserved' to 'confirmed' — this is what
+    // makes them count toward usage-limit enforcement and analytics;
+    // reservations from abandoned/failed checkouts are released elsewhere
+    // by cancel-pending-order, never confirmed here). Best-effort: a
+    // failure here must not block the plate/manufacturing pipeline that
+    // already succeeded above.
+    try {
+      await supabase.rpc("confirm_order_discounts", { p_order_id: orderId });
+    } catch (e) {
+      console.warn("[verify-payment] confirm_order_discounts failed (non-fatal):", (e as Error).message);
+    }
+
     // ── 8. Create Plate record ──
     const existingOwner = order.owner_id;
     let ownerId = existingOwner;
@@ -172,6 +186,47 @@ serve(async (req) => {
     // owner_id update in order
     if (ownerId && !order.owner_id) {
       await supabase.from("orders").update({ owner_id: ownerId }).eq("id", orderId);
+    }
+
+    // ── Phase 8A Commerce Engine: referral reward ──
+    // Reuses the EXISTING referrals/referral_logs tables (sql/11) — does not
+    // create new referral tracking. Only credits if there is a 'pending'
+    // referral_logs row for this owner AND this is their first-ever paid
+    // order (abuse guard: a customer can't keep re-triggering rewards on
+    // repeat purchases, and credit_referral_reward() is itself idempotent
+    // per referral via its `status = 'pending'` guard).
+    if (ownerId) {
+      try {
+        const { count: paidOrderCount } = await supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("owner_id", ownerId)
+          .eq("payment_status", "paid");
+
+        if ((paidOrderCount || 0) <= 1) {
+          const { data: activeReferralRule } = await supabase
+            .from("pricing_rules")
+            .select("discount_type, discount_value")
+            .eq("rule_type", "referral_discount")
+            .eq("is_active", true)
+            .order("priority", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (activeReferralRule) {
+            const rewardAmount = activeReferralRule.discount_type === "fixed"
+              ? Number(activeReferralRule.discount_value)
+              : Math.round(Number(order.total_amount) * Number(activeReferralRule.discount_value) / 100);
+
+            await supabase.rpc("credit_referral_reward", {
+              p_referred_owner_id: ownerId,
+              p_reward_amount:     rewardAmount,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn("[verify-payment] Referral reward credit skipped (non-fatal):", (e as Error).message);
+      }
     }
 
     // ── 9. Create Manufacturing record ──
