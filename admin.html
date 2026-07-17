@@ -658,6 +658,9 @@
     <div class="nav-item" data-panel="qr" data-resource="qr" onclick="switchPanel('qr', this)">
       <span class="nav-icon">📱</span> QR Management
     </div>
+    <div class="nav-item" data-panel="shipments" data-resource="shipments" onclick="switchPanel('shipments', this)">
+      <span class="nav-icon">🚚</span> Shipments
+    </div>
   </div>
 
   <div class="sidebar-section">
@@ -689,6 +692,19 @@
   </div>
 
   <div class="sidebar-section">
+    <div class="sidebar-section-label">Operations</div>
+    <div class="nav-item" data-panel="replacements" data-resource="replacements" onclick="switchPanel('replacements', this)">
+      <span class="nav-icon">🔁</span> Replacements &amp; Transfers
+    </div>
+    <div class="nav-item" data-panel="warranty" data-resource="warranty" onclick="switchPanel('warranty', this)">
+      <span class="nav-icon">🛡️</span> Warranty
+    </div>
+    <div class="nav-item" data-panel="productSkus" data-resource="product_skus" onclick="switchPanel('productSkus', this)">
+      <span class="nav-icon">🏷️</span> Product SKUs
+    </div>
+  </div>
+
+  <div class="sidebar-section">
     <div class="sidebar-section-label">Support</div>
     <div class="nav-item" data-panel="support" data-resource="support" onclick="switchPanel('support', this)">
       <span class="nav-icon">🎫</span> Support Center
@@ -710,6 +726,9 @@
     </div>
     <div class="nav-item" data-panel="team" data-resource="team" data-action="manage" onclick="switchPanel('team', this)">
       <span class="nav-icon">🛡️</span> Admin Team
+    </div>
+    <div class="nav-item" data-panel="backup" data-resource="backup" onclick="switchPanel('backup', this)">
+      <span class="nav-icon">💾</span> Backup &amp; Recovery
     </div>
   </div>
 
@@ -1021,6 +1040,28 @@
       </div>
     </div>
 
+    <!-- ══════════ PHASE 7: SHIPMENTS PANEL ══════════ -->
+    <div class="panel" id="panel-shipments">
+      <div class="section-header">
+        <span class="section-title">🚚 Shipment Tracking</span>
+        <button class="btn btn-primary btn-sm" onclick="openCreateShipmentForm()">+ Create Shipment</button>
+      </div>
+      <div class="tabs" id="shipmentTabs">
+        <div class="tab active" onclick="filterShipments('all', this)">All</div>
+        <div class="tab" onclick="filterShipments('created', this)">Created</div>
+        <div class="tab" onclick="filterShipments('in_transit', this)">In Transit</div>
+        <div class="tab" onclick="filterShipments('out_for_delivery', this)">Out for Delivery</div>
+        <div class="tab" onclick="filterShipments('delivered', this)">Delivered</div>
+        <div class="tab" onclick="filterShipments('failed', this)">Failed / Returned</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>AWB</th><th>Order</th><th>Customer</th><th>Provider</th><th>Status</th><th>Est. Delivery</th><th>Actions</th></tr></thead>
+          <tbody id="shipmentsTable"><tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ══════════ SUBSCRIPTIONS PANEL ══════════ -->
     <div class="panel" id="panel-subscriptions">
       <div class="section-header">
@@ -1251,6 +1292,25 @@
         </div>
       </div>
 
+      <!-- ══ PHASE 7: Live Operations Health ══ -->
+      <div class="metric-grid" id="opsHealthGrid" style="margin:16px 0;">
+        <div class="metric-card"><div class="metric-label">Edge Functions</div><div class="metric-value" id="oh-edge-status">—</div><div class="metric-sub" id="oh-edge-latency">—</div></div>
+        <div class="metric-card"><div class="metric-label">AI Screenings (24h)</div><div class="metric-value" id="oh-ai-count">—</div><div class="metric-sub" id="oh-ai-confidence">—</div></div>
+        <div class="metric-card"><div class="metric-label">Realtime Calls (24h)</div><div class="metric-value" id="oh-rtc-count">—</div><div class="metric-sub" id="oh-rtc-detail">—</div></div>
+        <div class="metric-card"><div class="metric-label">Webhook Failures (24h)</div><div class="metric-value" id="oh-webhook-fail">—</div><div class="metric-sub">Razorpay / integrations</div></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">🧩 Edge Function Dependency Checks</span></div>
+          <div id="edgeFunctionHealthList"><div class="empty-state"><div class="spinner"></div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">🔄 Background Jobs (Renewal Engine)</span></div>
+          <div id="backgroundJobsList"><div class="empty-state"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header"><span class="card-title">Recent Error Logs</span></div>
         <div id="errorLogsList">
@@ -1415,6 +1475,80 @@
         <div class="metric-card"><div class="metric-label">Avg Turnaround</div><div class="metric-value" id="ia-avg-turnaround">—</div><div class="metric-sub">Claim → complete</div></div>
       </div>
       <div id="myJobsList"><div class="empty-state"><div class="spinner"></div></div></div>
+    </div>
+
+    <!-- ══════════ PHASE 7: REPLACEMENTS & TRANSFERS PANEL ══════════ -->
+    <div class="panel" id="panel-replacements">
+      <div class="section-header">
+        <span class="section-title">🔁 Replacements &amp; Ownership Transfers</span>
+      </div>
+      <div class="tabs" id="replacementTabs">
+        <div class="tab active" onclick="switchReplacementTab('replacements', this)">Replacement Requests</div>
+        <div class="tab" onclick="switchReplacementTab('transfers', this)">Ownership Transfers</div>
+      </div>
+      <div id="replacementsView" class="table-wrap">
+        <table>
+          <thead><tr><th>Plate</th><th>Owner</th><th>Reason</th><th>Status</th><th>Requested</th><th>Actions</th></tr></thead>
+          <tbody id="replacementsTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+      <div id="transfersView" class="table-wrap" style="display:none">
+        <table>
+          <thead><tr><th>Plate</th><th>Reason</th><th>Status</th><th>Initiated</th><th>Actions</th></tr></thead>
+          <tbody id="transfersTable"><tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 7: WARRANTY PANEL ══════════ -->
+    <div class="panel" id="panel-warranty">
+      <div class="section-header">
+        <span class="section-title">🛡️ Warranty Management</span>
+        <button class="btn btn-primary btn-sm" onclick="openCreateWarrantyForm()">+ Issue Warranty</button>
+      </div>
+      <div class="tabs" id="warrantyTabs">
+        <div class="tab active" onclick="filterWarranty('all', this)">All</div>
+        <div class="tab" onclick="filterWarranty('active', this)">Active</div>
+        <div class="tab" onclick="filterWarranty('expired', this)">Expired</div>
+        <div class="tab" onclick="filterWarranty('void', this)">Void</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plate</th><th>Owner</th><th>Coverage</th><th>Status</th><th>Ends</th><th>Open Claims</th><th>Actions</th></tr></thead>
+          <tbody id="warrantyTable"><tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 7: PRODUCT SKUS PANEL ══════════ -->
+    <div class="panel" id="panel-productSkus">
+      <div class="section-header">
+        <span class="section-title">🏷️ Product SKU Management</span>
+        <button class="btn btn-primary btn-sm" onclick="openProductSkuForm()">+ Add SKU</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>SKU</th><th>Name</th><th>Material</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="productSkuTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ PHASE 7: BACKUP & RECOVERY PANEL ══════════ -->
+    <div class="panel" id="panel-backup">
+      <div class="section-header">
+        <span class="section-title">💾 Backup &amp; Recovery</span>
+        <button class="btn btn-primary btn-sm" onclick="triggerBackup()">⤓ Run Backup Now</button>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:14px;">
+        Exports core tables (customers, plates, orders, subscriptions, manufacturing, inventory, tickets, SKUs, warranties) as a JSON snapshot to private storage. This is an app-data export aid — Supabase's own infra-level Postgres backups run independently.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Started</th><th>Type</th><th>Status</th><th>Tables</th><th>Rows</th><th>Completed</th></tr></thead>
+          <tbody id="backupTable"><tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
     </div>
 
   </div><!-- /content -->
@@ -1780,6 +1914,13 @@ const PANEL_RBAC = {
   franchiseOverview:{ resource: 'franchise_overview' },
   installers:       { resource: 'installers' },
   myJobs:           { resource: 'installation_jobs' },
+
+  // ── Phase 7: Operations & Administration Platform ──
+  shipments:    { resource: 'shipments' },
+  replacements: { resource: 'replacements' },
+  warranty:     { resource: 'warranty' },
+  productSkus:  { resource: 'product_skus' },
+  backup:       { resource: 'backup' },
 };
 
 // Per-role landing panel — where each role lands right after login.
@@ -1824,6 +1965,9 @@ window.switchPanel = function(panelId, navEl) {
     dealerAssignment:['Dealer Assignment','Plate → Dealer Routing'], installations:['Installations','Installation Job Tracking'],
     commissions:['Commissions','Dealer Commission Ledger'], franchiseOverview:['Regional Overview','Franchise Territory Snapshot'],
     installers:['Installers','Field Technicians'], myJobs:['My Jobs','Assigned Installations'],
+    shipments:['Shipments','Shipment Tracking & AWB'], replacements:['Replacements & Transfers','Lost/Damaged Plates & Ownership Changes'],
+    warranty:['Warranty','Coverage & Claims'], productSkus:['Product SKUs','Sellable Plate Catalog'],
+    backup:['Backup & Recovery','Data Export Snapshots'],
   };
   const t = titles[panelId] || [panelId, ''];
   const ht = document.getElementById('headerTitle'); if(ht) ht.textContent = t[0];
@@ -1879,6 +2023,11 @@ async function loadPanel(panelId) {
     case 'franchiseOverview': await loadFranchiseOverview(); break;
     case 'installers':        await loadInstallers(); break;
     case 'myJobs':            await loadMyJobs(); break;
+    case 'shipments':    await loadShipments(); break;
+    case 'replacements': await loadReplacements(); break;
+    case 'warranty':     await loadWarranty(); break;
+    case 'productSkus':  await loadProductSkus(); break;
+    case 'backup':       await loadBackups(); break;
   }
 }
 
@@ -2452,9 +2601,273 @@ async function loadSystemHealth() {
       <span>${s.status}</span>
     </div>
   </div>`).join('');
+  loadOperationsHealth();
   const se=document.getElementById('usageStatsList');
   if(se){const st=h.stats||{};se.innerHTML=[{label:'DB Size',value:st.dbSize||'—'},{label:'Storage Used',value:st.storageUsed||'—'},{label:'Edge Fn Calls (24h)',value:st.edgeFnInvocations??'—'},{label:'Active Sessions',value:st.activeSessions??'—'}].map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:13px">${s.label}</span><span style="font-size:12px;font-weight:600">${s.value}</span></div>`).join('');}
 }
+
+// ══════════════════════════════════════════════════════════════
+// PHASE 7 — OPERATIONS & ADMINISTRATION PLATFORM
+// ══════════════════════════════════════════════════════════════
+
+// ── LIVE OPERATIONS HEALTH (Edge Fn / AI / Realtime / Background Jobs / Errors) ──
+async function loadOperationsHealth() {
+  const res = await adminCall('operations_health');
+  if (!res.success) return;
+  const h = res.health || {};
+
+  const edge = h.edgeFunctions || {};
+  const edgeOk = edge.status === 'ok' || edge.checks;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; };
+  set('oh-edge-status', edgeOk ? (edge.status === 'degraded' ? 'Degraded' : 'Operational') : 'Unknown');
+  set('oh-edge-latency', edge.totalMs != null ? edge.totalMs + 'ms total' : '—');
+  set('oh-ai-count', h.ai?.screenings24h ?? 0);
+  set('oh-ai-confidence', h.ai?.avgConfidence != null ? 'Avg confidence ' + (h.ai.avgConfidence * 100).toFixed(0) + '%' : 'No screenings yet');
+  set('oh-rtc-count', h.realtime?.callAttempts24h ?? 0);
+  set('oh-rtc-detail', h.realtime ? `${h.realtime.successfulCalls24h} connected · ${h.realtime.fallbacksTriggered24h} fallback` : '—');
+  set('oh-webhook-fail', h.integrations?.webhookFailures24h ?? 0);
+
+  const efEl = document.getElementById('edgeFunctionHealthList');
+  if (efEl) {
+    const checks = edge.checks || {};
+    const rows = Object.keys(checks).length
+      ? Object.entries(checks).map(([name, c]) => {
+          const cc = c || {};
+          const color = cc.status === 'ok' ? '#10B981' : cc.status === 'degraded' ? '#F59E0B' : '#EF4444';
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="font-size:13px;text-transform:capitalize">${escapeHtml(name)}</span>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px">
+              <div style="width:7px;height:7px;border-radius:50%;background:${color}"></div>
+              <span>${escapeHtml(cc.status||'unknown')}${cc.latencyMs!=null?' · '+cc.latencyMs+'ms':''}</span>
+            </div>
+          </div>`;
+        }).join('')
+      : '<div class="empty-state"><div class="text">health-check function unreachable — verify it is deployed with --no-verify-jwt</div></div>';
+    efEl.innerHTML = rows;
+  }
+
+  const bjEl = document.getElementById('backgroundJobsList');
+  if (bjEl) {
+    const runs = h.backgroundJobs?.renewalEngine || [];
+    bjEl.innerHTML = runs.length
+      ? runs.map(r => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;color:var(--muted)">${fmtDate(r.run_at)}</span>
+          <span style="font-size:12px">${r.processed||0} processed · ${r.skipped||0} skipped${r.errors_count?' · <span style=\"color:#EF4444\">'+r.errors_count+' errors</span>':''}</span>
+        </div>`).join('')
+      : '<div class="empty-state"><div class="text">No renewal engine runs logged yet</div></div>';
+  }
+
+  const errEl = document.getElementById('errorLogsList');
+  if (errEl) {
+    const recent = h.errors?.recent || [];
+    if (recent.length) {
+      errEl.innerHTML = recent.map(e => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div><span class="badge badge-${e.level==='fatal'?'danger':e.level==='error'?'danger':'warning'}">${escapeHtml(e.level)}</span> <span style="font-size:12px;margin-left:6px">${escapeHtml((e.message||'').slice(0,80))}</span></div>
+        <span style="font-size:11px;color:var(--muted)">${fmtDate(e.created_at)}</span>
+      </div>`).join('');
+    } else {
+      errEl.innerHTML = '<div class="empty-state"><div class="icon">✅</div><div class="text">No critical errors detected in last 24 hours</div></div>';
+    }
+  }
+}
+
+// ── SHIPMENT TRACKING ──
+let _shipmentFilter = 'all';
+async function loadShipments() {
+  const tbody = document.getElementById('shipmentsTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('shipment_list', { status: _shipmentFilter === 'all' ? null : _shipmentFilter, limit: 200 });
+  if (!res.success || !res.shipments?.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🚚</div><div class="text">No shipments found</div></div></td></tr>'; return; }
+  tbody.innerHTML = res.shipments.map(s => `<tr>
+    <td style="font-family:monospace;font-size:12px">${escapeHtml(s.awb_number)}</td>
+    <td style="font-size:12px">${escapeHtml(s.orders?.plate_id||'—')}</td>
+    <td style="font-size:12px">${escapeHtml(s.orders?.users?.name||'—')}</td>
+    <td><span class="badge badge-muted">${escapeHtml(s.provider)}</span></td>
+    <td>${badgeHTML(s.status)}</td>
+    <td style="font-size:12px">${fmtDate(s.estimated_delivery)}</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="updateShipmentStatusPrompt('${s.id}','${s.status}')">Update</button></td>
+  </tr>`).join('');
+}
+window.filterShipments = function(status, el) {
+  _shipmentFilter = status;
+  document.querySelectorAll('#shipmentTabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadShipments();
+};
+window.openCreateShipmentForm = async function() {
+  if (!hasPermission(getAdminSession(), 'shipments', 'write')) { showToast('Your role cannot create shipments.', 'error'); return; }
+  const orderId = prompt('Order UUID'); if (!orderId) return;
+  const awb = prompt('AWB / Tracking Number'); if (!awb) return;
+  const provider = prompt('Provider (manual / shiprocket / delhivery / bluedart / dtdc)', 'manual') || 'manual';
+  const res = await adminCall('shipment_create', { order_id: orderId, awb_number: awb, provider });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not create shipment'), 'error'); return; }
+  showToast('✅ Shipment created', 'success'); loadShipments();
+};
+window.updateShipmentStatusPrompt = async function(shipmentId, current) {
+  if (!hasPermission(getAdminSession(), 'shipments', 'write')) { showToast('Your role cannot update shipments.', 'error'); return; }
+  const status = prompt('New status (created / in_transit / out_for_delivery / delivered / failed / returned)', current);
+  if (!status) return;
+  const res = await adminCall('shipment_update_status', { shipment_id: shipmentId, status });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not update shipment'), 'error'); return; }
+  showToast('✅ Shipment updated', 'success'); loadShipments();
+};
+
+// ── REPLACEMENT & TRANSFER CONSOLE ──
+let _replacementTab = 'replacements';
+window.switchReplacementTab = function(tab, el) {
+  _replacementTab = tab;
+  document.querySelectorAll('#replacementTabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('replacementsView').style.display = tab === 'replacements' ? '' : 'none';
+  document.getElementById('transfersView').style.display = tab === 'transfers' ? '' : 'none';
+  loadReplacements();
+};
+async function loadReplacements() {
+  if (_replacementTab === 'transfers') {
+    const tbody = document.getElementById('transfersTable'); if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+    const res = await adminCall('transfer_list', { limit: 200 });
+    if (!res.success || !res.transfers?.length) { tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="icon">🔁</div><div class="text">No ownership transfers found</div></div></td></tr>'; return; }
+    tbody.innerHTML = res.transfers.map(t => `<tr>
+      <td style="font-family:monospace;font-size:12px">${escapeHtml(t.plate_id)}</td>
+      <td style="font-size:12px">${escapeHtml((t.reason||'').replace(/_/g,' '))}</td>
+      <td>${badgeHTML(t.status)}</td>
+      <td style="font-size:12px">${fmtDate(t.created_at)}</td>
+      <td>${t.status==='pending' ? `<button class="btn btn-ghost btn-sm" onclick="decideTransfer('${t.id}','completed')">Complete</button>
+        <button class="btn btn-ghost btn-sm" onclick="decideTransfer('${t.id}','cancelled')">Cancel</button>` : '—'}</td>
+    </tr>`).join('');
+    return;
+  }
+  const tbody = document.getElementById('replacementsTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('replacement_list', { limit: 200 });
+  if (!res.success || !res.requests?.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">🔁</div><div class="text">No replacement requests found</div></div></td></tr>'; return; }
+  tbody.innerHTML = res.requests.map(r => `<tr>
+    <td style="font-family:monospace;font-size:12px">${escapeHtml(r.plate_id)}</td>
+    <td style="font-size:12px">${escapeHtml(r.users?.name||'—')}</td>
+    <td><span class="badge badge-muted">${escapeHtml(r.reason)}</span></td>
+    <td>${badgeHTML(r.status)}</td>
+    <td style="font-size:12px">${fmtDate(r.requested_at)}</td>
+    <td>${r.status==='requested' ? `<button class="btn btn-ghost btn-sm" onclick="decideReplacement('${r.id}','approved')">Approve</button>
+      <button class="btn btn-ghost btn-sm" onclick="decideReplacement('${r.id}','rejected')">Reject</button>` : '—'}</td>
+  </tr>`).join('');
+}
+window.decideReplacement = async function(requestId, decision) {
+  if (!hasPermission(getAdminSession(), 'replacements', 'write')) { showToast('Your role cannot decide replacements.', 'error'); return; }
+  let replacementOrderId = null, reason = '';
+  if (decision === 'approved') replacementOrderId = prompt('Replacement order UUID (optional — leave blank if not yet created)') || null;
+  else reason = prompt('Rejection reason') || '';
+  const res = await adminCall('replacement_decide', { request_id: requestId, decision, replacement_order_id: replacementOrderId, reason });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not update request'), 'error'); return; }
+  showToast('✅ Replacement ' + decision, 'success'); loadReplacements();
+};
+window.decideTransfer = async function(transferId, decision) {
+  if (!hasPermission(getAdminSession(), 'replacements', 'write')) { showToast('Your role cannot decide transfers.', 'error'); return; }
+  let newOwnerId = null, reason = '';
+  if (decision === 'completed') newOwnerId = prompt('New owner UUID (leave blank to use the one on file)') || null;
+  else reason = prompt('Cancellation reason') || '';
+  const res = await adminCall('transfer_decide', { transfer_id: transferId, decision, new_owner_id: newOwnerId, reason });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not update transfer'), 'error'); return; }
+  showToast('✅ Transfer ' + decision, 'success'); loadReplacements();
+};
+
+// ── WARRANTY MANAGEMENT ──
+let _warrantyFilter = 'all';
+async function loadWarranty() {
+  const tbody = document.getElementById('warrantyTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('warranty_list', { status: _warrantyFilter === 'all' ? null : _warrantyFilter, limit: 200 });
+  if (!res.success || !res.warranties?.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🛡️</div><div class="text">No warranties found</div></div></td></tr>'; return; }
+  tbody.innerHTML = res.warranties.map(w => {
+    const openClaims = (w.warranty_claims||[]).filter(c => c.status !== 'resolved' && c.status !== 'rejected').length;
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px">${escapeHtml(w.plate_id)}</td>
+      <td style="font-size:12px">${escapeHtml(w.users?.name||'—')}</td>
+      <td><span class="badge badge-muted">${escapeHtml(w.coverage_type)}</span></td>
+      <td>${badgeHTML(w.status)}</td>
+      <td style="font-size:12px">${fmtDate(w.ends_at)}</td>
+      <td>${openClaims ? `<span class="badge badge-warning">${openClaims} open</span>` : '—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="showToast('Warranty ID: ${w.id}','info')">Details</button></td>
+    </tr>`;
+  }).join('');
+}
+window.filterWarranty = function(status, el) {
+  _warrantyFilter = status;
+  document.querySelectorAll('#warrantyTabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  loadWarranty();
+};
+window.openCreateWarrantyForm = async function() {
+  if (!hasPermission(getAdminSession(), 'warranty', 'write')) { showToast('Your role cannot issue warranties.', 'error'); return; }
+  const plateId = prompt('Plate ID (e.g. SD-ABX9K7)'); if (!plateId) return;
+  const ownerId = prompt('Owner UUID'); if (!ownerId) return;
+  const coverageType = prompt('Coverage type (standard / extended)', 'standard') || 'standard';
+  const durationMonths = parseInt(prompt('Duration in months', '12') || '12', 10);
+  const res = await adminCall('warranty_create', { plate_id: plateId, owner_id: ownerId, coverage_type: coverageType, duration_months: durationMonths });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not issue warranty'), 'error'); return; }
+  showToast('✅ Warranty issued', 'success'); loadWarranty();
+};
+
+// ── PRODUCT SKU MANAGEMENT ──
+async function loadProductSkus() {
+  const tbody = document.getElementById('productSkuTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('product_sku_list');
+  if (!res.success || !res.skus?.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">🏷️</div><div class="text">No product SKUs yet — add your first one</div></div></td></tr>'; return; }
+  tbody.innerHTML = res.skus.map(s => `<tr>
+    <td style="font-family:monospace;font-size:12px">${escapeHtml(s.sku)}</td>
+    <td style="font-size:12px">${escapeHtml(s.name)}</td>
+    <td><span class="badge badge-muted">${escapeHtml((s.material||'').replace(/_/g,' '))}</span></td>
+    <td style="font-size:12px">${fmtMoney(s.price)}</td>
+    <td>${s.is_active ? '<span class="badge badge-success">active</span>' : '<span class="badge badge-danger">inactive</span>'}</td>
+    <td>
+      <button class="btn btn-ghost btn-sm" onclick="openProductSkuForm('${s.id}','${escapeHtml(s.sku)}','${escapeHtml(s.name)}','${s.material}','${s.price}')">Edit</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleProductSku('${s.id}',${!s.is_active})">${s.is_active ? 'Deactivate' : 'Activate'}</button>
+    </td>
+  </tr>`).join('');
+}
+window.openProductSkuForm = async function(id, currentSku, currentName, currentMaterial, currentPrice) {
+  if (!hasPermission(getAdminSession(), 'product_skus', 'write')) { showToast('Your role cannot manage SKUs.', 'error'); return; }
+  const sku = prompt('SKU (e.g. PLATE-ACRYLIC-STD)', currentSku || ''); if (!sku) return;
+  const name = prompt('Product name', currentName || ''); if (!name) return;
+  const material = prompt('Material (acrylic / teakwood / stainless_steel / other)', currentMaterial || 'acrylic') || 'acrylic';
+  const price = parseFloat(prompt('Price (INR)', currentPrice || '0') || '0');
+  const res = await adminCall('product_sku_upsert', { id: id || null, sku, name, material, price });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not save SKU'), 'error'); return; }
+  showToast('✅ SKU saved', 'success'); loadProductSkus();
+};
+window.toggleProductSku = async function(id, activate) {
+  if (!hasPermission(getAdminSession(), 'product_skus', 'write')) { showToast('Your role cannot manage SKUs.', 'error'); return; }
+  const res = await adminCall('product_sku_toggle', { id, is_active: activate });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not update SKU'), 'error'); return; }
+  showToast(activate ? '✅ SKU activated' : '✅ SKU deactivated', 'success'); loadProductSkus();
+};
+
+// ── BACKUP & RECOVERY ──
+async function loadBackups() {
+  const tbody = document.getElementById('backupTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('backup_list');
+  if (!res.success || !res.backups?.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">💾</div><div class="text">No backups run yet</div></div></td></tr>'; return; }
+  tbody.innerHTML = res.backups.map(b => {
+    const totalRows = Object.values(b.row_counts || {}).reduce((a, c) => a + Number(c || 0), 0);
+    return `<tr>
+      <td style="font-size:12px">${fmtDate(b.created_at)}</td>
+      <td><span class="badge badge-muted">${escapeHtml(b.snapshot_type)}</span></td>
+      <td>${badgeHTML(b.status==='completed'?'active':b.status==='failed'?'inactive':'queued')}</td>
+      <td style="font-size:12px">${(b.tables_included||[]).length} tables</td>
+      <td style="font-size:12px">${totalRows}</td>
+      <td style="font-size:12px">${fmtDate(b.completed_at)}</td>
+    </tr>`;
+  }).join('');
+}
+window.triggerBackup = async function() {
+  if (!hasPermission(getAdminSession(), 'backup', 'write') && !isSuperAdmin(getAdminSession())) { showToast('Your role cannot run backups.', 'error'); return; }
+  showToast('Backup started — this may take a moment…', 'info');
+  const res = await adminCall('backup_trigger');
+  if (!res.success) { showToast('Error: ' + (res.message || 'Backup failed'), 'error'); return; }
+  showToast('✅ Backup completed', 'success'); loadBackups();
+};
 
 // ── ADMIN TEAM ──
 async function loadTeam() {
