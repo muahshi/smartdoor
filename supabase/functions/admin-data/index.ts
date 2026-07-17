@@ -19,6 +19,15 @@
  *   audit_logs          — admin_audit_logs
  *   system_health       — connectivity + counts
  *
+ *   -- Phase 7: Operations & Administration Platform --
+ *   shipment_list / shipment_create / shipment_update_status
+ *   replacement_list / replacement_decide
+ *   transfer_list / transfer_decide
+ *   warranty_list / warranty_create / warranty_claim_update
+ *   product_sku_list / product_sku_upsert / product_sku_toggle
+ *   operations_health   — edge fn + AI + realtime + background job + error health
+ *   backup_list / backup_trigger
+ *
  * Permissions enforced server-side per the admin role/RBAC system.
  */
 
@@ -1266,6 +1275,439 @@ serve(async (req) => {
       });
 
       return Response.json({ success: true }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 7 — SHIPMENT TRACKING
+    // Admin surface over the existing `shipments` / `tracking_events`
+    // tables and services/shipping.js logic (that service was previously
+    // never called from any UI — this wires it up, no new schema).
+    // ══════════════════════════════════════════════
+    if (type === 'shipment_list') {
+      if (!adminCan(ctx, 'shipments', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { status = null, limit = 100, offset = 0 } = body as any;
+      let qb = db.from('shipments')
+        .select('*, orders(id, plate_id, owner_id, product_type, users(name, phone))', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(Number(offset), Number(offset) + Number(limit) - 1);
+      if (status) qb = qb.eq('status', status);
+      const { data, error, count } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, shipments: data || [], total: count || 0 }, { headers });
+    }
+
+    if (type === 'shipment_create') {
+      if (!adminCan(ctx, 'shipments', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { order_id, awb_number, provider = 'manual', tracking_url = null, estimated_delivery = null } = body as any;
+      if (!order_id || !awb_number) {
+        return Response.json({ success: false, message: 'order_id and awb_number required' }, { status: 400, headers });
+      }
+      const { data, error } = await db.from('shipments').insert({
+        order_id, awb_number, provider, tracking_url, estimated_delivery, status: 'created',
+      }).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('tracking_events').insert({
+        order_id, event_type: 'shipped', event_label: 'Shipment created',
+        event_detail: `AWB ${awb_number} via ${provider}`, actor: 'admin',
+        metadata: { awb_number, provider },
+      });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'shipment_created',
+        resource: 'shipments', resource_id: (data as any)?.id, metadata: { order_id, awb_number, provider },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true, shipment: data }, { headers });
+    }
+
+    if (type === 'shipment_update_status') {
+      if (!adminCan(ctx, 'shipments', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { shipment_id, status, remarks = '' } = body as any;
+      const validStatuses = ['created', 'in_transit', 'out_for_delivery', 'delivered', 'failed', 'returned'];
+      if (!shipment_id || !validStatuses.includes(status)) {
+        return Response.json({ success: false, message: 'shipment_id and a valid status required' }, { status: 400, headers });
+      }
+      const { data: shipment, error: fetchErr } = await db.from('shipments').select('order_id').eq('id', shipment_id).maybeSingle();
+      if (fetchErr || !shipment) return Response.json({ success: false, message: 'Shipment not found' }, { status: 404, headers });
+
+      const { error } = await db.from('shipments').update({ status, remarks, updated_at: new Date().toISOString() }).eq('id', shipment_id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('tracking_events').insert({
+        order_id: (shipment as any).order_id, event_type: status,
+        event_label: `Shipment ${status.replace(/_/g, ' ')}`, event_detail: remarks, actor: 'admin',
+      });
+
+      if (status === 'delivered') {
+        await db.from('orders').update({ manufacturing_status: 'delivered', updated_at: new Date().toISOString() }).eq('id', (shipment as any).order_id);
+      }
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'shipment_status_update',
+        resource: 'shipments', resource_id: shipment_id, metadata: { status, remarks },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 7 — REPLACEMENT & OWNERSHIP TRANSFER CONSOLE
+    // The backend logic (services/replacementTransfer.js) already existed
+    // and is untouched here — this only adds the admin read/approve
+    // surface that was missing (no admin panel called it before).
+    // ══════════════════════════════════════════════
+    if (type === 'replacement_list') {
+      if (!adminCan(ctx, 'replacements', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { status = null, limit = 100 } = body as any;
+      let qb = db.from('replacement_requests')
+        .select('*, users(name, phone, email)')
+        .order('created_at', { ascending: false })
+        .limit(Number(limit));
+      if (status) qb = qb.eq('status', status);
+      const { data, error } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, requests: data || [] }, { headers });
+    }
+
+    if (type === 'replacement_decide') {
+      if (!adminCan(ctx, 'replacements', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { request_id, decision, replacement_order_id = null, reason = '' } = body as any;
+      if (!request_id || !['approved', 'rejected'].includes(decision)) {
+        return Response.json({ success: false, message: 'request_id and decision (approved|rejected) required' }, { status: 400, headers });
+      }
+      const updates: Record<string, unknown> = { status: decision, updated_at: new Date().toISOString() };
+      if (decision === 'approved') {
+        updates.replacement_order_id = replacement_order_id;
+      } else {
+        updates.resolved_at = new Date().toISOString();
+        updates.notes = reason;
+      }
+      const { error } = await db.from('replacement_requests').update(updates).eq('id', request_id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: `replacement_${decision}`,
+        resource: 'replacements', resource_id: request_id, metadata: { decision, reason },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
+    }
+
+    if (type === 'transfer_list') {
+      if (!adminCan(ctx, 'replacements', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { status = null, limit = 100 } = body as any;
+      let qb = db.from('ownership_transfers')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(Number(limit));
+      if (status) qb = qb.eq('status', status);
+      const { data, error } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, transfers: data || [] }, { headers });
+    }
+
+    if (type === 'transfer_decide') {
+      if (!adminCan(ctx, 'replacements', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { transfer_id, decision, new_owner_id = null, reason = '' } = body as any;
+      if (!transfer_id || !['completed', 'cancelled'].includes(decision)) {
+        return Response.json({ success: false, message: 'transfer_id and decision (completed|cancelled) required' }, { status: 400, headers });
+      }
+
+      if (decision === 'completed') {
+        const { data: transfer, error: fetchErr } = await db.from('ownership_transfers').select('plate_id, new_owner_id').eq('id', transfer_id).maybeSingle();
+        if (fetchErr || !transfer) return Response.json({ success: false, message: 'Transfer not found' }, { status: 404, headers });
+        const ownerId = new_owner_id || (transfer as any).new_owner_id;
+        if (!ownerId) return Response.json({ success: false, message: 'new_owner_id required to complete transfer' }, { status: 400, headers });
+
+        const { error: plateErr } = await db.from('plates').update({ owner_id: ownerId }).eq('plate_id', (transfer as any).plate_id);
+        if (plateErr) return Response.json({ success: false, message: plateErr.message }, { status: 500, headers });
+
+        await db.from('ownership_transfers').update({
+          status: 'completed', new_owner_id: ownerId, transferred_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        }).eq('id', transfer_id);
+      } else {
+        await db.from('ownership_transfers').update({
+          status: 'cancelled', notes: reason, updated_at: new Date().toISOString(),
+        }).eq('id', transfer_id);
+      }
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: `transfer_${decision}`,
+        resource: 'replacements', resource_id: transfer_id, metadata: { decision, reason },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 7 — WARRANTY MANAGEMENT
+    // ══════════════════════════════════════════════
+    if (type === 'warranty_list') {
+      if (!adminCan(ctx, 'warranty', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { status = null, limit = 100 } = body as any;
+      let qb = db.from('warranties')
+        .select('*, users(name, phone), warranty_claims(id, status)')
+        .order('created_at', { ascending: false })
+        .limit(Number(limit));
+      if (status) qb = qb.eq('status', status);
+      const { data, error } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, warranties: data || [] }, { headers });
+    }
+
+    if (type === 'warranty_create') {
+      if (!adminCan(ctx, 'warranty', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { plate_id, owner_id, order_id = null, coverage_type = 'standard', duration_months = 12, terms = '' } = body as any;
+      if (!plate_id || !owner_id) {
+        return Response.json({ success: false, message: 'plate_id and owner_id required' }, { status: 400, headers });
+      }
+      const startsAt = new Date();
+      const endsAt = new Date(startsAt);
+      endsAt.setMonth(endsAt.getMonth() + Number(duration_months || 12));
+
+      const { data, error } = await db.from('warranties').insert({
+        plate_id, owner_id, order_id, coverage_type, terms,
+        starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), status: 'active',
+      }).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'warranty_created',
+        resource: 'warranty', resource_id: (data as any)?.id, metadata: { plate_id, coverage_type, duration_months },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true, warranty: data }, { headers });
+    }
+
+    if (type === 'warranty_claim_update') {
+      if (!adminCan(ctx, 'warranty', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { claim_id, status, resolution = '', admin_notes = '' } = body as any;
+      const validStatuses = ['open', 'in_review', 'approved', 'rejected', 'resolved'];
+      if (!claim_id || !validStatuses.includes(status)) {
+        return Response.json({ success: false, message: 'claim_id and a valid status required' }, { status: 400, headers });
+      }
+      const updates: Record<string, unknown> = { status, resolution, admin_notes, updated_at: new Date().toISOString() };
+      if (status === 'resolved' || status === 'rejected') {
+        updates.resolved_by = ctx.id;
+        updates.resolved_at = new Date().toISOString();
+      }
+      const { error } = await db.from('warranty_claims').update(updates).eq('id', claim_id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'warranty_claim_update',
+        resource: 'warranty', resource_id: claim_id, metadata: { status, resolution },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 7 — PRODUCT SKU MANAGEMENT
+    // ══════════════════════════════════════════════
+    if (type === 'product_sku_list') {
+      if (!adminCan(ctx, 'product_skus', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { data, error } = await db.from('product_skus').select('*').order('sort_order', { ascending: true });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, skus: data || [] }, { headers });
+    }
+
+    if (type === 'product_sku_upsert') {
+      if (!adminCan(ctx, 'product_skus', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { id = null, sku, name, material, description = '', price, image_url = null, sort_order = 0 } = body as any;
+      if (!sku || !name || !material || price == null) {
+        return Response.json({ success: false, message: 'sku, name, material and price required' }, { status: 400, headers });
+      }
+      const row = { sku, name, material, description, price, image_url, sort_order, updated_at: new Date().toISOString() };
+      const { data, error } = id
+        ? await db.from('product_skus').update(row).eq('id', id).select().maybeSingle()
+        : await db.from('product_skus').insert({ ...row, created_by: ctx.id }).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: id ? 'product_sku_updated' : 'product_sku_created',
+        resource: 'product_skus', resource_id: (data as any)?.id, metadata: { sku, name, price },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true, sku: data }, { headers });
+    }
+
+    if (type === 'product_sku_toggle') {
+      if (!adminCan(ctx, 'product_skus', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { id, is_active } = body as any;
+      if (!id || typeof is_active !== 'boolean') {
+        return Response.json({ success: false, message: 'id and is_active (boolean) required' }, { status: 400, headers });
+      }
+      const { error } = await db.from('product_skus').update({ is_active, updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: is_active ? 'product_sku_activated' : 'product_sku_deactivated',
+        resource: 'product_skus', resource_id: id, created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 7 — LIVE OPERATIONS HEALTH
+    // Aggregates existing signals only (error_logs, webhook_events,
+    // ai_call_screenings, rtc_call_attempts/rtc_presence_events,
+    // renewal_engine_logs) plus the existing health-check Edge Function
+    // (reused via internal fetch, not duplicated) — every field here
+    // reads a table or function that already existed pre-Phase-7.
+    // ══════════════════════════════════════════════
+    if (type === 'operations_health') {
+      if (!adminCan(ctx, 'system', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const [
+        edgeHealthRes, errorLogsRes, errorCountRes, webhookFailRes,
+        aiScreeningsRes, rtcAttemptsRes, rtcPresenceRes, renewalLogRes,
+      ] = await Promise.all([
+        // Reuse the existing public health-check function instead of
+        // re-implementing its dependency checks here.
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/health-check`)
+          .then((r) => r.json()).catch(() => null),
+        db.from('error_logs').select('id, level, category, message, created_at').order('created_at', { ascending: false }).limit(15),
+        db.from('error_logs').select('level', { count: 'exact', head: false }).gte('created_at', since24h),
+        db.from('webhook_events').select('id', { count: 'exact', head: true }).eq('status', 'failed').gte('created_at', since24h),
+        db.from('ai_call_screenings').select('confidence', { count: 'exact', head: false }).gte('created_at', since24h),
+        db.from('rtc_call_attempts').select('outcome, fallback_triggered').gte('created_at', since24h),
+        db.from('rtc_presence_events').select('event_type', { count: 'exact', head: false }).gte('created_at', since24h),
+        db.from('renewal_engine_logs').select('*').order('run_at', { ascending: false }).limit(5),
+      ]);
+
+      const errorCounts = { warn: 0, error: 0, fatal: 0 };
+      for (const row of (errorCountRes.data || []) as any[]) {
+        if (row.level in errorCounts) (errorCounts as any)[row.level]++;
+      }
+
+      const aiRows = (aiScreeningsRes.data || []) as any[];
+      const aiAvgConfidence = aiRows.length
+        ? aiRows.reduce((sum, r) => sum + Number(r.confidence || 0), 0) / aiRows.length
+        : null;
+
+      const rtcRows = (rtcAttemptsRes.data || []) as any[];
+      const rtcSuccess = rtcRows.filter((r) => r.outcome === 'connected' || r.outcome === 'answered').length;
+      const rtcFallbacks = rtcRows.filter((r) => r.fallback_triggered).length;
+
+      return Response.json({
+        success: true,
+        health: {
+          edgeFunctions: edgeHealthRes || { status: 'unknown', note: 'health-check function unreachable' },
+          errors: { last24h: errorCounts, recent: errorLogsRes.data || [] },
+          integrations: { webhookFailures24h: webhookFailRes.count || 0 },
+          ai: { screenings24h: aiRows.length, avgConfidence: aiAvgConfidence },
+          realtime: {
+            callAttempts24h: rtcRows.length, successfulCalls24h: rtcSuccess,
+            fallbacksTriggered24h: rtcFallbacks, presenceEvents24h: rtcPresenceRes.count || 0,
+          },
+          backgroundJobs: { renewalEngine: renewalLogRes.data || [] },
+          timestamp: new Date().toISOString(),
+        },
+      }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 7 — BACKUP & RECOVERY
+    // Exports critical tables as a single JSON snapshot to the
+    // 'backup-snapshots' storage bucket and logs the run. This is an
+    // app-data export/restore aid, not a substitute for Supabase's
+    // infra-level Postgres backups (not reachable from an Edge Function).
+    // ══════════════════════════════════════════════
+    if (type === 'backup_list') {
+      if (!adminCan(ctx, 'backup', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { data, error } = await db.from('backup_snapshots').select('*').order('created_at', { ascending: false }).limit(20);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, backups: data || [] }, { headers });
+    }
+
+    if (type === 'backup_trigger') {
+      if (!adminCan(ctx, 'backup', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const BACKUP_TABLES = [
+        'users', 'plates', 'orders', 'subscriptions', 'manufacturing',
+        'inventory_items', 'support_tickets', 'admin_users', 'product_skus', 'warranties',
+      ];
+
+      const { data: run, error: runErr } = await db.from('backup_snapshots').insert({
+        snapshot_type: 'manual', tables_included: BACKUP_TABLES, status: 'running', triggered_by: ctx.id,
+      }).select().maybeSingle();
+      if (runErr || !run) return Response.json({ success: false, message: runErr?.message || 'Could not start backup' }, { status: 500, headers });
+
+      try {
+        const snapshot: Record<string, unknown> = {};
+        const rowCounts: Record<string, number> = {};
+        for (const table of BACKUP_TABLES) {
+          const { data: rows, error: tblErr } = await db.from(table).select('*').limit(5000);
+          if (tblErr) throw new Error(`${table}: ${tblErr.message}`);
+          snapshot[table] = rows || [];
+          rowCounts[table] = (rows || []).length;
+        }
+
+        const path = `snapshots/${(run as any).id}.json`;
+        const { error: uploadErr } = await db.storage.from('backup-snapshots').upload(
+          path, new Blob([JSON.stringify(snapshot)], { type: 'application/json' }), { upsert: true },
+        );
+        if (uploadErr) throw new Error(uploadErr.message);
+
+        await db.from('backup_snapshots').update({
+          status: 'completed', storage_path: path, row_counts: rowCounts, completed_at: new Date().toISOString(),
+        }).eq('id', (run as any).id);
+
+        await db.from('admin_audit_logs').insert({
+          admin_id: ctx.id, admin_email: ctx.email, action: 'backup_triggered',
+          resource: 'backup', resource_id: (run as any).id, metadata: { tables: BACKUP_TABLES, rowCounts },
+          created_at: new Date().toISOString(),
+        });
+
+        return Response.json({ success: true, backup_id: (run as any).id, rowCounts }, { headers });
+      } catch (backupErr) {
+        await db.from('backup_snapshots').update({
+          status: 'failed', error_message: String(backupErr), completed_at: new Date().toISOString(),
+        }).eq('id', (run as any).id);
+        return Response.json({ success: false, message: `Backup failed: ${String(backupErr)}` }, { status: 500, headers });
+      }
     }
 
     return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });
