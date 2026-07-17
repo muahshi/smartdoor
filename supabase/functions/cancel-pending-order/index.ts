@@ -77,6 +77,16 @@ serve(async (req) => {
         event_label: "Payment Cancelled by Customer",
         actor:       "system",
       });
+
+      // Phase 8A Commerce Engine: release any reserved coupon usage slot /
+      // pricing-rule ledger rows so an abandoned checkout never permanently
+      // consumes a limited-use coupon. Best-effort — this is bookkeeping,
+      // not payment-critical.
+      try {
+        await supabase.rpc("release_order_discounts", { p_order_id: orderId });
+      } catch (e) {
+        console.warn("[cancel-pending-order] release_order_discounts failed (non-fatal):", (e as Error).message);
+      }
     }
 
     // Whether or not a row matched (e.g. it was already paid/failed),
