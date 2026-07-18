@@ -1102,7 +1102,12 @@ serve(async (req) => {
     if (type === 'commission_list') {
       if (!adminCan(ctx, 'commissions', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       let q = db.from('dealer_commissions').select('*').order('created_at', { ascending: false });
-      if (ctx.role_name === 'dealer') q = q.eq('dealer_admin_id', ctx.id);
+      // Bug fix (Phase 8C Part 3 audit): franchise/distributor hold the same
+      // 'commissions':['read'] permission as dealer but were never scoped to
+      // their own rows here, unlike dealer — meaning any franchise/distributor
+      // admin could see every other partner's commission ledger. Scoped the
+      // same way for all three partner roles; every other role is unaffected.
+      if (['dealer', 'franchise', 'distributor'].includes(ctx.role_name)) q = q.eq('dealer_admin_id', ctx.id);
       const { data } = await q;
       return Response.json({ success: true, commissions: data || [] }, { headers });
     }
