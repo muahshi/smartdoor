@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Become a Smart Door Partner — Dealer / Franchise / Distributor Application</title>
+<link rel="icon" href="/images/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100dvh;
+    background: #080F1A;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    padding: 24px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .brand { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; margin-bottom: 8px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 26px; margin-bottom: 6px; }
+  .sub { color: rgba(255,255,255,0.6); margin-bottom: 28px; font-size: 14px; }
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+  .step-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #00A2E8; margin-bottom: 16px; font-weight: 600; }
+  label { display: block; font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 6px; margin-top: 14px; }
+  label:first-child { margin-top: 0; }
+  input, select, textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 11px 13px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #00A2E8; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hint { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+  .btn {
+    background: #00A2E8; color: #06121F; border: none; border-radius: 12px;
+    padding: 13px 20px; font-weight: 600; font-size: 15px; cursor: pointer; width: 100%; margin-top: 22px;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn.secondary { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; }
+  .msg { margin-top: 14px; font-size: 13px; padding: 12px 14px; border-radius: 10px; display: none; }
+  .msg.error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; display: block; }
+  .msg.success { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: #86efac; display: block; }
+  .doc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .doc-row:last-child { border-bottom: none; }
+  .doc-status { font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+  .doc-status.pending { background: rgba(234,179,8,0.15); color: #fde047; }
+  .doc-status.approved { background: rgba(34,197,94,0.15); color: #86efac; }
+  .doc-status.rejected { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .appnum { font-family: 'Space Grotesk', sans-serif; font-size: 22px; color: #00A2E8; letter-spacing: 0.02em; }
+  #applyForm, #docsSection, #statusSection { display: none; }
+  #applyForm.active, #docsSection.active, #statusSection.active { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">SMART DOOR</div>
+  <h1>Partner with Smart Door</h1>
+  <div class="sub">Apply as a Dealer, Franchise, or Distributor. Fill the form below — we'll review your KYC documents and get back to you.</div>
+
+  <div class="card">
+    <div class="step-title">Step 1 — Business & Contact Details</div>
+    <form id="applyForm" class="active">
+      <label>Partner Type</label>
+      <select id="partner_type" required>
+        <option value="dealer">Dealer</option>
+        <option value="franchise">Franchise</option>
+        <option value="distributor">Distributor</option>
+      </select>
+
+      <label>Business Name</label>
+      <input id="business_name" required placeholder="e.g. Sharma Enterprises" />
+
+      <label>Business Type</label>
+      <select id="business_type">
+        <option value="proprietorship">Proprietorship</option>
+        <option value="partnership">Partnership</option>
+        <option value="pvt_ltd">Private Limited</option>
+        <option value="llp">LLP</option>
+        <option value="other">Other</option>
+      </select>
+
+      <div class="row2">
+        <div>
+          <label>GST Number (optional)</label>
+          <input id="gst_number" placeholder="22AAAAA0000A1Z5" maxlength="15" style="text-transform:uppercase" />
+        </div>
+        <div>
+          <label>PAN Number</label>
+          <input id="pan_number" required placeholder="AAAAA0000A" maxlength="10" style="text-transform:uppercase" />
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>Contact Person Name</label>
+          <input id="contact_name" required />
+        </div>
+        <div>
+          <label>Contact Phone</label>
+          <input id="contact_phone" required maxlength="10" placeholder="9876543210" />
+        </div>
+      </div>
+      <label>Contact Email</label>
+      <input id="contact_email" type="email" required placeholder="For your login credentials once approved" />
+
+      <label>Requested Territory / City</label>
+      <input id="requested_territory" placeholder="e.g. Bhopal, MP" />
+
+      <div class="step-title" style="margin-top:22px;">Bank Details (for commission payouts)</div>
+      <div class="row2">
+        <div><label>Account Holder Name</label><input id="bank_account_name" /></div>
+        <div><label>Bank Name</label><input id="bank_name" /></div>
+      </div>
+      <div class="row2">
+        <div><label>Account Number</label><input id="bank_account_number" /></div>
+        <div><label>IFSC Code</label><input id="bank_ifsc" style="text-transform:uppercase" /></div>
+      </div>
+
+      <label>Address</label>
+      <textarea id="address_line" rows="2" placeholder="Full business address"></textarea>
+
+      <button type="submit" class="btn" id="submitBtn">Submit Application</button>
+      <div class="msg" id="applyMsg"></div>
+    </form>
+
+    <div id="docsSection">
+      <div class="step-title">Step 2 — Upload KYC Documents</div>
+      <div class="sub" style="margin-bottom:14px;">Application <span class="appnum" id="appNumDisplay"></span> submitted. Upload the documents below to move to review.</div>
+      <div id="docUploaders"></div>
+      <div class="msg" id="docMsg"></div>
+      <button class="btn secondary" id="checkStatusBtn" style="margin-top:20px;">Check Application Status</button>
+    </div>
+
+    <div id="statusSection">
+      <div class="step-title">Application Status</div>
+      <div id="statusBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="config/env.generated.js"></script>
+<script type="module">
+  import { submitPartnerApplication, uploadPartnerDocument, getPartnerApplicationStatus, fileToBase64 } from './services/partnerOnboarding.js';
+
+  const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  const PHONE_RE = /^[6-9]\d{9}$/;
+
+  const applyForm = document.getElementById('applyForm');
+  const docsSection = document.getElementById('docsSection');
+  const statusSection = document.getElementById('statusSection');
+  const applyMsg = document.getElementById('applyMsg');
+  const docMsg = document.getElementById('docMsg');
+  const submitBtn = document.getElementById('submitBtn');
+
+  let currentApp = null; // { application_number, contact_phone }
+
+  const DOC_TYPES = [
+    { key: 'pan_card', label: 'PAN Card' },
+    { key: 'gst_certificate', label: 'GST Certificate (if applicable)' },
+    { key: 'address_proof', label: 'Address Proof' },
+    { key: 'bank_proof', label: 'Bank Proof (cancelled cheque / passbook)' },
+  ];
+
+  function showMsg(el, text, type) {
+    el.textContent = text;
+    el.className = `msg ${type}`;
+  }
+
+  applyForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    applyMsg.className = 'msg';
+
+    const gst = document.getElementById('gst_number').value.trim().toUpperCase();
+    const pan = document.getElementById('pan_number').value.trim().toUpperCase();
+    const phone = document.getElementById('contact_phone').value.trim();
+
+    if (!PHONE_RE.test(phone)) return showMsg(applyMsg, 'Enter a valid 10-digit mobile number.', 'error');
+    if (!PAN_RE.test(pan)) return showMsg(applyMsg, 'PAN number format looks invalid.', 'error');
+    if (gst && !GSTIN_RE.test(gst)) return showMsg(applyMsg, 'GST number format looks invalid.', 'error');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    const res = await submitPartnerApplication({
+      partner_type: document.getElementById('partner_type').value,
+      business_name: document.getElementById('business_name').value.trim(),
+      business_type: document.getElementById('business_type').value,
+      gst_number: gst || null,
+      pan_number: pan,
+      contact_name: document.getElementById('contact_name').value.trim(),
+      contact_phone: phone,
+      contact_email: document.getElementById('contact_email').value.trim(),
+      requested_territory: document.getElementById('requested_territory').value.trim() || null,
+      bank_account_name: document.getElementById('bank_account_name').value.trim() || null,
+      bank_name: document.getElementById('bank_name').value.trim() || null,
+      bank_account_number: document.getElementById('bank_account_number').value.trim() || null,
+      bank_ifsc: document.getElementById('bank_ifsc').value.trim().toUpperCase() || null,
+      address: { line: document.getElementById('address_line').value.trim() },
+    });
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Application';
+
+    if (!res.success) return showMsg(applyMsg, res.error || 'Submission failed.', 'error');
+
+    currentApp = { application_number: res.application.application_number, contact_phone: phone };
+    applyForm.classList.remove('active');
+    docsSection.classList.add('active');
+    document.getElementById('appNumDisplay').textContent = res.application.application_number;
+    renderDocUploaders();
+  });
+
+  function renderDocUploaders() {
+    const container = document.getElementById('docUploaders');
+    container.innerHTML = '';
+    DOC_TYPES.forEach(({ key, label }) => {
+      const row = document.createElement('div');
+      row.className = 'doc-row';
+      row.innerHTML = `
+        <span>${label}</span>
+        <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" data-doctype="${key}" style="max-width:180px;" />
+      `;
+      container.appendChild(row);
+    });
+    container.querySelectorAll('input[type=file]').forEach((input) => {
+      input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const docType = e.target.dataset.doctype;
+        e.target.disabled = true;
+        const base64 = await fileToBase64(file);
+        const res = await uploadPartnerDocument({
+          applicationNumber: currentApp.application_number,
+          contactPhone: currentApp.contact_phone,
+          docType,
+          fileBase64: base64,
+          mimeType: file.type,
+        });
+        e.target.disabled = false;
+        if (!res.success) return showMsg(docMsg, res.error || 'Upload failed.', 'error');
+        showMsg(docMsg, `${docType.replace('_', ' ')} uploaded.`, 'success');
+      });
+    });
+  }
+
+  document.getElementById('checkStatusBtn').addEventListener('click', async () => {
+    if (!currentApp) return;
+    const res = await getPartnerApplicationStatus({ applicationNumber: currentApp.application_number, contactPhone: currentApp.contact_phone });
+    docsSection.classList.remove('active');
+    statusSection.classList.add('active');
+    if (!res.success) {
+      document.getElementById('statusBody').innerHTML = `<div class="msg error" style="display:block;">${res.error}</div>`;
+      return;
+    }
+    const a = res.application;
+    const docsHtml = (res.documents || []).map(d => `
+      <div class="doc-row"><span>${d.doc_type.replace('_', ' ')}</span><span class="doc-status ${d.status}">${d.status}</span></div>
+    `).join('') || '<div class="hint">No documents uploaded yet.</div>';
+    document.getElementById('statusBody').innerHTML = `
+      <div class="appnum">${a.application_number}</div>
+      <div class="hint" style="margin:8px 0 16px;">${a.business_name} — <strong>${a.status.replace('_',' ')}</strong></div>
+      ${a.status === 'rejected' ? `<div class="msg error" style="display:block;">Rejected: ${a.rejection_reason || ''}</div>` : ''}
+      ${docsHtml}
+    `;
+  });
+</script>
+</body>
+</html>

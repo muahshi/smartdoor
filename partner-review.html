@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Door Admin — Partner Applications</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" href="/images/favicon.ico" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { min-height: 100dvh; background: #080F1A; color: #fff; font-family: 'Inter', sans-serif; padding: 24px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; margin-bottom: 4px; }
+  .sub { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 20px; }
+  .filters { display: flex; gap: 10px; margin-bottom: 18px; }
+  select { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 8px; padding: 8px 12px; font-family: inherit; }
+  table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow: hidden; }
+  th, td { text-align: left; padding: 12px 14px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  th { color: rgba(255,255,255,0.5); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: rgba(255,255,255,0.03); }
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 999px; text-transform: capitalize; }
+  .badge.submitted, .badge.under_review { background: rgba(234,179,8,0.15); color: #fde047; }
+  .badge.approved { background: rgba(34,197,94,0.15); color: #86efac; }
+  .badge.rejected { background: rgba(239,68,68,0.15); color: #fca5a5; }
+  .badge.pending { background: rgba(234,179,8,0.15); color: #fde047; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; z-index: 50; }
+  .modal-backdrop.active { display: flex; }
+  .modal { background: #0D1626; border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; padding: 26px; max-width: 560px; width: 100%; }
+  .modal h2 { font-family: 'Space Grotesk', sans-serif; font-size: 18px; margin-bottom: 14px; }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; font-size: 13px; margin-bottom: 6px; }
+  .kv b { color: rgba(255,255,255,0.5); font-weight: 500; }
+  .doc-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13px; }
+  .doc-actions button { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer; margin-left: 6px; }
+  .doc-actions .approve { background: rgba(34,197,94,0.2); color: #86efac; }
+  .doc-actions .reject { background: rgba(239,68,68,0.2); color: #fca5a5; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-btns button { flex: 1; padding: 11px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-approve { background: #22c55e; color: #06120a; }
+  .btn-reject { background: transparent; border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; }
+  .btn-close { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; }
+  .msg { margin-top: 12px; font-size: 13px; padding: 10px 12px; border-radius: 8px; display: none; }
+  .msg.error { background: rgba(239,68,68,0.12); color: #fca5a5; display: block; }
+  .msg.success { background: rgba(34,197,94,0.12); color: #86efac; display: block; }
+  textarea { width: 100%; margin-top: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px; color: #fff; font-family: inherit; font-size: 13px; display: none; }
+  .empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.4); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Partner Applications</h1>
+  <div class="sub">Dealer / Franchise / Distributor onboarding — KYC review + approval (Phase 8C)</div>
+
+  <div class="filters">
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option value="submitted">Submitted</option>
+      <option value="under_review" selected>Under Review</option>
+      <option value="approved">Approved</option>
+      <option value="rejected">Rejected</option>
+    </select>
+    <select id="typeFilter">
+      <option value="">All types</option>
+      <option value="dealer">Dealer</option>
+      <option value="franchise">Franchise</option>
+      <option value="distributor">Distributor</option>
+    </select>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Application #</th><th>Business</th><th>Type</th><th>Territory</th><th>Submitted</th><th>Status</th></tr>
+    </thead>
+    <tbody id="appTableBody"></tbody>
+  </table>
+  <div class="empty" id="emptyState" style="display:none;">No applications match this filter.</div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modalBody"></div>
+</div>
+
+<script type="module">
+  import { requireAdminAuth } from './services/admin.js';
+  import { getPartnerApplicationList, getPartnerApplicationDetail, reviewPartnerKycDocument, reviewPartnerApplication } from './services/adminData.js';
+
+  const session = requireAdminAuth();
+  if (session && session.role !== 'super_admin' && !(session.permissions && session.permissions['*'])) {
+    document.querySelector('.wrap').innerHTML = '<div class="empty">You do not have access to Partner Applications.</div>';
+    throw new Error('unauthorized');
+  }
+
+  const tbody = document.getElementById('appTableBody');
+  const emptyState = document.getElementById('emptyState');
+  const statusFilter = document.getElementById('statusFilter');
+  const typeFilter = document.getElementById('typeFilter');
+  const backdrop = document.getElementById('modalBackdrop');
+  const modalBody = document.getElementById('modalBody');
+
+  async function loadList() {
+    tbody.innerHTML = '';
+    const res = await getPartnerApplicationList({ status: statusFilter.value || null, partnerType: typeFilter.value || null });
+    if (!res.success) { emptyState.style.display = 'block'; emptyState.textContent = res.error || 'Failed to load.'; return; }
+    const apps = res.applications || [];
+    emptyState.style.display = apps.length ? 'none' : 'block';
+    emptyState.textContent = 'No applications match this filter.';
+    apps.forEach((a) => {
+      const tr = document.createElement('tr');
+      tr.className = 'clickable';
+      tr.innerHTML = `
+        <td>${a.application_number}</td>
+        <td>${a.business_name}</td>
+        <td style="text-transform:capitalize;">${a.partner_type}</td>
+        <td>${a.requested_territory || '—'}</td>
+        <td>${new Date(a.created_at).toLocaleDateString('en-IN')}</td>
+        <td><span class="badge ${a.status}">${a.status.replace('_',' ')}</span></td>
+      `;
+      tr.addEventListener('click', () => openDetail(a.id));
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function openDetail(id) {
+    const res = await getPartnerApplicationDetail(id);
+    if (!res.success) { alert(res.error || 'Failed to load application.'); return; }
+    renderModal(res.application, res.documents || []);
+  }
+
+  function renderModal(a, docs) {
+    const docsHtml = docs.length ? docs.map((d) => `
+      <div class="doc-row">
+        <span style="text-transform:capitalize;">${d.doc_type.replace('_',' ')} <span class="badge ${d.status}" style="margin-left:6px;">${d.status}</span></span>
+        <span class="doc-actions">
+          <button class="approve" data-docid="${d.id}" data-decision="approved">Approve</button>
+          <button class="reject" data-docid="${d.id}" data-decision="rejected">Reject</button>
+        </span>
+      </div>
+    `).join('') : '<div class="empty" style="padding:12px 0;">No documents uploaded yet.</div>';
+
+    modalBody.innerHTML = `
+      <h2>${a.business_name}</h2>
+      <div class="kv"><b>Application #</b><span>${a.application_number}</span></div>
+      <div class="kv"><b>Type</b><span style="text-transform:capitalize;">${a.partner_type}</span></div>
+      <div class="kv"><b>Status</b><span class="badge ${a.status}">${a.status.replace('_',' ')}</span></div>
+      <div class="kv"><b>Contact</b><span>${a.contact_name} · ${a.contact_phone} · ${a.contact_email || '—'}</span></div>
+      <div class="kv"><b>GST</b><span>${a.gst_number || '—'} ${a.gst_number ? (a.gst_verified ? '✅ verified' : '⏳ pending') : ''}</span></div>
+      <div class="kv"><b>PAN</b><span>${a.pan_number || '—'} ${a.pan_verified ? '✅ verified' : '⏳ pending'}</span></div>
+      <div class="kv"><b>Territory</b><span>${a.requested_territory || '—'}</span></div>
+      <div style="margin-top:16px; font-size:12px; color:rgba(255,255,255,0.5); text-transform:uppercase; letter-spacing:0.05em;">KYC Documents</div>
+      <div id="docsList">${docsHtml}</div>
+      <div class="msg" id="modalMsg"></div>
+      <textarea id="rejectReason" placeholder="Rejection reason (required to reject)"></textarea>
+      ${a.status !== 'approved' && a.status !== 'rejected' ? `
+        <div class="modal-btns">
+          <button class="btn-approve" id="approveBtn">Approve & Create Login</button>
+          <button class="btn-reject" id="rejectBtn">Reject</button>
+        </div>
+      ` : ''}
+      <div class="modal-btns"><button class="btn-close" id="closeModalBtn">Close</button></div>
+    `;
+    backdrop.classList.add('active');
+
+    modalBody.querySelectorAll('.doc-actions button').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const res = await reviewPartnerKycDocument(btn.dataset.docid, btn.dataset.decision);
+        if (!res.success) { showModalMsg(res.error, 'error'); return; }
+        const fresh = await getPartnerApplicationDetail(a.id);
+        if (fresh.success) renderModal(fresh.application, fresh.documents);
+      });
+    });
+
+    const approveBtn = modalBody.querySelector('#approveBtn');
+    const rejectBtn = modalBody.querySelector('#rejectBtn');
+    const reasonBox = modalBody.querySelector('#rejectReason');
+
+    if (approveBtn) approveBtn.addEventListener('click', async () => {
+      approveBtn.disabled = true; approveBtn.textContent = 'Approving…';
+      const res = await reviewPartnerApplication(a.id, 'approve');
+      approveBtn.disabled = false; approveBtn.textContent = 'Approve & Create Login';
+      if (!res.success) return showModalMsg(res.error, 'error');
+      showModalMsg(`Approved. Login: ${res.newAdmin.email} — temp password: ${res.tempPassword} (shown once, also emailed).`, 'success');
+      loadList();
+    });
+
+    if (rejectBtn) rejectBtn.addEventListener('click', () => {
+      if (reasonBox.style.display !== 'block') { reasonBox.style.display = 'block'; reasonBox.focus(); return; }
+      if (!reasonBox.value.trim()) return showModalMsg('Rejection reason is required.', 'error');
+      rejectBtn.disabled = true;
+      reviewPartnerApplication(a.id, 'reject', reasonBox.value.trim()).then((res) => {
+        rejectBtn.disabled = false;
+        if (!res.success) return showModalMsg(res.error, 'error');
+        showModalMsg('Application rejected.', 'success');
+        loadList();
+      });
+    });
+
+    modalBody.querySelector('#closeModalBtn').addEventListener('click', () => backdrop.classList.remove('active'));
+  }
+
+  function showModalMsg(text, type) {
+    const el = modalBody.querySelector('#modalMsg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = `msg ${type}`;
+  }
+
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.classList.remove('active'); });
+  statusFilter.addEventListener('change', loadList);
+  typeFilter.addEventListener('change', loadList);
+
+  loadList();
+</script>
+</body>
+</html>
