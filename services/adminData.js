@@ -133,5 +133,32 @@ export async function getRevenueChartData(months = 6) {
   return { success: true, labels: res.labels, values: res.values };
 }
 
+// ────────── PHASE 8C: PARTNER APPLICATIONS + KYC REVIEW ──────────
+export async function getPartnerApplicationList({ status = null, partnerType = null } = {}) {
+  const res = await _call('partner_application_list', { status, partner_type: partnerType });
+  if (!res.success) return res;
+  return { success: true, applications: res.applications };
+}
+
+export async function getPartnerApplicationDetail(applicationId) {
+  const res = await _call('partner_application_detail', { application_id: applicationId });
+  if (!res.success) return res;
+  return { success: true, application: res.application, documents: res.documents };
+}
+
+export async function reviewPartnerKycDocument(documentId, status, reviewNotes = '') {
+  const res = await _call('partner_kyc_document_review', { document_id: documentId, status, review_notes: reviewNotes });
+  if (!res.success) return res;
+  return { success: true, document: res.document };
+}
+
+export async function reviewPartnerApplication(applicationId, decision, rejectionReason = '') {
+  const res = await _call('partner_application_review', {
+    application_id: applicationId, decision, rejection_reason: rejectionReason,
+  });
+  if (!res.success) return res;
+  return { success: true, application: res.application, newAdmin: res.new_admin, tempPassword: res.temp_password };
+}
+
 // ────────── ORDER ANALYTICS (for charts) ──────────
 
