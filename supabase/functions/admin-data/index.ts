@@ -32,6 +32,9 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+// Partner-application approval (Phase 8C) needs to create a real admin_users
+// row with a bcrypt password hash — same library/pattern as admin-login.
+import bcryptjs from 'npm:bcryptjs@2.4.3';
 import { restrictedCors } from '../_shared/cors.ts';
 import {
   getServiceClient,
@@ -1125,6 +1128,166 @@ serve(async (req) => {
         resource: 'commissions', resource_id: cid, after_data: { status: newStatus },
       });
       return Response.json({ success: true, commission: data }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 8C — PARTNER APPLICATIONS + KYC REVIEW
+    // Gated on 'partner_applications' — no admin_roles row grants this
+    // today (see migration 58), so only super_admin's '*' wildcard can
+    // reach these handlers until a future migration scopes it further.
+    // ══════════════════════════════════════════════
+    if (type === 'partner_application_list') {
+      if (!adminCan(ctx, 'partner_applications', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { status: filterStatus, partner_type: filterType } = body as any;
+      let q = db.from('partner_applications').select('*').order('created_at', { ascending: false });
+      if (filterStatus) q = q.eq('status', filterStatus);
+      if (filterType) q = q.eq('partner_type', filterType);
+      const { data, error } = await q;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      return Response.json({ success: true, applications: data || [] }, { headers });
+    }
+
+    if (type === 'partner_application_detail') {
+      if (!adminCan(ctx, 'partner_applications', 'read')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { application_id: paid } = body as any;
+      if (!paid) return Response.json({ success: false, message: 'application_id required' }, { status: 400, headers });
+      const { data: app, error } = await db.from('partner_applications').select('*').eq('id', paid).maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+      if (!app) return Response.json({ success: false, message: 'Application not found' }, { status: 404, headers });
+      const { data: docs } = await db.from('partner_kyc_documents').select('*').eq('application_id', paid).order('created_at', { ascending: false });
+      return Response.json({ success: true, application: app, documents: docs || [] }, { headers });
+    }
+
+    // Reviewer approves/rejects one uploaded document. Approving the
+    // gst_certificate/pan_card doc types also flips the corresponding
+    // gst_verified/pan_verified flag on the application — this is the
+    // real verification hook: a human checked the document. Wiring an
+    // automated GST/PAN API is a drop-in replacement for this same
+    // column pair later, not a new schema.
+    if (type === 'partner_kyc_document_review') {
+      if (!adminCan(ctx, 'partner_applications', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { document_id: did, status: docStatus, review_notes: dnotes } = body as any;
+      const VALID_DOC_STATUSES = ['pending', 'approved', 'rejected'];
+      if (!did || !VALID_DOC_STATUSES.includes(String(docStatus))) {
+        return Response.json({ success: false, message: 'document_id and a valid status are required' }, { status: 400, headers });
+      }
+      const { data: doc, error: docErr } = await db.from('partner_kyc_documents')
+        .update({ status: docStatus, review_notes: dnotes || null, reviewed_by: ctx.id, reviewed_at: new Date().toISOString() })
+        .eq('id', did).select().maybeSingle();
+      if (docErr) return Response.json({ success: false, message: docErr.message }, { status: 400, headers });
+      if (!doc) return Response.json({ success: false, message: 'Document not found' }, { status: 404, headers });
+
+      if (docStatus === 'approved' && (doc.doc_type === 'gst_certificate' || doc.doc_type === 'pan_card')) {
+        const flagField = doc.doc_type === 'gst_certificate' ? 'gst_verified' : 'pan_verified';
+        const atField = doc.doc_type === 'gst_certificate' ? 'gst_verified_at' : 'pan_verified_at';
+        await db.from('partner_applications').update({ [flagField]: true, [atField]: new Date().toISOString() }).eq('id', doc.application_id);
+      }
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'partner_kyc_document_review',
+        resource: 'partner_kyc_documents', resource_id: did, after_data: { status: docStatus },
+      });
+      return Response.json({ success: true, document: doc }, { headers });
+    }
+
+    // Approve/reject the application itself.
+    //   - reject: sets status + rejection_reason. Applicant can call
+    //     partner-application's `reapply` afterwards.
+    //   - approve: creates the real admin_users row (role matched to
+    //     partner_type — this is the missing step identified during the
+    //     audit; no code anywhere in this repo created admin_users
+    //     before this migration/handler). Generates a one-time temp
+    //     password (bcrypt-hashed, same library as admin-login), returns
+    //     it once in the response for the reviewer to relay, and emails
+    //     it to the applicant via the existing send-email function.
+    if (type === 'partner_application_review') {
+      if (!adminCan(ctx, 'partner_applications', 'write')) return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      const { application_id: raid, decision, rejection_reason: rreason } = body as any;
+      if (!raid || !['approve', 'reject'].includes(String(decision))) {
+        return Response.json({ success: false, message: 'application_id and decision (approve|reject) are required' }, { status: 400, headers });
+      }
+
+      const { data: app, error: appErr } = await db.from('partner_applications').select('*').eq('id', raid).maybeSingle();
+      if (appErr) return Response.json({ success: false, message: appErr.message }, { status: 400, headers });
+      if (!app) return Response.json({ success: false, message: 'Application not found' }, { status: 404, headers });
+      if (app.status === 'approved' || app.status === 'rejected') {
+        return Response.json({ success: false, message: `Application is already ${app.status}` }, { status: 400, headers });
+      }
+
+      if (decision === 'reject') {
+        if (!rreason || String(rreason).trim().length < 3) {
+          return Response.json({ success: false, message: 'rejection_reason is required' }, { status: 400, headers });
+        }
+        const { data: updated, error } = await db.from('partner_applications')
+          .update({ status: 'rejected', rejection_reason: rreason, reviewed_by: ctx.id, reviewed_at: new Date().toISOString() })
+          .eq('id', raid).select().maybeSingle();
+        if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+
+        await db.from('admin_audit_logs').insert({
+          admin_id: ctx.id, admin_email: ctx.email, action: 'partner_application_reject',
+          resource: 'partner_applications', resource_id: raid, after_data: { status: 'rejected', reason: rreason },
+        });
+
+        if (app.contact_email) {
+          try {
+            await db.functions.invoke('send-email', {
+              body: { template: 'partner_application_rejected', to: app.contact_email, to_name: app.contact_name, data: { application_number: app.application_number, reason: rreason } },
+            });
+          } catch (e) { console.warn('[admin-data] partner rejection email failed (non-fatal):', (e as Error).message); }
+        }
+
+        return Response.json({ success: true, application: updated }, { headers });
+      }
+
+      // decision === 'approve'
+      if (!app.gst_verified && app.gst_number) {
+        return Response.json({ success: false, message: 'GST document is not verified yet — review the KYC documents before approving.' }, { status: 400, headers });
+      }
+      if (!app.pan_verified) {
+        return Response.json({ success: false, message: 'PAN document is not verified yet — review the KYC documents before approving.' }, { status: 400, headers });
+      }
+      if (!app.contact_email) {
+        return Response.json({ success: false, message: 'Application has no contact_email — cannot create login credentials.' }, { status: 400, headers });
+      }
+
+      const { data: role, error: roleErr } = await db.from('admin_roles').select('id').eq('name', app.partner_type).maybeSingle();
+      if (roleErr || !role) return Response.json({ success: false, message: `No admin role found for partner_type '${app.partner_type}'` }, { status: 500, headers });
+
+      const { data: existingAdmin } = await db.from('admin_users').select('id').eq('email', app.contact_email).maybeSingle();
+      if (existingAdmin) return Response.json({ success: false, message: `An admin account already exists for ${app.contact_email}` }, { status: 409, headers });
+
+      const tempPassword = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+      const passwordHash = bcryptjs.hashSync(tempPassword, 10);
+
+      const { data: newAdmin, error: adminInsertErr } = await db.from('admin_users').insert({
+        email: app.contact_email,
+        full_name: app.contact_name,
+        role_id: role.id,
+        password_hash: passwordHash,
+        is_active: true,
+        region: app.requested_territory || null,
+        created_by: ctx.id,
+      }).select('id, email, full_name').maybeSingle();
+      if (adminInsertErr) return Response.json({ success: false, message: adminInsertErr.message }, { status: 400, headers });
+
+      const { data: updated, error } = await db.from('partner_applications')
+        .update({ status: 'approved', reviewed_by: ctx.id, reviewed_at: new Date().toISOString(), resulting_admin_id: newAdmin!.id })
+        .eq('id', raid).select().maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 400, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'partner_application_approve',
+        resource: 'partner_applications', resource_id: raid, after_data: { status: 'approved', new_admin_id: newAdmin!.id, role: app.partner_type },
+      });
+
+      try {
+        await db.functions.invoke('send-email', {
+          body: { template: 'partner_application_approved', to: app.contact_email, to_name: app.contact_name, data: { application_number: app.application_number, login_email: app.contact_email, temp_password: tempPassword } },
+        });
+      } catch (e) { console.warn('[admin-data] partner approval email failed (non-fatal):', (e as Error).message); }
+
+      // temp_password returned once — not stored in plaintext anywhere, not retrievable again after this response.
+      return Response.json({ success: true, application: updated, new_admin: newAdmin, temp_password: tempPassword }, { headers });
     }
 
     // ══════════════════════════════════════════════
