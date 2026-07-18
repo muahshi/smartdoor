@@ -14,7 +14,8 @@
 import { getSubscription, isComplimentaryPremium } from '../services/subscriptions.js';
 import { getPlanCatalog, planFeatureList } from '../services/plans.js';
 import { getUsageSummary, formatUsageLine } from '../services/usageLimits.js';
-import { getInvoices, formatInvoiceStatus } from '../services/invoices.js';
+import { getInvoices, formatInvoiceStatus, formatInvoiceType } from '../services/invoices.js';
+import { downloadInvoicePdf } from '../services/gstInvoicePdf.js';
 import { changePlan, verifySubscriptionPayment, downgradeToFree, cancelSubscription, reactivateSubscription } from '../services/subscriptions.js';
 import { loadRazorpaySDK, openRazorpayCheckout } from '../services/payments.js';
 
@@ -296,14 +297,21 @@ const SubscriptionManager = (() => {
     }
     const rows = invoices.map((inv) => {
       const st = formatInvoiceStatus(inv.status);
+      const typeTag = formatInvoiceType(inv.invoice_type);
       const date = new Date(inv.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const displayAmount = inv.invoice_total != null ? inv.invoice_total : inv.amount;
+      const planLabel = inv.order_id ? 'Hardware Order' : `${inv.plan} · ${inv.billing_cycle}`;
       return `
         <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-          <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.8);">${inv.invoice_number}</td>
+          <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.8);">
+            ${inv.invoice_number}
+            ${inv.invoice_type && inv.invoice_type !== 'tax_invoice' ? `<div style="font-size:0.62rem; font-weight:700; color:${typeTag.color};">${typeTag.label}</div>` : ''}
+          </td>
           <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.6);">${date}</td>
-          <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.8); text-transform:capitalize;">${inv.plan} · ${inv.billing_cycle}</td>
-          <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.8);">₹${inv.amount}</td>
+          <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.8); text-transform:capitalize;">${planLabel}</td>
+          <td style="padding:8px 6px; font-size:0.75rem; color:rgba(255,255,255,0.8);">₹${displayAmount}</td>
           <td style="padding:8px 6px; font-size:0.72rem; font-weight:700; color:${st.color};">${st.label}</td>
+          <td style="padding:8px 6px;"><button onclick="SubscriptionManager.downloadInvoice('${inv.id}')" style="background:none; border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.8); border-radius:6px; padding:4px 10px; font-size:0.68rem; cursor:pointer;">⬇ PDF</button></td>
         </tr>`;
     }).join('');
 
@@ -319,6 +327,7 @@ const SubscriptionManager = (() => {
                 <th style="text-align:left; padding:8px 6px; font-size:0.68rem; color:rgba(255,255,255,0.45); text-transform:uppercase;">Plan</th>
                 <th style="text-align:left; padding:8px 6px; font-size:0.68rem; color:rgba(255,255,255,0.45); text-transform:uppercase;">Amount</th>
                 <th style="text-align:left; padding:8px 6px; font-size:0.68rem; color:rgba(255,255,255,0.45); text-transform:uppercase;">Status</th>
+                <th style="text-align:left; padding:8px 6px; font-size:0.68rem; color:rgba(255,255,255,0.45); text-transform:uppercase;">GST Invoice</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -408,7 +417,14 @@ const SubscriptionManager = (() => {
     } finally { _busy = false; }
   }
 
-  return { open, close, setBillingCycle, upgrade, downgrade, cancel, reactivate };
+  // ────────── GST INVOICE DOWNLOAD (Phase 8B) ──────────
+  async function downloadInvoice(invoiceId) {
+    _toast('Preparing your invoice…', 'info');
+    const res = await downloadInvoicePdf(invoiceId);
+    if (!res.success) { _toast(res.error || 'Could not download invoice.', 'danger'); return; }
+  }
+
+  return { open, close, setBillingCycle, upgrade, downgrade, cancel, reactivate, downloadInvoice };
 })();
 
 window.SubscriptionManager = SubscriptionManager;
