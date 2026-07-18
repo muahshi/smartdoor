@@ -14,6 +14,7 @@
     { "source": "/admin-login",    "destination": "/admin-login.html" },
     { "source": "/app",            "destination": "/app.html" },
     { "source": "/admin",          "destination": "/admin.html" },
+    { "source": "/partner",        "destination": "/partner-portal.html" },
     { "source": "/onboarding",     "destination": "/onboarding.html" },
     { "source": "/gate/:path*",    "destination": "/guard.html" },
     { "source": "/society/:path*", "destination": "/society-admin.html" },
@@ -36,6 +37,10 @@
     },
     {
       "source": "/admin.html",
+      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+    },
+    {
+      "source": "/partner-portal.html",
       "headers": [{ "key": "Cache-Control", "value": "no-store" }]
     },
     {
