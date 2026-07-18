@@ -1092,17 +1092,47 @@
       <!-- ══ SaaS Launch: Invoices & Refunds (Admin Controls) ══ -->
       <div class="section-header" style="margin-top:28px;">
         <span class="section-title">📄 Invoices &amp; Refunds</span>
-        <button class="btn btn-ghost btn-sm" onclick="loadInvoicesAdmin()">↻ Refresh</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" onclick="openGstSettings()">⚙ GST Settings</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadInvoicesAdmin()">↻ Refresh</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Invoice #</th><th>Customer</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th><th>Actions</th>
+              <th>Invoice #</th><th>Customer</th><th>Plan</th><th>Taxable</th><th>Tax</th><th>Total</th><th>Status</th><th>Date</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="invoicesTable">
-            <tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>
+            <tr><td colspan="9"><div class="empty-state"><div class="spinner"></div></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ══ Phase 8B: GST Billing Analytics ══ -->
+      <div class="section-header" style="margin-top:28px;">
+        <span class="section-title">📊 Billing Analytics (GST)</span>
+        <button class="btn btn-ghost btn-sm" onclick="loadBillingAnalytics()">↻ Refresh</button>
+      </div>
+      <div id="billingAnalyticsGrid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px;">
+        <div class="empty-state"><div class="spinner"></div></div>
+      </div>
+
+      <!-- ══ Phase 8B: Credit / Debit Notes ══ -->
+      <div class="section-header" style="margin-top:28px;">
+        <span class="section-title">🧾 Credit &amp; Debit Notes</span>
+        <button class="btn btn-ghost btn-sm" onclick="loadBillingNotes()">↻ Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Note #</th><th>Customer</th><th>Type</th><th>Amount</th><th>Reason</th><th>Approval</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="billingNotesTable">
+            <tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -2007,7 +2037,7 @@ async function loadPanel(panelId) {
     case 'customers':     await loadCustomers(); break;
     case 'orders':        await loadOrders(); break;
     case 'manufacturing': await loadManufacturing(); break;
-    case 'subscriptions': await loadSubscriptions(); await loadInvoicesAdmin(); break;
+    case 'subscriptions': await loadSubscriptions(); await loadInvoicesAdmin(); await loadBillingAnalytics(); await loadBillingNotes(); break;
     case 'support':       await loadSupport(); break;
     case 'communication': await loadCommunication(); break;
     case 'analytics':     await loadAnalytics(); break;
@@ -2377,24 +2407,148 @@ window.toggleSubEnabled = async function(subId, currentStatus) {
 // ── SaaS Launch: INVOICES & REFUNDS ──
 async function loadInvoicesAdmin() {
   const tbody = document.getElementById('invoicesTable'); if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
-  const res = await adminCall('invoice_list', { limit: 50 });
-  if (!res.success) { tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="text">Error: ${res.message}</div></div></td></tr>`; return; }
+  tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('invoice_list', { limit: 50, invoice_type_filter: 'tax_invoice' });
+  if (!res.success) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="text">Error: ${res.message}</div></div></td></tr>`; return; }
   const invoices = res.invoices || [];
-  if (!invoices.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">📄</div><div class="text">No invoices yet</div></div></td></tr>'; return; }
+  if (!invoices.length) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">📄</div><div class="text">No invoices yet</div></div></td></tr>'; return; }
   tbody.innerHTML = invoices.map(inv => {
     const statusColor = inv.status==='paid'?'#22C55E':inv.status==='refunded'?'#94A3B8':inv.status==='failed'?'#EF4444':'#F59E0B';
+    const taxTotal = (Number(inv.cgst_amount)||0) + (Number(inv.sgst_amount)||0) + (Number(inv.igst_amount)||0);
+    const planLabel = inv.order_id ? 'Hardware Order' : `${inv.plan} · ${inv.billing_cycle}`;
     return `<tr>
       <td><span style="font-family:monospace;font-size:11px">${escapeHtml(inv.invoice_number)}</span></td>
       <td><div style="font-weight:500;font-size:12px">${escapeHtml(inv.users?.full_name||'—')}</div><div style="font-size:10px;color:var(--muted)">${escapeHtml(inv.users?.phone||'')}</div></td>
-      <td style="text-transform:capitalize;font-size:12px">${escapeHtml(inv.plan)} · ${escapeHtml(inv.billing_cycle)}</td>
-      <td style="font-weight:600;font-size:12px">${fmtMoney(inv.amount)}</td>
+      <td style="text-transform:capitalize;font-size:12px">${escapeHtml(planLabel)}</td>
+      <td style="font-size:12px">${fmtMoney(inv.taxable_value ?? inv.amount)}</td>
+      <td style="font-size:12px">${fmtMoney(taxTotal)}</td>
+      <td style="font-weight:600;font-size:12px">${fmtMoney(inv.invoice_total ?? inv.amount)}</td>
       <td><span style="font-size:11px;font-weight:700;color:${statusColor};text-transform:capitalize">${escapeHtml(inv.status)}</span></td>
       <td style="font-size:11px">${fmtDate(inv.created_at)}</td>
-      <td>${inv.status==='paid'?`<button class="btn btn-danger btn-sm" onclick="refundInvoiceAdmin('${inv.id}')">↩ Refund</button>`:'—'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="downloadInvoiceAdmin('${inv.id}')">⬇ PDF</button>
+        ${inv.status==='paid'?`<button class="btn btn-danger btn-sm" onclick="refundInvoiceAdmin('${inv.id}')">↩ Refund</button>`:''}
+        ${inv.status==='paid'?`<button class="btn btn-ghost btn-sm" onclick="openIssueNoteDialog('${inv.id}','credit_note')">🧾 CN</button>`:''}
+      </td>
     </tr>`;
   }).join('');
 }
+
+// ── Phase 8B: Download GST invoice PDF from the admin panel ──
+// Reuses the exact same client-side renderer as the owner dashboard
+// (services/gstInvoicePdf.js) — no duplicate PDF layout code.
+window.downloadInvoiceAdmin = async function(invoiceId) {
+  showToast('Preparing invoice…', 'info');
+  try {
+    const { downloadInvoicePdf } = await import('/services/gstInvoicePdf.js');
+    const res = await downloadInvoicePdf(invoiceId);
+    if (!res.success) showToast(res.error || 'Could not download invoice', 'error');
+  } catch (err) {
+    showToast('Could not load invoice PDF module', 'error');
+  }
+};
+
+// ── Phase 8B: Issue a credit/debit note against an invoice ──
+window.openIssueNoteDialog = async function(invoiceId, noteType) {
+  const label = noteType === 'debit_note' ? 'Debit Note' : 'Credit Note';
+  const amountStr = prompt(`${label} amount (₹):`);
+  if (!amountStr) return;
+  const amount = parseFloat(amountStr);
+  if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+  const reason = prompt(`Reason for this ${label}:`);
+  if (!reason) return;
+
+  const res = await adminCall(noteType === 'debit_note' ? 'debit_note_issue' : 'credit_note_issue', {
+    invoice_id: invoiceId, amount, reason,
+  });
+  if (!res.success) { showToast(res.message || `Could not issue ${label}`, 'error'); return; }
+  showToast(`${label} issued — pending approval`, 'success');
+  loadBillingNotes();
+};
+
+// ── Phase 8B: Credit / Debit Notes list + approve/reject ──
+async function loadBillingNotes() {
+  const tbody = document.getElementById('billingNotesTable'); if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="spinner"></div></div></td></tr>';
+  const res = await adminCall('billing_note_list', { limit: 50 });
+  if (!res.success) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="text">Error: ${res.message}</div></div></td></tr>`; return; }
+  const notes = res.notes || [];
+  if (!notes.length) { tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">🧾</div><div class="text">No credit/debit notes yet</div></div></td></tr>'; return; }
+  tbody.innerHTML = notes.map(n => {
+    const typeColor = n.invoice_type === 'credit_note' ? '#F59E0B' : '#EF4444';
+    const apprColor = n.approval_status === 'approved' ? '#22C55E' : n.approval_status === 'rejected' ? '#EF4444' : '#F59E0B';
+    const actions = n.approval_status === 'pending_approval'
+      ? `<button class="btn btn-ghost btn-sm" onclick="approveBillingNote('${n.id}','approved')">✓ Approve</button>
+         <button class="btn btn-danger btn-sm" onclick="approveBillingNote('${n.id}','rejected')">✕ Reject</button>`
+      : `<button class="btn btn-ghost btn-sm" onclick="downloadInvoiceAdmin('${n.id}')">⬇ PDF</button>`;
+    return `<tr>
+      <td><span style="font-family:monospace;font-size:11px">${escapeHtml(n.invoice_number)}</span></td>
+      <td><div style="font-weight:500;font-size:12px">${escapeHtml(n.users?.full_name||'—')}</div></td>
+      <td><span style="font-size:11px;font-weight:700;color:${typeColor};text-transform:capitalize">${n.invoice_type==='credit_note'?'Credit Note':'Debit Note'}</span></td>
+      <td style="font-size:12px">${fmtMoney(n.invoice_total ?? n.amount)}</td>
+      <td style="font-size:11px;max-width:180px">${escapeHtml(n.notes||'—')}</td>
+      <td><span style="font-size:11px;font-weight:700;color:${apprColor};text-transform:capitalize">${n.approval_status.replace('_',' ')}</span></td>
+      <td style="font-size:11px">${fmtDate(n.created_at)}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+window.approveBillingNote = async function(noteId, decision) {
+  if (!confirm(`${decision === 'approved' ? 'Approve' : 'Reject'} this note?`)) return;
+  const res = await adminCall('billing_note_approve', { note_id: noteId, decision });
+  if (!res.success) { showToast(res.message || 'Could not process note', 'error'); return; }
+  showToast(`Note ${decision}`, 'success');
+  loadBillingNotes();
+};
+
+// ── Phase 8B: Billing Analytics (GST) ──
+async function loadBillingAnalytics() {
+  const grid = document.getElementById('billingAnalyticsGrid'); if (!grid) return;
+  grid.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+  const res = await adminCall('billing_analytics', {});
+  if (!res.success) { grid.innerHTML = `<div class="empty-state"><div class="text">Error: ${res.message}</div></div>`; return; }
+  const a = res.analytics;
+  const card = (label, value) => `
+    <div class="metric-card" style="background:var(--card-bg,#161B22); border:1px solid var(--border,#30363d); border-radius:10px; padding:14px;">
+      <div style="font-size:10px; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">${label}</div>
+      <div style="font-size:18px; font-weight:700;">${value}</div>
+    </div>`;
+  grid.innerHTML = [
+    card('Invoiced', fmtMoney(a.invoiceTotal)),
+    card('Taxable Value', fmtMoney(a.taxableValueTotal)),
+    card('Tax Collected', fmtMoney(a.taxCollected)),
+    card('Credit Notes', fmtMoney(a.creditNoteTotal)),
+    card('Refunds', fmtMoney(a.refundTotal)),
+    card('Outstanding', `${a.outstandingCount} · ${fmtMoney(a.outstandingTotal)}`),
+  ].join('');
+}
+
+// ── Phase 8B: GST Settings editor (configurable rates/company details —
+//    a rate change is a data update here, never a code deploy) ──
+window.openGstSettings = async function() {
+  const res = await adminCall('gst_settings_get', {});
+  if (!res.success || !res.settings) { showToast('Could not load GST settings', 'error'); return; }
+  const s = res.settings;
+  const gstin = prompt('Seller GSTIN (leave blank to keep unchanged):', s.seller_gstin || '');
+  if (gstin === null) return;
+  const hwRate = prompt('Hardware GST rate % (leave blank to keep unchanged):', s.hardware_gst_rate);
+  if (hwRate === null) return;
+  const saasRate = prompt('SaaS GST rate % (leave blank to keep unchanged):', s.saas_gst_rate);
+  if (saasRate === null) return;
+
+  const updates = {};
+  if (gstin.trim()) updates.seller_gstin = gstin.trim().toUpperCase();
+  if (hwRate.trim()) updates.hardware_gst_rate = parseFloat(hwRate);
+  if (saasRate.trim()) updates.saas_gst_rate = parseFloat(saasRate);
+  if (gstin.trim()) updates.is_gst_registered = true;
+
+  if (!Object.keys(updates).length) { showToast('No changes made', 'info'); return; }
+
+  const upd = await adminCall('gst_settings_update', { updates });
+  if (!upd.success) { showToast(upd.message || 'Could not update GST settings', 'error'); return; }
+  showToast('GST settings updated', 'success');
+};
 window.refundInvoiceAdmin = async function(invoiceId) {
   if (!confirm('Refund this invoice via Razorpay? This also cancels the subscription it funded.')) return;
   const s = getAdminSession();
@@ -2406,9 +2560,10 @@ window.refundInvoiceAdmin = async function(invoiceId) {
     });
     const data = await res.json();
     if (!data.success) { showToast('Refund error: '+data.message, 'error'); return; }
-    showToast('Refund initiated', 'success');
+    showToast(data.creditNoteId ? 'Refund initiated — credit note issued' : 'Refund initiated', 'success');
     loadInvoicesAdmin();
     loadSubscriptions();
+    if (typeof loadBillingNotes === 'function') loadBillingNotes();
   } catch (err) {
     showToast('Refund error: '+err.message, 'error');
   }
