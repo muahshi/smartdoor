@@ -159,6 +159,39 @@ serve(async (req) => {
 
     await supabase.from("invoices").update({ subscription_id: existingSub?.id ?? null }).eq("id", invoiceId);
 
+    // ── Phase 8B GST Billing: backfill GST fields on this SaaS invoice now
+    // that it's paid. Idempotent (no-op if already populated) and
+    // best-effort — a failure here must never block the plan activation
+    // that already succeeded above.
+    try {
+      await supabase.rpc("populate_gst_fields_for_invoice", { p_invoice_id: invoiceId });
+    } catch (e) {
+      console.warn("[verify-subscription-payment] GST field backfill failed (non-fatal):", (e as Error).message);
+    }
+
+    // ── Phase 8B GST Billing: email the invoice-ready notice (link back to
+    // the dashboard's download portal — see services/gstInvoicePdf.js).
+    try {
+      const { data: ownerRow } = await supabase.from("users").select("email, full_name").eq("id", ownerId).maybeSingle();
+      if (ownerRow?.email) {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            to:      ownerRow.email,
+            subject: `Your GST Invoice — ${invoice.invoice_number}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:540px;margin:auto;">
+                <h2 style="color:#00A2E8;">Your GST Invoice is Ready 🧾</h2>
+                <p>Hi ${ownerRow.full_name || ""},</p>
+                <p>Your GST tax invoice <strong>${invoice.invoice_number}</strong> for the ${invoice.plan} plan has been generated.</p>
+                <p>Sign in to your SmartDoor dashboard and open <strong>Subscription &amp; Billing → Invoices</strong> to download the PDF.</p>
+              </div>`,
+          },
+        });
+      }
+    } catch (emailErr) {
+      console.warn("[verify-subscription-payment] GST invoice email failed (non-fatal):", (emailErr as Error).message);
+    }
+
     // ── 7. In-app notification ──
     try {
       await supabase.from("notifications").insert({
