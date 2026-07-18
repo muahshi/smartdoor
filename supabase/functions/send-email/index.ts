@@ -94,6 +94,25 @@ function getEmailContent(template: string, toName: string, data: Record<string, 
 <p><a href="${data.renew_url}">Renew Now →</a></p>
 <p>— Smart Door Team</p>`,
     },
+    // Phase 8C — Partner Onboarding + KYC
+    partner_application_approved: {
+      subject: `Your Smart Door Partner Application is Approved! — ${data.application_number}`,
+      html: `<p>${greet}</p>
+<p>Congratulations! Your partner application <strong>${data.application_number}</strong> has been approved.</p>
+<p>Your login details:<br/>
+<strong>Email:</strong> ${data.login_email}<br/>
+<strong>Temporary Password:</strong> ${data.temp_password}</p>
+<p>Please sign in at the admin portal and change your password on first login.</p>
+<p>— Smart Door Team</p>`,
+    },
+    partner_application_rejected: {
+      subject: `Update on Your Smart Door Partner Application — ${data.application_number}`,
+      html: `<p>${greet}</p>
+<p>Thank you for applying to become a Smart Door partner. Unfortunately, we're unable to approve application <strong>${data.application_number}</strong> at this time.</p>
+<p><strong>Reason:</strong> ${data.reason}</p>
+<p>You're welcome to reapply once the above is addressed.</p>
+<p>— Smart Door Team</p>`,
+    },
   };
 
   return templates[template] || null;
