@@ -80,11 +80,50 @@ serve(async (req) => {
         }).eq("id", invoice.subscription_id);
       }
 
+      // ── Phase 8B GST Billing: auto-issue a credit note against this
+      // invoice (only if it's an actual GST tax invoice — i.e. taxable_value
+      // has been populated) and log the refund in the unified ledger.
+      // Best-effort — the refund itself has already succeeded at the
+      // gateway and in `invoices` above; a billing-side failure here must
+      // not be reported back as a failed refund.
+      let creditNoteId: string | null = null;
+      try {
+        if (invoice.taxable_value != null) {
+          const { data: cnId, error: cnErr } = await supabase.rpc("issue_billing_note", {
+            p_original_invoice_id: invoice_id,
+            p_note_type:           "credit_note",
+            p_amount:              refundAmount / 100,
+            p_reason:              reason,
+            p_issued_by:           "system_refund",
+          });
+          if (cnErr) throw cnErr;
+          creditNoteId = cnId as string;
+        }
+      } catch (e) {
+        console.warn("[razorpay-refund] Auto credit-note issuance skipped (non-fatal):", (e as Error).message);
+      }
+
+      try {
+        await supabase.from("refund_ledger").insert({
+          source_type:        "saas_invoice",
+          invoice_id:          invoice_id,
+          owner_id:            invoice.owner_id,
+          razorpay_refund_id:  refundData.id,
+          amount:              refundAmount / 100,
+          reason,
+          credit_note_id:      creditNoteId,
+          initiated_by:        "admin",
+        });
+      } catch (e) {
+        console.warn("[razorpay-refund] refund_ledger insert failed (non-fatal):", (e as Error).message);
+      }
+
       return Response.json({
-        success:  true,
-        refundId: refundData.id,
-        amount:   refundAmount / 100,
-        message:  "Refund initiated successfully.",
+        success:      true,
+        refundId:     refundData.id,
+        amount:       refundAmount / 100,
+        creditNoteId,
+        message:      "Refund initiated successfully.",
       }, { headers: corsHeaders });
     }
 
@@ -143,11 +182,56 @@ serve(async (req) => {
       actor:       "admin",
     });
 
+    // ── Phase 8B GST Billing: auto-issue a credit note against this order's
+    // GST tax invoice (if one exists) and log the refund in the unified
+    // ledger. Best-effort — the refund itself has already succeeded at the
+    // gateway and in `payments`/`orders` above.
+    let creditNoteId: string | null = null;
+    try {
+      const { data: gstInvoice } = await supabase
+        .from("invoices")
+        .select("id, taxable_value")
+        .eq("order_id", order_id)
+        .eq("invoice_type", "tax_invoice")
+        .maybeSingle();
+
+      if (gstInvoice?.id && gstInvoice.taxable_value != null) {
+        const { data: cnId, error: cnErr } = await supabase.rpc("issue_billing_note", {
+          p_original_invoice_id: gstInvoice.id,
+          p_note_type:           "credit_note",
+          p_amount:              refundAmount / 100,
+          p_reason:              reason,
+          p_issued_by:           "system_refund",
+        });
+        if (cnErr) throw cnErr;
+        creditNoteId = cnId as string;
+      }
+    } catch (e) {
+      console.warn("[razorpay-refund] Auto credit-note issuance skipped (non-fatal):", (e as Error).message);
+    }
+
+    try {
+      const { data: orderOwner } = await supabase.from("orders").select("owner_id").eq("id", order_id).maybeSingle();
+      await supabase.from("refund_ledger").insert({
+        source_type:        "hardware_order",
+        order_id,
+        owner_id:            orderOwner?.owner_id || null,
+        razorpay_refund_id:  refundData.id,
+        amount:              refundAmount / 100,
+        reason,
+        credit_note_id:      creditNoteId,
+        initiated_by:        "admin",
+      });
+    } catch (e) {
+      console.warn("[razorpay-refund] refund_ledger insert failed (non-fatal):", (e as Error).message);
+    }
+
     return Response.json({
-      success:  true,
-      refundId: refundData.id,
-      amount:   refundAmount / 100,
-      message:  "Refund initiated successfully.",
+      success:      true,
+      refundId:     refundData.id,
+      amount:       refundAmount / 100,
+      creditNoteId,
+      message:      "Refund initiated successfully.",
     }, { headers: corsHeaders });
 
   } catch (err) {
