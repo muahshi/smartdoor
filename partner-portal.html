@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="config/env.generated.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Door — Partner Portal</title>
+  <link rel="icon" href="/images/favicon.ico" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════
+   SMART DOOR PARTNER PORTAL — reuses the admin.html design
+   tokens (near-black bg, graphite surface, orange-red accent)
+   so this reads as the same product family, not a bolt-on.
+   ═══════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #080C18; --bg2: #0D1221; --surface: #111827; --surface2: #1A2235;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --accent: #FF4500; --accent2: #FF6B35; --accent-glow: rgba(255,69,0,0.15);
+  --text: #E8EDF8; --text2: #9AABC4; --muted: #5A6A85;
+  --success: #10B981; --warning: #F59E0B; --danger: #EF4444; --info: #3B82F6; --purple: #8B5CF6;
+  --sidebar-w: 232px; --header-h: 56px;
+}
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.5; display: flex; }
+.sidebar { width: var(--sidebar-w); height: 100vh; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; left: 0; top: 0; z-index: 100; overflow-y: auto; }
+.sidebar-logo { padding: 18px 16px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.logo-icon { width: 34px; height: 34px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.logo-name { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; }
+.logo-sub { font-size: 10px; color: var(--accent2); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.nav-section { padding: 12px 8px 4px; }
+.nav-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 8px; margin-bottom: 4px; }
+.nav-item { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; cursor: pointer; color: var(--text2); font-size: 13px; font-weight: 500; margin-bottom: 1px; }
+.nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.nav-item.active { background: var(--accent-glow); color: var(--accent2); font-weight: 600; }
+.nav-item .ic { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.sidebar-footer { margin-top: auto; padding: 12px 8px; border-top: 1px solid var(--border); }
+.partner-info { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+.partner-avatar { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.partner-name { font-size: 12px; font-weight: 600; }
+.partner-role { font-size: 10px; color: var(--muted); text-transform: capitalize; }
+.logout-btn { margin-top: 6px; width: 100%; padding: 7px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 7px; color: #FCA5A5; font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 500; }
+.logout-btn:hover { background: rgba(239,68,68,0.2); }
+.main { margin-left: var(--sidebar-w); flex: 1; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.header { height: var(--header-h); background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0; }
+.header-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; }
+.header-sub { font-size: 12px; color: var(--muted); margin-left: 6px; }
+.header-spacer { flex: 1; }
+.btn { height: 34px; padding: 0 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text2); font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--border2); color: var(--text); }
+.btn-accent { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-accent:hover { background: var(--accent2); color: #fff; }
+.content { flex: 1; overflow-y: auto; padding: 20px; }
+.panel { display: none; }
+.panel.active { display: block; }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+.metric-value { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+.metric-value.good { color: var(--success); }
+.metric-value.warn { color: var(--warning); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.card-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text2); }
+tr:hover td { color: var(--text); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge.pending, .badge.open, .badge.draft, .badge.submitted { background: rgba(245,158,11,0.15); color: var(--warning); }
+.badge.paid, .badge.approved, .badge.delivered, .badge.active, .badge.resolved { background: rgba(16,185,129,0.15); color: var(--success); }
+.badge.rejected, .badge.failed, .badge.cancelled { background: rgba(239,68,68,0.15); color: var(--danger); }
+.badge.in_transit, .badge.pending_approval, .badge.under_review { background: rgba(59,130,246,0.15); color: var(--info); }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+.field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.field-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+.field-value { font-size: 14px; font-weight: 500; }
+.loading { color: var(--muted); font-size: 13px; padding: 20px; text-align: center; }
+input, textarea, select { background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); padding: 8px 10px; font-family: inherit; font-size: 13px; width: 100%; }
+label { font-size: 12px; color: var(--text2); margin-bottom: 4px; display: block; }
+.form-row { margin-bottom: 12px; }
+#toast { position: fixed; bottom: 20px; right: 20px; z-index: 999; }
+.toast-msg { background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 16px; margin-top: 8px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.toast-msg.error { border-color: var(--danger); color: #FCA5A5; }
+.toast-msg.success { border-color: var(--success); color: #A7F3D0; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🚪</div>
+    <div>
+      <div class="logo-name">Smart Door</div>
+      <div class="logo-sub">Partner Portal</div>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" data-panel="dashboard"><span class="ic">📊</span>Dashboard</div>
+    <div class="nav-item" data-panel="profile"><span class="ic">🏢</span>Profile</div>
+    <div class="nav-item" data-panel="kyc"><span class="ic">🪪</span>KYC Status</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Orders</div>
+    <div class="nav-item" data-panel="orders"><span class="ic">📦</span>Orders</div>
+    <div class="nav-item" data-panel="shipments"><span class="ic">🚚</span>Shipments</div>
+    <div class="nav-item" data-panel="manufacturing"><span class="ic">🏭</span>Manufacturing</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Earnings</div>
+    <div class="nav-item" data-panel="commission"><span class="ic">💰</span>Commission</div>
+    <div class="nav-item" data-panel="settlements"><span class="ic">🧾</span>Settlement History</div>
+    <div class="nav-item" data-panel="payouts"><span class="ic">🏦</span>Payout History</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Post-Sale</div>
+    <div class="nav-item" data-panel="warranty"><span class="ic">🛡️</span>Warranty</div>
+    <div class="nav-item" data-panel="replacements"><span class="ic">🔁</span>Replacements</div>
+    <div class="nav-item" data-panel="support"><span class="ic">🎫</span>Support Tickets</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Insights</div>
+    <div class="nav-item" data-panel="analytics"><span class="ic">📈</span>Analytics</div>
+    <div class="nav-item" data-panel="activity"><span class="ic">🔔</span>Activity</div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="partner-info">
+      <div class="partner-avatar" id="pAvatar">P</div>
+      <div>
+        <div class="partner-name" id="pName">—</div>
+        <div class="partner-role" id="pRole">—</div>
+      </div>
+    </div>
+    <button class="logout-btn" id="logoutBtn">Log Out</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="header">
+    <div>
+      <span class="header-title" id="headerTitle">Dashboard</span>
+      <span class="header-sub" id="headerSub">Your account at a glance</span>
+    </div>
+    <div class="header-spacer"></div>
+    <button class="btn" id="refreshBtn">↻ Refresh</button>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="metric-grid" id="dashMetrics"><div class="loading">Loading…</div></div>
+      <div class="card">
+        <div class="card-title">Recent Orders</div>
+        <div id="dashRecentOrders"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="panel" id="panel-profile">
+      <div class="card">
+        <div class="card-title">Business Profile</div>
+        <div class="field-grid" id="profileFields"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- KYC -->
+    <div class="panel" id="panel-kyc">
+      <div class="card">
+        <div class="card-title">Application Status</div>
+        <div id="kycStatus"><div class="loading">Loading…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Documents</div>
+        <div id="kycDocs"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="panel" id="panel-orders">
+      <div class="card">
+        <div class="card-title">My Orders <button class="btn" onclick="exportCSV('orders')">⬇ Export CSV</button></div>
+        <div id="ordersTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- SHIPMENTS -->
+    <div class="panel" id="panel-shipments">
+      <div class="card">
+        <div class="card-title">Shipments</div>
+        <div id="shipmentsTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- MANUFACTURING -->
+    <div class="panel" id="panel-manufacturing">
+      <div class="card">
+        <div class="card-title">Manufacturing Status</div>
+        <div id="mfgTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- COMMISSION -->
+    <div class="panel" id="panel-commission">
+      <div class="metric-grid" id="commSummary"><div class="loading">Loading…</div></div>
+      <div class="card">
+        <div class="card-title">Commission Ledger <button class="btn" onclick="exportCSV('commission')">⬇ Export CSV</button></div>
+        <div id="commTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- SETTLEMENTS -->
+    <div class="panel" id="panel-settlements">
+      <div class="card">
+        <div class="card-title">Settlement History</div>
+        <div id="settlementsTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- PAYOUTS -->
+    <div class="panel" id="panel-payouts">
+      <div class="card">
+        <div class="card-title">Payout History</div>
+        <div id="payoutsTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- WARRANTY -->
+    <div class="panel" id="panel-warranty">
+      <div class="card">
+        <div class="card-title">Warranty Coverage</div>
+        <div id="warrantyTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- REPLACEMENTS -->
+    <div class="panel" id="panel-replacements">
+      <div class="card">
+        <div class="card-title">Replacement Requests</div>
+        <div id="replacementsTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- SUPPORT -->
+    <div class="panel" id="panel-support">
+      <div class="card">
+        <div class="card-title">Support Tickets <button class="btn btn-accent" onclick="openTicketForm()">+ New Ticket</button></div>
+        <div id="ticketForm" style="display:none; margin-bottom:16px;">
+          <div class="form-row"><label>Order</label><select id="ticketOrder"></select></div>
+          <div class="form-row"><label>Subject</label><input id="ticketSubject" /></div>
+          <div class="form-row"><label>Description</label><textarea id="ticketDesc" rows="3"></textarea></div>
+          <div class="form-row"><label>Category</label>
+            <select id="ticketCategory">
+              <option value="general">General</option>
+              <option value="delivery">Delivery</option>
+              <option value="qr">QR / Plate</option>
+              <option value="billing">Billing</option>
+              <option value="account">Account</option>
+            </select>
+          </div>
+          <button class="btn btn-accent" onclick="submitTicket()">Submit Ticket</button>
+        </div>
+        <div id="ticketsTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="panel" id="panel-analytics">
+      <div class="metric-grid" id="analyticsGrid"><div class="loading">Loading…</div></div>
+    </div>
+
+    <!-- ACTIVITY -->
+    <div class="panel" id="panel-activity">
+      <div class="card">
+        <div class="card-title">Recent Activity</div>
+        <div id="activityFeed"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SESSION_KEY = 'sd_admin_session'; // reuse the exact same session admin-login already writes
+const SUPABASE_URL = () => window.__SD_CONFIG__?.supabaseUrl || '';
+const EDGE = () => SUPABASE_URL() + '/functions/v1';
+const PARTNER_ROLES = ['dealer', 'franchise', 'distributor'];
+
+function getSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s?.exp || Date.now() > s.exp) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+}
+
+function showToast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = 'toast-msg ' + type;
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+let _authFailCount = 0;
+async function call(type, extra = {}) {
+  const s = getSession();
+  if (!s) { window.location.href = '/admin-login.html'; return { success: false }; }
+  const base = EDGE();
+  if (!base || base === '/functions/v1') {
+    showToast('Configuration error: Supabase URL missing.', 'error');
+    return { success: false };
+  }
+  try {
+    const res = await fetch(base + '/partner-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${s.token}` },
+      body: JSON.stringify({ type, ...extra }),
+    });
+    if (res.status === 401) {
+      _authFailCount++;
+      if (_authFailCount >= 3) { localStorage.removeItem(SESSION_KEY); window.location.href = '/admin-login.html'; }
+      return { success: false };
+    }
+    if (res.status === 403) {
+      showToast('Partner portal access only. Contact support if this seems wrong.', 'error');
+      return { success: false };
+    }
+    _authFailCount = 0;
+    const data = await res.json();
+    if (!data?.success) showToast(data?.message || 'Request failed', 'error');
+    return data;
+  } catch (e) {
+    showToast('Network error — please retry.', 'error');
+    return { success: false };
+  }
+}
+
+function fmtMoney(n) { return '₹' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
+function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'; }
+function badge(status) { return `<span class="badge ${status}">${(status || '—').replace(/_/g, ' ')}</span>`; }
+function emptyRow(colspan, label) { return `<tr><td colspan="${colspan}" class="empty-state">${label}</td></tr>`; }
+
+// ── NAV ──
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    const panel = item.dataset.panel;
+    document.getElementById('panel-' + panel).classList.add('active');
+    document.getElementById('headerTitle').textContent = item.textContent.trim();
+    loadPanel(panel);
+  });
+});
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem(SESSION_KEY);
+  window.location.href = '/admin-login.html';
+});
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  const active = document.querySelector('.nav-item.active').dataset.panel;
+  loadPanel(active, true);
+});
+
+// ── PANEL LOADERS ──
+const _loaded = {};
+function loadPanel(panel, force = false) {
+  if (_loaded[panel] && !force) return;
+  _loaded[panel] = true;
+  const fn = { dashboard: loadDashboard, profile: loadProfile, kyc: loadKyc, orders: loadOrders,
+    shipments: loadShipments, manufacturing: loadManufacturing, commission: loadCommission,
+    settlements: loadSettlements, payouts: loadPayouts, warranty: loadWarranty,
+    replacements: loadReplacements, support: loadSupport, analytics: loadAnalytics, activity: loadActivity }[panel];
+  if (fn) fn();
+}
+
+async function loadDashboard() {
+  const [analytics, orders] = await Promise.all([call('partner_analytics'), call('partner_order_list', { limit: 5 })]);
+  if (analytics.success) {
+    const a = analytics.analytics;
+    document.getElementById('dashMetrics').innerHTML = `
+      <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${a.totalOrders}</div></div>
+      <div class="metric-card"><div class="metric-label">Paid Orders</div><div class="metric-value good">${a.paidOrders}</div></div>
+      <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value">${a.deliveredOrders}</div></div>
+      <div class="metric-card"><div class="metric-label">Commission Earned</div><div class="metric-value good">${fmtMoney(a.totalCommissionEarned)}</div></div>
+      <div class="metric-card"><div class="metric-label">Paid Out</div><div class="metric-value">${fmtMoney(a.totalPaidOut)}</div></div>`;
+  }
+  if (orders.success) {
+    const rows = (orders.orders || []).map(o => `<tr><td>${o.order_number}</td><td>${o.product_type}</td><td>${badge(o.payment_status)}</td><td>${badge(o.manufacturing_status)}</td><td>${fmtDate(o.created_at)}</td></tr>`).join('');
+    document.getElementById('dashRecentOrders').innerHTML = `<table><thead><tr><th>Order</th><th>Product</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows || emptyRow(5,'No orders yet')}</tbody></table>`;
+  }
+}
+
+async function loadProfile() {
+  const r = await call('partner_profile');
+  if (!r.success) return;
+  const a = r.application;
+  document.getElementById('profileFields').innerHTML = a ? `
+    <div><div class="field-label">Business Name</div><div class="field-value">${a.business_name || '—'}</div></div>
+    <div><div class="field-label">Partner Type</div><div class="field-value">${a.partner_type || '—'}</div></div>
+    <div><div class="field-label">Business Type</div><div class="field-value">${a.business_type || '—'}</div></div>
+    <div><div class="field-label">GST Number</div><div class="field-value">${a.gst_number || '—'} ${a.gst_verified ? '✅' : ''}</div></div>
+    <div><div class="field-label">PAN Number</div><div class="field-value">${a.pan_number || '—'} ${a.pan_verified ? '✅' : ''}</div></div>
+    <div><div class="field-label">Contact Person</div><div class="field-value">${a.contact_name || '—'}</div></div>
+    <div><div class="field-label">Contact Phone</div><div class="field-value">${a.contact_phone || '—'}</div></div>
+    <div><div class="field-label">Contact Email</div><div class="field-value">${a.contact_email || '—'}</div></div>
+    <div><div class="field-label">Territory</div><div class="field-value">${a.requested_territory || '—'}</div></div>
+  ` : `<div class="empty-state">No application on file for this account.</div>`;
+}
+
+async function loadKyc() {
+  const r = await call('partner_kyc_status');
+  if (!r.success) return;
+  const a = r.application;
+  document.getElementById('kycStatus').innerHTML = a ? `
+    <div class="field-grid">
+      <div><div class="field-label">Application #</div><div class="field-value">${a.application_number}</div></div>
+      <div><div class="field-label">Status</div><div class="field-value">${badge(a.status)}</div></div>
+      <div><div class="field-label">GST Verified</div><div class="field-value">${a.gst_verified ? '✅ Yes' : '⏳ Pending'}</div></div>
+      <div><div class="field-label">PAN Verified</div><div class="field-value">${a.pan_verified ? '✅ Yes' : '⏳ Pending'}</div></div>
+      ${a.rejection_reason ? `<div><div class="field-label">Rejection Reason</div><div class="field-value">${a.rejection_reason}</div></div>` : ''}
+    </div>` : `<div class="empty-state">No application on file.</div>`;
+  const rows = (r.documents || []).map(d => `<tr><td>${d.doc_type.replace(/_/g,' ')}</td><td>${badge(d.status)}</td><td>${d.review_notes || '—'}</td><td>${fmtDate(d.created_at)}</td></tr>`).join('');
+  document.getElementById('kycDocs').innerHTML = `<table><thead><tr><th>Document</th><th>Status</th><th>Notes</th><th>Uploaded</th></tr></thead><tbody>${rows || emptyRow(4,'No documents uploaded')}</tbody></table>`;
+}
+
+async function loadOrders() {
+  const r = await call('partner_order_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.orders || []).map(o => `<tr><td>${o.order_number}</td><td>${o.plate_id || '—'}</td><td>${o.product_type}</td><td>${fmtMoney(o.total_amount)}</td><td>${badge(o.payment_status)}</td><td>${badge(o.manufacturing_status)}</td><td>${fmtDate(o.created_at)}</td></tr>`).join('');
+  document.getElementById('ordersTable').innerHTML = `<table><thead><tr><th>Order</th><th>Plate</th><th>Product</th><th>Amount</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows || emptyRow(7,'No orders yet')}</tbody></table>`;
+  window._ordersCache = r.orders || [];
+}
+
+async function loadShipments() {
+  const r = await call('partner_shipment_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.shipments || []).map(s => `<tr><td>${s.awb_number}</td><td>${s.provider}</td><td>${badge(s.status)}</td><td>${fmtDate(s.estimated_delivery)}</td><td>${s.tracking_url ? `<a href="${s.tracking_url}" target="_blank" style="color:var(--accent2)">Track</a>` : '—'}</td></tr>`).join('');
+  document.getElementById('shipmentsTable').innerHTML = `<table><thead><tr><th>AWB</th><th>Provider</th><th>Status</th><th>ETA</th><th></th></tr></thead><tbody>${rows || emptyRow(5,'No shipments yet')}</tbody></table>`;
+}
+
+async function loadManufacturing() {
+  const r = await call('partner_manufacturing_status');
+  if (!r.success) return;
+  const rows = (r.orders || []).map(o => `<tr><td>${o.order_number}</td><td>${o.plate_id || '—'}</td><td>${o.product_type}</td><td>${badge(o.manufacturing_status)}</td><td>${badge(o.tracking_status)}</td></tr>`).join('');
+  document.getElementById('mfgTable').innerHTML = `<table><thead><tr><th>Order</th><th>Plate</th><th>Product</th><th>Manufacturing</th><th>Tracking</th></tr></thead><tbody>${rows || emptyRow(5,'No orders yet')}</tbody></table>`;
+}
+
+async function loadCommission() {
+  const [summary, list] = await Promise.all([call('partner_commission_summary'), call('partner_commission_list', { limit: 100 })]);
+  if (summary.success) {
+    const s = summary.summary;
+    document.getElementById('commSummary').innerHTML = `
+      <div class="metric-card"><div class="metric-label">Pending</div><div class="metric-value warn">${fmtMoney(s.pending)}</div></div>
+      <div class="metric-card"><div class="metric-label">Approved</div><div class="metric-value">${fmtMoney(s.approved)}</div></div>
+      <div class="metric-card"><div class="metric-label">Paid</div><div class="metric-value good">${fmtMoney(s.paid)}</div></div>
+      <div class="metric-card"><div class="metric-label">Lifetime Earned</div><div class="metric-value good">${fmtMoney(s.lifetime_earned)}</div></div>`;
+  }
+  if (list.success) {
+    const rows = (list.commissions || []).map(c => `<tr><td>${c.plate_id || '—'}</td><td>${c.entry_type}</td><td>${fmtMoney(c.amount)}</td><td>${badge(c.status)}</td><td>${fmtDate(c.created_at)}</td></tr>`).join('');
+    document.getElementById('commTable').innerHTML = `<table><thead><tr><th>Plate</th><th>Type</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows || emptyRow(5,'No commission entries yet')}</tbody></table>`;
+    window._commCache = list.commissions || [];
+  }
+}
+
+async function loadSettlements() {
+  const r = await call('partner_settlement_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.settlements || []).map(s => `<tr><td>${s.batch_reference}</td><td>${s.settlement_type}</td><td>${s.item_count}</td><td>${fmtMoney(s.total_commission_amount)}</td><td>${badge(s.status)}</td><td>${fmtDate(s.created_at)}</td></tr>`).join('');
+  document.getElementById('settlementsTable').innerHTML = `<table><thead><tr><th>Batch</th><th>Type</th><th>Items</th><th>Amount</th><th>Status</th><th>Created</th></tr></thead><tbody>${rows || emptyRow(6,'No settlement batches yet')}</tbody></table>`;
+}
+
+async function loadPayouts() {
+  const r = await call('partner_payout_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.payouts || []).map(p => `<tr><td>${p.batch_reference}</td><td>${fmtMoney(p.total_commission_amount)}</td><td>${p.payout_method}</td><td>${p.utr_number || '—'}</td><td>${fmtDate(p.payout_date)}</td></tr>`).join('');
+  document.getElementById('payoutsTable').innerHTML = `<table><thead><tr><th>Batch</th><th>Amount</th><th>Method</th><th>UTR</th><th>Paid On</th></tr></thead><tbody>${rows || emptyRow(5,'No payouts yet')}</tbody></table>`;
+}
+
+async function loadWarranty() {
+  const r = await call('partner_warranty_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.warranties || []).map(w => `<tr><td>${w.plate_id}</td><td>${w.coverage_type}</td><td>${fmtDate(w.starts_at)}</td><td>${fmtDate(w.ends_at)}</td><td>${badge(w.status)}</td></tr>`).join('');
+  document.getElementById('warrantyTable').innerHTML = `<table><thead><tr><th>Plate</th><th>Coverage</th><th>Starts</th><th>Ends</th><th>Status</th></tr></thead><tbody>${rows || emptyRow(5,'No warranty records yet')}</tbody></table>`;
+}
+
+async function loadReplacements() {
+  const r = await call('partner_replacement_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.replacements || []).map(x => `<tr><td>${x.plate_id}</td><td>${x.reason}</td><td>${badge(x.status)}</td><td>${fmtDate(x.requested_at)}</td><td>${fmtDate(x.resolved_at)}</td></tr>`).join('');
+  document.getElementById('replacementsTable').innerHTML = `<table><thead><tr><th>Plate</th><th>Reason</th><th>Status</th><th>Requested</th><th>Resolved</th></tr></thead><tbody>${rows || emptyRow(5,'No replacement requests yet')}</tbody></table>`;
+}
+
+async function loadSupport() {
+  const r = await call('partner_ticket_list', { limit: 100 });
+  if (!r.success) return;
+  const rows = (r.tickets || []).map(t => `<tr><td>${t.ticket_number}</td><td>${t.subject}</td><td>${t.category}</td><td>${badge(t.priority)}</td><td>${badge(t.status)}</td><td>${fmtDate(t.created_at)}</td></tr>`).join('');
+  document.getElementById('ticketsTable').innerHTML = `<table><thead><tr><th>Ticket</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Date</th></tr></thead><tbody>${rows || emptyRow(6,'No support tickets yet')}</tbody></table>`;
+}
+
+function openTicketForm() {
+  document.getElementById('ticketForm').style.display = 'block';
+  const sel = document.getElementById('ticketOrder');
+  sel.innerHTML = (window._ordersCache || []).map(o => `<option value="${o.id}">${o.order_number} — ${o.plate_id || 'no plate'}</option>`).join('') || '<option value="">No orders available</option>';
+  if (!window._ordersCache) call('partner_order_list', { limit: 100 }).then(r => {
+    window._ordersCache = r.orders || [];
+    sel.innerHTML = window._ordersCache.map(o => `<option value="${o.id}">${o.order_number} — ${o.plate_id || 'no plate'}</option>`).join('') || '<option value="">No orders available</option>';
+  });
+}
+async function submitTicket() {
+  const order_id = document.getElementById('ticketOrder').value;
+  const subject = document.getElementById('ticketSubject').value.trim();
+  const description = document.getElementById('ticketDesc').value.trim();
+  const category = document.getElementById('ticketCategory').value;
+  if (!order_id || !subject) { showToast('Order and subject are required', 'error'); return; }
+  const r = await call('partner_ticket_create', { order_id, subject, description, category });
+  if (r.success) {
+    showToast('Ticket submitted', 'success');
+    document.getElementById('ticketForm').style.display = 'none';
+    document.getElementById('ticketSubject').value = '';
+    document.getElementById('ticketDesc').value = '';
+    loadPanel('support', true);
+  }
+}
+
+async function loadAnalytics() {
+  const r = await call('partner_analytics');
+  if (!r.success) return;
+  const a = r.analytics;
+  document.getElementById('analyticsGrid').innerHTML = `
+    <div class="metric-card"><div class="metric-label">Total Orders</div><div class="metric-value">${a.totalOrders}</div></div>
+    <div class="metric-card"><div class="metric-label">Paid Orders</div><div class="metric-value good">${a.paidOrders}</div></div>
+    <div class="metric-card"><div class="metric-label">Delivered</div><div class="metric-value">${a.deliveredOrders}</div></div>
+    <div class="metric-card"><div class="metric-label">Commission Earned</div><div class="metric-value good">${fmtMoney(a.totalCommissionEarned)}</div></div>
+    <div class="metric-card"><div class="metric-label">Total Paid Out</div><div class="metric-value">${fmtMoney(a.totalPaidOut)}</div></div>`;
+}
+
+async function loadActivity() {
+  const r = await call('partner_activity_feed', { limit: 30 });
+  if (!r.success) return;
+  const rows = (r.activity || []).map(e => `<tr><td>${e.action.replace(/_/g,' ')}</td><td>${e.notes || '—'}</td><td>${fmtDate(e.created_at)}</td></tr>`).join('');
+  document.getElementById('activityFeed').innerHTML = `<table><thead><tr><th>Event</th><th>Notes</th><th>When</th></tr></thead><tbody>${rows || emptyRow(3,'No activity yet')}</tbody></table>`;
+}
+
+function exportCSV(kind) {
+  const rows = kind === 'orders' ? (window._ordersCache || []) : (window._commCache || []);
+  if (!rows.length) { showToast('Nothing to export yet', 'error'); return; }
+  const headers = Object.keys(rows[0]);
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => JSON.stringify(r[h] ?? '')).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `smartdoor-${kind}-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── BOOT ──
+(function init() {
+  const s = getSession();
+  if (!s) { window.location.href = '/admin-login.html'; return; }
+  if (!PARTNER_ROLES.includes(s.role)) {
+    showToast('This account is not a partner account. Redirecting to admin panel.', 'error');
+    setTimeout(() => window.location.href = '/admin.html', 1500);
+    return;
+  }
+  document.getElementById('pName').textContent = s.full_name || s.email;
+  document.getElementById('pRole').textContent = s.role_label || s.role;
+  document.getElementById('pAvatar').textContent = (s.full_name || s.email || 'P').charAt(0).toUpperCase();
+  loadDashboard();
+})();
+</script>
+</body>
+</html>
+
