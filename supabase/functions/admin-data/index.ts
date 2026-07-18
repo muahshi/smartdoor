@@ -1145,7 +1145,7 @@ serve(async (req) => {
       if (!adminCan(ctx, 'subscriptions', 'read')) {
         return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       }
-      const { owner_id = null, status_filter = null, limit = 50, offset = 0 } = body as any;
+      const { owner_id = null, status_filter = null, invoice_type_filter = null, limit = 50, offset = 0 } = body as any;
 
       let qb = db.from('invoices')
         .select('*, users!owner_id(full_name, phone, email, plate_id)', { count: 'exact' })
@@ -1154,11 +1154,219 @@ serve(async (req) => {
 
       if (owner_id) qb = qb.eq('owner_id', owner_id);
       if (status_filter && status_filter !== 'all') qb = qb.eq('status', status_filter);
+      if (invoice_type_filter && invoice_type_filter !== 'all') qb = qb.eq('invoice_type', invoice_type_filter);
 
       const { data, error, count } = await qb;
       if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
 
       return Response.json({ success: true, invoices: data || [], total: count || 0 }, { headers });
+    }
+
+    // ══════════════════════════════════════════════
+    // PHASE 8B — GST BILLING & INVOICING PLATFORM
+    // Reuses the 'subscriptions' RBAC resource (same permission that already
+    // gates invoice_list/refund above) — no new admin_roles migration needed.
+    // ══════════════════════════════════════════════
+
+    // ── GST Settings: read (for the admin settings editor) ──
+    if (type === 'gst_settings_get') {
+      if (!adminCan(ctx, 'subscriptions', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { data, error } = await db.from('gst_settings').select('*').eq('id', 1).maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, settings: data }, { headers });
+    }
+
+    // ── GST Settings: update (company details / rates — future GST rate
+    //    changes go here, never a code deploy) ──
+    if (type === 'gst_settings_update') {
+      if (!adminCan(ctx, 'subscriptions', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { updates } = body as any;
+      if (!updates || typeof updates !== 'object') {
+        return Response.json({ success: false, message: 'updates object required' }, { status: 400, headers });
+      }
+      if (updates.seller_gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(updates.seller_gstin)) {
+        return Response.json({ success: false, message: 'Invalid GSTIN format' }, { status: 400, headers });
+      }
+
+      const { data: before } = await db.from('gst_settings').select('*').eq('id', 1).maybeSingle();
+      const { data, error } = await db.from('gst_settings').update(updates).eq('id', 1).select('*').maybeSingle();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'gst_settings_update',
+        resource: 'gst_settings', resource_id: '1', before_data: before || {}, after_data: data || {},
+      });
+
+      return Response.json({ success: true, settings: data }, { headers });
+    }
+
+    // ── Credit / Debit Notes: list (history + tracking) ──
+    if (type === 'billing_note_list') {
+      if (!adminCan(ctx, 'subscriptions', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { note_type = null, approval_status_filter = null, limit = 50, offset = 0 } = body as any;
+
+      let qb = db.from('invoices')
+        .select('*, users!owner_id(full_name, phone, email)', { count: 'exact' })
+        .in('invoice_type', note_type && note_type !== 'all' ? [note_type] : ['credit_note', 'debit_note'])
+        .range(Number(offset), Number(offset) + Number(limit) - 1)
+        .order('created_at', { ascending: false });
+
+      if (approval_status_filter && approval_status_filter !== 'all') qb = qb.eq('approval_status', approval_status_filter);
+
+      const { data, error, count } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      return Response.json({ success: true, notes: data || [], total: count || 0 }, { headers });
+    }
+
+    // ── Credit Note: issue (manual — e.g. goodwill adjustment, not tied to
+    //    a Razorpay refund, which auto-issues its own via razorpay-refund) ──
+    if (type === 'credit_note_issue') {
+      if (!adminCan(ctx, 'subscriptions', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { invoice_id, amount, reason } = body as any;
+      if (!invoice_id || !amount || !reason) {
+        return Response.json({ success: false, message: 'invoice_id, amount and reason are required' }, { status: 400, headers });
+      }
+
+      const { data: noteId, error } = await db.rpc('issue_billing_note', {
+        p_original_invoice_id: invoice_id, p_note_type: 'credit_note',
+        p_amount: amount, p_reason: reason, p_issued_by: ctx.email,
+      });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'credit_note_issue',
+        resource: 'billing', resource_id: String(noteId), notes: reason,
+      });
+
+      return Response.json({ success: true, noteId }, { headers });
+    }
+
+    // ── Debit Note: issue (e.g. additional charges against an existing
+    //    invoice — installation surcharge, replacement fee, etc.) ──
+    if (type === 'debit_note_issue') {
+      if (!adminCan(ctx, 'subscriptions', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { invoice_id, amount, reason } = body as any;
+      if (!invoice_id || !amount || !reason) {
+        return Response.json({ success: false, message: 'invoice_id, amount and reason are required' }, { status: 400, headers });
+      }
+
+      const { data: noteId, error } = await db.rpc('issue_billing_note', {
+        p_original_invoice_id: invoice_id, p_note_type: 'debit_note',
+        p_amount: amount, p_reason: reason, p_issued_by: ctx.email,
+      });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'debit_note_issue',
+        resource: 'billing', resource_id: String(noteId), notes: reason,
+      });
+
+      return Response.json({ success: true, noteId }, { headers });
+    }
+
+    // ── Credit / Debit Note: approve or reject ──
+    if (type === 'billing_note_approve') {
+      if (!adminCan(ctx, 'subscriptions', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { note_id, decision } = body as any;
+      if (!note_id || !['approved', 'rejected'].includes(decision)) {
+        return Response.json({ success: false, message: 'note_id and a valid decision are required' }, { status: 400, headers });
+      }
+
+      const { data, error } = await db.rpc('approve_billing_note', {
+        p_note_id: note_id, p_admin_email: ctx.email, p_decision: decision,
+      });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      if (!(data as any)?.success) return Response.json({ success: false, message: (data as any)?.message || 'Could not process note' }, { status: 400, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'billing_note_' + decision,
+        resource: 'billing', resource_id: note_id,
+      });
+
+      return Response.json({ success: true, ...(data as any) }, { headers });
+    }
+
+    // ── Refund Ledger: history ──
+    if (type === 'refund_ledger_list') {
+      if (!adminCan(ctx, 'subscriptions', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { limit = 50, offset = 0 } = body as any;
+      const { data, error, count } = await db.from('refund_ledger')
+        .select('*, users!owner_id(full_name, phone, email)', { count: 'exact' })
+        .range(Number(offset), Number(offset) + Number(limit) - 1)
+        .order('created_at', { ascending: false });
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+      return Response.json({ success: true, refunds: data || [], total: count || 0 }, { headers });
+    }
+
+    // ── Billing Analytics: invoice totals, tax collected, refund totals,
+    //    outstanding invoices, monthly billing. Distinct from the existing
+    //    financial_metrics action (revenue-focused) — this is GST/tax-
+    //    focused and drives the GST return filing workflow. ──
+    if (type === 'billing_analytics') {
+      if (!adminCan(ctx, 'subscriptions', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const { from_date = null, to_date = null } = body as any;
+
+      let qb = db.from('invoices').select('invoice_type, status, approval_status, amount, taxable_value, cgst_amount, sgst_amount, igst_amount, invoice_total, created_at');
+      if (from_date) qb = qb.gte('created_at', from_date);
+      if (to_date) qb = qb.lte('created_at', to_date);
+
+      const { data: rows, error } = await qb;
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      const all = rows || [];
+      const taxInvoices  = all.filter(r => r.invoice_type === 'tax_invoice');
+      const creditNotes  = all.filter(r => r.invoice_type === 'credit_note' && r.approval_status === 'approved');
+      const paidInvoices = taxInvoices.filter(r => r.status === 'paid' || r.status === 'issued');
+      const outstanding  = taxInvoices.filter(r => r.status === 'pending');
+
+      const sum = (arr: any[], key: string) => arr.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+
+      const { data: refundTotals } = await db.from('refund_ledger').select('amount');
+      const totalRefunds = sum(refundTotals || [], 'amount');
+
+      // Monthly billing breakdown (by invoice month, tax invoices only)
+      const monthly: Record<string, { count: number; total: number; tax: number }> = {};
+      for (const r of paidInvoices) {
+        const month = new Date(r.created_at).toISOString().slice(0, 7); // YYYY-MM
+        if (!monthly[month]) monthly[month] = { count: 0, total: 0, tax: 0 };
+        monthly[month].count += 1;
+        monthly[month].total += Number(r.invoice_total || r.amount || 0);
+        monthly[month].tax += Number(r.cgst_amount || 0) + Number(r.sgst_amount || 0) + Number(r.igst_amount || 0);
+      }
+
+      return Response.json({
+        success: true,
+        analytics: {
+          invoiceTotal:      sum(paidInvoices, 'invoice_total') || sum(paidInvoices, 'amount'),
+          taxableValueTotal: sum(paidInvoices, 'taxable_value'),
+          taxCollected:      sum(paidInvoices, 'cgst_amount') + sum(paidInvoices, 'sgst_amount') + sum(paidInvoices, 'igst_amount'),
+          creditNoteTotal:   sum(creditNotes, 'invoice_total') || sum(creditNotes, 'amount'),
+          refundTotal:       totalRefunds,
+          outstandingCount:  outstanding.length,
+          outstandingTotal:  sum(outstanding, 'amount'),
+          invoiceCount:      paidInvoices.length,
+          monthly: Object.entries(monthly)
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .map(([month, v]) => ({ month, ...v })),
+        },
+      }, { headers });
     }
 
     // ══════════════════════════════════════════════
