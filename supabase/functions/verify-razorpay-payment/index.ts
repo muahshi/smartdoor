@@ -188,6 +188,21 @@ serve(async (req) => {
       await supabase.from("orders").update({ owner_id: ownerId }).eq("id", orderId);
     }
 
+    // ── Phase 8B GST Billing: issue the GST tax invoice for this hardware
+    // sale. Runs after owner_id has been finalized on the order (above),
+    // since guest checkouts only get a user record created at this point.
+    // Idempotent (create_hardware_gst_invoice is a no-op if one already
+    // exists for this order_id) and best-effort — a failure here must
+    // never block the plate/manufacturing pipeline that already succeeded.
+    let gstInvoiceId: string | null = null;
+    try {
+      const { data: invId, error: gstErr } = await supabase.rpc("create_hardware_gst_invoice", { p_order_id: orderId });
+      if (gstErr) throw gstErr;
+      gstInvoiceId = invId as string;
+    } catch (e) {
+      console.warn("[verify-payment] GST invoice generation failed (non-fatal):", (e as Error).message);
+    }
+
     // ── Phase 8A Commerce Engine: referral reward ──
     // Reuses the EXISTING referrals/referral_logs tables (sql/11) — does not
     // create new referral tracking. Only credits if there is a 'pending'
@@ -323,6 +338,32 @@ serve(async (req) => {
           },
         ]);
       } catch (_ne) { /* non-fatal */ }
+    }
+
+    // ── Phase 8B GST Billing: email the GST invoice (link back to the
+    // dashboard's download portal rather than an attachment — PDFs are
+    // generated on-demand client-side, see services/gstInvoicePdf.js).
+    // Best-effort — reuses the existing send-email Edge Function, does not
+    // replace the activation email sent above.
+    if (gstInvoiceId && ownerEmail) {
+      try {
+        await supabase.functions.invoke("send-email", {
+          body: {
+            to:      ownerEmail,
+            subject: `Your GST Invoice — Order ${order.order_number}`,
+            html: `
+              <div style="font-family:sans-serif;max-width:540px;margin:auto;">
+                <h2 style="color:#00A2E8;">Your GST Invoice is Ready 🧾</h2>
+                <p>Hi ${order.customer_name},</p>
+                <p>Your GST tax invoice for order <strong>${order.order_number}</strong> has been generated.</p>
+                <p>Sign in to your SmartDoor dashboard and open <strong>Subscription &amp; Billing → Invoices</strong> to download the PDF.</p>
+                <p style="color:#888;font-size:.85rem;">Questions about this invoice? Contact hello@mysmartdoor.in.</p>
+              </div>`,
+          },
+        });
+      } catch (emailErr) {
+        console.warn("[verify-payment] GST invoice email failed (non-fatal):", (emailErr as Error).message);
+      }
     }
 
     return Response.json({
