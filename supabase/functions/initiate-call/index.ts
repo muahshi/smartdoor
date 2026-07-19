@@ -24,6 +24,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import * as exotel from '../_shared/providers/exotel.ts';
 import * as twilio from '../_shared/providers/twilio.ts';
+import { signCallCallback } from '../_shared/callbackAuth.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -96,7 +97,8 @@ serve(async (req) => {
       return Response.json({ success: false, message: 'Could not create call record.' }, { status: 500, headers: corsHeaders });
     }
 
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-webhook?call_id=${callLog.id}`;
+    const callSig = await signCallCallback(callLog.id);
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-webhook?call_id=${callLog.id}${callSig ? `&sig=${callSig}` : ''}`;
     const providerModule = provider === 'twilio' ? twilio : exotel;
 
     // PRODUCTION FIX (phone-format bug — root cause of the reported
