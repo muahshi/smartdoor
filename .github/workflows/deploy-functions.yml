@@ -91,6 +91,41 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # ── PRODUCTION AUDIT FIX: these functions existed in the repo (fully
+      # implemented, actively called from live frontend code) but were never
+      # added to this workflow, so they were never deployed — 404 in
+      # production. Matched each to the JWT model its own file header
+      # documents. Root cause of: partner commission/settlement admin screens
+      # unreachable (commerce-engine), checkout coupon validation always
+      # failing (validate-coupon), the whole dealer/franchise application
+      # flow being unreachable (partner-application), the partner portal
+      # showing no data (partner-data), and client-side error monitoring
+      # silently losing every event (log-client-error).
+      - name: Deploy commerce-engine
+        run: supabase functions deploy commerce-engine --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy partner-data
+        run: supabase functions deploy partner-data --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy validate-coupon (no-verify-jwt)
+        run: supabase functions deploy validate-coupon --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy partner-application (no-verify-jwt)
+        run: supabase functions deploy partner-application --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy log-client-error (no-verify-jwt)
+        run: supabase functions deploy log-client-error --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       # ── Functions that skip JWT (public endpoints / cron) ──────────────────
       - name: Deploy generate-qr (no-verify-jwt)
         run: supabase functions deploy generate-qr --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
@@ -210,4 +245,4 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deployment complete
-        run: echo "✅ All 33 Edge Functions deployed successfully (including admin-data)"
+        run: echo "✅ All 38 Edge Functions deployed successfully (including admin-data, commerce-engine, partner-data, validate-coupon, partner-application, log-client-error)"
