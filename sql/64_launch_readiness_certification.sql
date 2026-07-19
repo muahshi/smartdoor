@@ -210,18 +210,28 @@ BEGIN
 
   -- Most recent backup: exists, completed, and within the 8-day staleness
   -- window docs/BACKUP_STRATEGY.md §8 already specifies.
+  --
+  -- BUGFIX (Phase 12 audit): this function RETURNS TABLE(..., status TEXT, ...),
+  -- which declares "status" as a PL/pgSQL OUT parameter/variable in scope for
+  -- the whole function body. Every unqualified reference to "status" below
+  -- resolved to that OUT parameter instead of backup_snapshots.status,
+  -- causing 42702 "column reference \"status\" is ambiguous" as soon as
+  -- Postgres tried to disambiguate inside the subqueries. Fixed by aliasing
+  -- backup_snapshots as "bs" and qualifying every column reference (bs.status,
+  -- bs.created_at, bs.snapshot_type) so none of them can resolve to the OUT
+  -- parameter.
   RETURN QUERY
   SELECT
     'recent_backup_exists'::TEXT,
     CASE
       WHEN NOT EXISTS (SELECT 1 FROM backup_snapshots) THEN 'fail'
-      WHEN (SELECT status FROM backup_snapshots ORDER BY created_at DESC LIMIT 1) <> 'completed' THEN 'fail'
-      WHEN (SELECT created_at FROM backup_snapshots WHERE status = 'completed' ORDER BY created_at DESC LIMIT 1) < NOW() - INTERVAL '8 days' THEN 'fail'
+      WHEN (SELECT bs.status FROM backup_snapshots bs ORDER BY bs.created_at DESC LIMIT 1) <> 'completed' THEN 'fail'
+      WHEN (SELECT bs.created_at FROM backup_snapshots bs WHERE bs.status = 'completed' ORDER BY bs.created_at DESC LIMIT 1) < NOW() - INTERVAL '8 days' THEN 'fail'
       ELSE 'ok'
     END,
     COALESCE(
-      (SELECT 'Last completed backup: ' || created_at::TEXT || ' (' || snapshot_type || ')'
-       FROM backup_snapshots WHERE status = 'completed' ORDER BY created_at DESC LIMIT 1),
+      (SELECT 'Last completed backup: ' || bs.created_at::TEXT || ' (' || bs.snapshot_type || ')'
+       FROM backup_snapshots bs WHERE bs.status = 'completed' ORDER BY bs.created_at DESC LIMIT 1),
       'No backup_snapshots row found — run scheduled-backup or the admin panel "Trigger Backup" button'
     );
 

@@ -5,7 +5,9 @@
   "description": "Smart Door — Home Privacy OS",
   "scripts": {
     "build": "node scripts/build-env.js",
-    "dev": "node scripts/build-env.js && npx serve . -p 3000"
+    "dev": "node scripts/build-env.js && npx serve . -p 3000",
+    "smoke-test": "node scripts/smoke-test.js",
+    "validate:prod-config": "node scripts/validate-production-config.js"
   },
   "engines": {
     "node": ">=18"

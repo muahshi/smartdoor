@@ -13,6 +13,13 @@
  *   Production  branch → VITE_APP_ENV=production
  *   Staging     branch → VITE_APP_ENV=staging
  *   Dev/local          → VITE_APP_ENV=development  (or unset)
+ *
+ * NOTE (Phase 12 audit): this file is not currently imported for its
+ * config/appUrl values anywhere in the app — scripts/build-env.js +
+ * config/env.generated.js (window.__SD_CONFIG__) is the actual source of
+ * truth for what ships to the browser, and already resolves appUrl
+ * correctly per environment. Keep the two in sync if this file is wired
+ * up for real use later.
  */
 
 // ────────── DETECT ENVIRONMENT ──────────
@@ -37,7 +44,7 @@ const CONFIGS = {
   production: {
     env:              'production',
     label:            '🟢 Production',
-    appUrl:           'https://smartdoor.in',
+    appUrl:           'https://mysmartdoor.in',
     supabaseUrl:      import.meta?.env?.VITE_SUPABASE_URL        || '',
     supabaseAnonKey:  import.meta?.env?.VITE_SUPABASE_ANON_KEY   || '',
     razorpayKeyId:    import.meta?.env?.VITE_RAZORPAY_KEY_ID     || '',
@@ -61,7 +68,7 @@ const CONFIGS = {
   staging: {
     env:              'staging',
     label:            '🟡 Staging',
-    appUrl:           'https://staging.smartdoor.in',
+    appUrl:           'https://staging.mysmartdoor.in',
     supabaseUrl:      import.meta?.env?.VITE_SUPABASE_URL        || '',
     supabaseAnonKey:  import.meta?.env?.VITE_SUPABASE_ANON_KEY   || '',
     razorpayKeyId:    import.meta?.env?.VITE_RAZORPAY_KEY_ID     || '',

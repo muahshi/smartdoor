@@ -146,9 +146,56 @@ psql "$TEST_DB_URL" -c "
 
 ---
 
-## 6. GITHUB ACTIONS — WEEKLY BACKUP WORKFLOW
+## 6. AUTOMATED WEEKLY BACKUP (Phase 12 — as actually implemented)
 
-Create `.github/workflows/weekly-backup.yml`:
+> **Phase 12 audit note**: this section originally described a GitHub
+> Actions + AWS S3 pipeline (`weekly-backup.yml`, `pg_dump`, an S3 bucket).
+> That workflow file was never created and no S3 bucket was ever
+> provisioned — it existed only as a plan in this doc. Phase 12 replaced it
+> with automation built on infrastructure that already existed and was
+> already deployed: `backup_snapshots` (table), the `backup-snapshots`
+> Supabase Storage bucket, and the manual "Trigger Backup" flow in the
+> admin panel (`admin-data` → `backup_trigger`), all from Phase 7. No new
+> AWS account, IAM user, or GitHub secret is required.
+
+**What it does**: exports the same tables the manual admin-panel backup
+already exports (`users`, `plates`, `orders`, `subscriptions`,
+`manufacturing`, `inventory_items`, `support_tickets`, `admin_users`,
+`product_skus`, `warranties`) to a JSON snapshot in the private
+`backup-snapshots` bucket, and logs the run in `backup_snapshots` with
+`snapshot_type = 'scheduled'` (that value already existed in the
+`sql/56` schema's CHECK constraint — it was defined but never used until
+now).
+
+**Setup** (one-time, in Supabase Dashboard):
+1. Deploy the function: `supabase functions deploy scheduled-backup --no-verify-jwt`
+   (also wired into `.github/workflows/deploy-functions.yml`)
+2. Ensure the `CRON_SECRET` secret is set (same one `renewal-engine-cron`
+   already uses — no new secret needed)
+3. Supabase Dashboard → Edge Functions → `scheduled-backup` → Schedule →
+   add a Cron Trigger: `0 21 * * 0` (Sunday 21:00 UTC ≈ Monday 02:30 IST,
+   matching the cadence this doc specified in §1)
+
+**Restore verification**: a completed backup is not automatically known
+to be restorable — `verified_at` / `verified_ok` on `backup_snapshots`
+(added in `sql/64`) track whether anyone has confirmed it since. Trigger
+verification via the admin panel or directly:
+```
+POST admin-data  { "type": "backup_verify", "backupId": "<uuid>" }
+```
+This re-downloads the stored JSON and confirms it parses with row counts
+matching what was recorded at backup time.
+
+**Monitoring**: a failed scheduled run inserts an `open` row into
+`system_alerts` (the table Phase 10 added for exactly this purpose)
+instead of failing silently — visible in the admin panel's alerts view.
+
+**Historical note — the original GitHub Actions / S3 plan below is kept
+for reference only and was never implemented. If a true `pg_dump`-level
+backup (as opposed to this app-data JSON export) is needed later, this is
+the pattern to build from:**
+
+
 
 ```yaml
 name: Weekly DB Backup
@@ -210,11 +257,15 @@ jobs:
 
 ## 8. MONITORING BACKUP STATUS
 
-Add to Supabase Edge Function `health-check`:
-- Check `error_logs` for recent backup failures
-- Alert if last weekly backup is > 8 days old
-- Verify S3 bucket accessibility
+- `verify_production_readiness()` (added `sql/64`) includes a
+  `recent_backup_exists` check — fails if the most recent completed
+  backup is missing, not completed, or older than 8 days.
+- A failed `scheduled-backup` run writes an `open` row to `system_alerts`
+  (visible in the admin panel) rather than failing silently.
+- Admin panel → Backup & Recovery panel shows the full `backup_snapshots`
+  history including `verified_at` / `verified_ok` status.
 
 **Alert channels**:
-- Email: admin@mysmartdoor.in (critical failures)
-- Dashboard badge (health-check endpoint returns backup_status)
+- Dashboard: admin panel alerts view (`system_alerts`, `status = 'open'`)
+- Email: admin@mysmartdoor.in (critical failures) — wire this into
+  `services/monitoring.js`'s existing alert routing if not already done

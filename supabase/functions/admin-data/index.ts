@@ -29,7 +29,7 @@
  *                         (Phase 10: now also payment success rate, push
  *                         delivery rate, pg_cron job health, open system_alerts)
  *   alert_resolve       — Phase 10: acknowledge/resolve a system_alerts row
- *   backup_list / backup_trigger
+ *   backup_list / backup_trigger / backup_verify
  *
  * Permissions enforced server-side per the admin role/RBAC system.
  */
@@ -45,6 +45,7 @@ import {
   adminCan,
   adminAuthError,
 } from '../_shared/adminAuth.ts';
+import { runBackupSnapshot, verifyBackupSnapshot } from '../_shared/backupSnapshot.ts';
 
 serve(async (req) => {
   const headers = restrictedCors(req.headers.get('origin'));
@@ -2071,49 +2072,32 @@ serve(async (req) => {
       if (!adminCan(ctx, 'backup', 'write') && !adminCan(ctx, '*', 'write')) {
         return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       }
-      const BACKUP_TABLES = [
-        'users', 'plates', 'orders', 'subscriptions', 'manufacturing',
-        'inventory_items', 'support_tickets', 'admin_users', 'product_skus', 'warranties',
-      ];
+      const result = await runBackupSnapshot(db, 'manual', ctx.id);
+      if (!result.success) return Response.json({ success: false, message: result.message }, { status: 500, headers });
+      return Response.json({ success: true, backup_id: result.backupId, rowCounts: result.rowCounts }, { headers });
+    }
 
-      const { data: run, error: runErr } = await db.from('backup_snapshots').insert({
-        snapshot_type: 'manual', tables_included: BACKUP_TABLES, status: 'running', triggered_by: ctx.id,
-      }).select().maybeSingle();
-      if (runErr || !run) return Response.json({ success: false, message: runErr?.message || 'Could not start backup' }, { status: 500, headers });
-
-      try {
-        const snapshot: Record<string, unknown> = {};
-        const rowCounts: Record<string, number> = {};
-        for (const table of BACKUP_TABLES) {
-          const { data: rows, error: tblErr } = await db.from(table).select('*').limit(5000);
-          if (tblErr) throw new Error(`${table}: ${tblErr.message}`);
-          snapshot[table] = rows || [];
-          rowCounts[table] = (rows || []).length;
-        }
-
-        const path = `snapshots/${(run as any).id}.json`;
-        const { error: uploadErr } = await db.storage.from('backup-snapshots').upload(
-          path, new Blob([JSON.stringify(snapshot)], { type: 'application/json' }), { upsert: true },
-        );
-        if (uploadErr) throw new Error(uploadErr.message);
-
-        await db.from('backup_snapshots').update({
-          status: 'completed', storage_path: path, row_counts: rowCounts, completed_at: new Date().toISOString(),
-        }).eq('id', (run as any).id);
-
-        await db.from('admin_audit_logs').insert({
-          admin_id: ctx.id, admin_email: ctx.email, action: 'backup_triggered',
-          resource: 'backup', resource_id: (run as any).id, metadata: { tables: BACKUP_TABLES, rowCounts },
-          created_at: new Date().toISOString(),
-        });
-
-        return Response.json({ success: true, backup_id: (run as any).id, rowCounts }, { headers });
-      } catch (backupErr) {
-        await db.from('backup_snapshots').update({
-          status: 'failed', error_message: String(backupErr), completed_at: new Date().toISOString(),
-        }).eq('id', (run as any).id);
-        return Response.json({ success: false, message: `Backup failed: ${String(backupErr)}` }, { status: 500, headers });
+    // Phase 12 — Launch Readiness: restore verification. Downloads the
+    // stored snapshot back and confirms it parses + row counts match what
+    // was recorded, so "completed" backups are confirmed restorable, not
+    // just assumed so. See _shared/backupSnapshot.ts.
+    if (type === 'backup_verify') {
+      if (!adminCan(ctx, 'backup', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       }
+      const { backupId } = body as { backupId?: string };
+      if (!backupId) return Response.json({ success: false, message: 'backupId required' }, { status: 400, headers });
+
+      const result = await verifyBackupSnapshot(db, backupId);
+      if (!result.success) return Response.json({ success: false, message: result.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'backup_verified',
+        resource: 'backup', resource_id: backupId, metadata: { ok: result.ok, mismatches: result.mismatches || null },
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true, ok: result.ok, mismatches: result.mismatches }, { headers });
     }
 
     return Response.json({ success: false, message: `Unknown type: ${type}` }, { status: 400, headers });

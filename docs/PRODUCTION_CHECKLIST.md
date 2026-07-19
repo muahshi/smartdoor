@@ -105,10 +105,15 @@
 ## 💾 BACKUP CHECKLIST
 
 - [ ] Supabase Project on **Pro plan** (7-day backup retention minimum)
-- [ ] GitHub Actions weekly backup workflow created (`.github/workflows/weekly-backup.yml`)
-- [ ] S3 bucket `smartdoor-backups` created with versioning enabled
-- [ ] AWS IAM user with S3-only write permissions for backup workflow
-- [ ] First manual backup completed and verified restorable
+- [ ] `scheduled-backup` Edge Function deployed and a weekly Cron Trigger
+      configured in Supabase Dashboard (see `docs/BACKUP_STRATEGY.md` §6 —
+      Phase 12 implementation, reuses the existing `backup_snapshots`
+      table + `backup-snapshots` bucket from Phase 7; no AWS/GitHub Actions
+      setup required)
+- [ ] First scheduled backup completed and verified restorable via
+      `backup_verify` (`admin-data` → `type: "backup_verify"`)
+- [ ] `SELECT * FROM verify_production_readiness();` shows
+      `recent_backup_exists = ok`
 - [ ] Disaster recovery doc reviewed by team (`docs/BACKUP_STRATEGY.md`)
 
 ---

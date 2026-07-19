@@ -195,20 +195,37 @@ See `docs/LOAD_TEST_PREPARATION.md` for the full breakdown by user tier
 These are flagged honestly rather than silently patched, since fixing them
 touches business logic / UI which is out of scope for Phase 10:
 
-1. **QR scan landing flow**: `vercel.json` now rewrites `/p/:plateId` →
-   `login.html?plate=:plateId` at the infrastructure level, but no
-   client-side code in `login.html` currently reads the `?plate=` query
-   parameter to pre-fill or auto-route the visitor. Confirm with the team
-   whether visitor-side QR landing was meant to be a separate page/flow
-   before launch — if visitors are expected to scan and immediately see a
-   visitor-facing page (not the owner login form), this needs a small
-   follow-up phase.
-2. **Legal page dates**: All 6 legal documents contain
+1. **Legal page dates**: All 6 legal documents contain
    `[INSERT GO-LIVE DATE]` placeholders — must be replaced before
    accepting real customer payments.
-3. **Lawyer review**: Legal pages were drafted to be comprehensive and
+2. **Lawyer review**: Legal pages were drafted to be comprehensive and
    India-appropriate but have not been reviewed by a licensed lawyer —
    recommended before processing live payments at scale.
+
+> Phase 12 audit note: the QR scan landing flow gap previously listed here
+> is resolved — `vercel.json` rewrites `/p/:plateId` to
+> `visitor.html?plate=:plateId`, and `visitor.html` reads the `plate` query
+> parameter directly (confirmed in the repo, not just documented).
+
+---
+
+## 16. PHASE 12 ADDITIONS (Launch Readiness & Production Certification)
+
+- [ ] `node scripts/validate-production-config.js` run with `VITE_APP_ENV=production`
+      and the real production env vars — exits 0 (see script for what it checks:
+      Supabase URL/key format, live vs test Razorpay key, correct domain,
+      no server secrets leaked with a `VITE_` prefix)
+- [ ] `node scripts/smoke-test.js` run against the live production URL after
+      DNS cutover (`BASE_URL=https://mysmartdoor.in SUPABASE_URL=... npm run smoke-test`)
+      — all checks pass
+- [ ] `scheduled-backup` Edge Function deployed and a weekly Cron Trigger
+      configured in Supabase Dashboard → Edge Functions → Schedule (see
+      `docs/BACKUP_STRATEGY.md` §6 for the exact steps — this replaced the
+      originally-planned GitHub Actions + S3 approach, which was never
+      implemented, with a mechanism built on infrastructure that already
+      exists: `backup_snapshots` + the `backup-snapshots` storage bucket)
+- [ ] `SELECT * FROM verify_production_readiness();` run in the production
+      Supabase SQL editor — every row shows `status = 'ok'`
 
 ---
 
