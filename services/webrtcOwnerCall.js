@@ -34,7 +34,7 @@
  */
 
 import { isWebRTCEnabledForOwner } from './featureFlags.js';
-import { fetchIceServers, RTC_RECONNECT_GRACE_MS, WEBRTC_CONNECT_TIMEOUT_MS } from '../config/rtcConfig.js';
+import { fetchIceServers, getUserMediaWithTimeout, RTC_RECONNECT_GRACE_MS, WEBRTC_CONNECT_TIMEOUT_MS } from '../config/rtcConfig.js';
 import { supabase } from './supabase.js';
 import {
   ringChannelName,
@@ -380,10 +380,14 @@ async function _startListening(ownerId, handlers = {}) {
 
         let localStream;
         try {
-          localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          // PRODUCTION FIX (getUserMedia hang in in-app browsers): bare
+          // getUserMedia() can hang forever in WhatsApp/Instagram WebViews
+          // instead of resolving or rejecting — see config/rtcConfig.js#getUserMediaWithTimeout.
+          localStream = await getUserMediaWithTimeout({ audio: true, video: false });
         } catch (err) {
-          console.warn('[WebRTCOwnerCall] Microphone permission denied on accept:', err);
-          sendSignal(callChannel, 'reject', { reason: 'owner_mic_denied' }).catch(() => {});
+          const isTimeout = err?.message === 'gum_timeout';
+          console.warn(`[WebRTCOwnerCall] Microphone permission denied${isTimeout ? ' (prompt timed out)' : ''} on accept:`, err);
+          sendSignal(callChannel, 'reject', { reason: isTimeout ? 'owner_mic_timeout' : 'owner_mic_denied' }).catch(() => {});
           releasePreJoin();
           cleanupActiveCall();
           return;

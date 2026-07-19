@@ -33,6 +33,7 @@ import { getOwnerPresenceSnapshot } from './presence.js';
 import { isWebRTCEnabledForOwner } from './featureFlags.js';
 import {
   fetchIceServers,
+  getUserMediaWithTimeout,
   WEBRTC_CONNECT_TIMEOUT_MS,
   RTC_RECONNECT_GRACE_MS,
   RTC_MONITORING_EVENTS,
@@ -129,12 +130,16 @@ export async function attemptTapToTalk({ ownerId, plateId, remoteAudioEl, onStat
 
   let localStream = null;
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    // PRODUCTION FIX (getUserMedia hang in in-app browsers): bare
+    // getUserMedia() can hang forever in WhatsApp/Instagram WebViews
+    // instead of resolving or rejecting — see config/rtcConfig.js#getUserMediaWithTimeout.
+    localStream = await getUserMediaWithTimeout({ audio: true, video: false });
   } catch (err) {
-    console.warn(`[RTC-TRACE][FAIL] mic denied | File=services/webrtcCall.js ownerId=${ownerId} Reason=${err?.message || err} Current=no-mic-access Expected=mic-granted`);
-    console.warn('[WebRTCCall] Microphone permission denied or unavailable:', err);
-    await _logAttempt(ownerId, plateId, null, RTC_MONITORING_EVENTS.RTC_PERMISSION_DENIED, true);
-    return { attempted: false, connected: false, reason: 'mic_denied' };
+    const isTimeout = err?.message === 'gum_timeout';
+    console.warn(`[RTC-TRACE][FAIL] ${isTimeout ? 'mic prompt timed out' : 'mic denied'} | File=services/webrtcCall.js ownerId=${ownerId} Reason=${err?.message || err} Current=no-mic-access Expected=mic-granted`);
+    console.warn('[WebRTCCall] Microphone permission denied, unavailable, or prompt hung:', err);
+    await _logAttempt(ownerId, plateId, null, isTimeout ? RTC_MONITORING_EVENTS.RTC_GUM_TIMEOUT : RTC_MONITORING_EVENTS.RTC_PERMISSION_DENIED, true);
+    return { attempted: false, connected: false, reason: isTimeout ? 'mic_timeout' : 'mic_denied' };
   }
 
   const callId = crypto.randomUUID();
