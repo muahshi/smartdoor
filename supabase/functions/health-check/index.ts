@@ -12,6 +12,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getOrCreateRequestId, withRequestIdHeader } from '../_shared/requestId.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin':  '*',
@@ -38,6 +39,8 @@ async function runCheck(fn: () => Promise<void>): Promise<CheckResult> {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const requestId = getOrCreateRequestId(req);
+  const responseHeaders = withRequestIdHeader(corsHeaders, requestId);
   const startMs = Date.now();
 
   const supabaseAdmin = createClient(
@@ -113,15 +116,16 @@ serve(async (req) => {
       .map(([k, v]) => ({ check: k, ...v }));
 
     await supabaseAdmin.from('error_logs').insert({
-      level:    anyError ? 'error' : 'warn',
-      category: 'system',
-      message:  `Health check failed: ${failedChecks.map(c => c.check).join(', ')}`,
-      meta:     { failedChecks },
+      level:      anyError ? 'error' : 'warn',
+      category:   'system',
+      message:    `Health check failed: ${failedChecks.map(c => c.check).join(', ')}`,
+      meta:       { failedChecks },
+      request_id: requestId,
     });
   }
 
-  return Response.json(body, {
+  return Response.json({ ...body, requestId }, {
     status:  httpStatus,
-    headers: corsHeaders,
+    headers: responseHeaders,
   });
 });
