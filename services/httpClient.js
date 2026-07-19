@@ -58,4 +58,103 @@ export async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_TI
   }
 }
 
-export default { fetchWithTimeout, DEFAULT_TIMEOUT_MS };
+// ─── CIRCUIT BREAKER (Phase 10 — Reliability) ─────────────────────────────────
+// PRODUCTION GAP: every outbound call in this codebase (to Razorpay, Exotel,
+// Groq, etc., via their respective Edge Functions) retries/timeouts
+// individually per-call, but nothing remembers "this dependency has been
+// failing repeatedly" across calls — a stalled downstream provider means
+// every single caller pays the full timeout, one at a time, instead of
+// failing fast once the pattern is clear. This is a small, in-memory,
+// per-key breaker: after `failureThreshold` consecutive failures for a key,
+// further calls fail fast (no network attempt) for `cooldownMs`, then allow
+// one trial call through (half-open) before fully resetting.
+//
+// Opt-in — existing fetchWithTimeout() callers are completely unaffected
+// unless they switch to fetchWithCircuitBreaker(). Not a redesign of any
+// existing call site; nothing currently uses this except where explicitly
+// wired in this Phase 10 pass.
+const _breakers = new Map(); // key -> { failures, state: 'closed'|'open'|'half_open', openedAt }
+
+const CIRCUIT_DEFAULTS = {
+  failureThreshold: 5,     // consecutive failures before opening
+  cooldownMs: 30_000,      // stay open this long before a half-open trial
+};
+
+export class CircuitOpenError extends Error {
+  constructor(key) {
+    super(`Circuit open for '${key}' — failing fast without a network attempt`);
+    this.name = 'CircuitOpenError';
+    this.isCircuitOpen = true;
+    this.key = key;
+  }
+}
+
+function _getBreaker(key) {
+  if (!_breakers.has(key)) _breakers.set(key, { failures: 0, state: 'closed', openedAt: 0 });
+  return _breakers.get(key);
+}
+
+/**
+ * Wraps fetchWithTimeout with a per-key circuit breaker.
+ * @param {string} key         Stable identifier for the dependency, e.g. 'razorpay', 'groq', 'exotel'.
+ * @param {string} url
+ * @param {object} [options]
+ * @param {number} [timeoutMs]
+ * @param {object} [circuitOpts]  { failureThreshold, cooldownMs }
+ */
+export async function fetchWithCircuitBreaker(key, url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS, circuitOpts = {}) {
+  const cfg = { ...CIRCUIT_DEFAULTS, ...circuitOpts };
+  const breaker = _getBreaker(key);
+  const now = Date.now();
+
+  if (breaker.state === 'open') {
+    if (now - breaker.openedAt < cfg.cooldownMs) {
+      throw new CircuitOpenError(key);
+    }
+    breaker.state = 'half_open'; // allow exactly one trial call through
+  }
+
+  try {
+    const res = await fetchWithTimeout(url, options, timeoutMs);
+    // Treat any 5xx as a failure for breaker purposes (network succeeded,
+    // dependency didn't) — 4xx are the caller's/request's problem, not the
+    // dependency being down, so they don't count against the breaker.
+    if (res.status >= 500) {
+      _recordFailure(breaker, cfg);
+    } else {
+      _recordSuccess(breaker);
+    }
+    return res;
+  } catch (err) {
+    _recordFailure(breaker, cfg);
+    throw err;
+  }
+}
+
+function _recordSuccess(breaker) {
+  breaker.failures = 0;
+  breaker.state = 'closed';
+}
+
+function _recordFailure(breaker, cfg) {
+  breaker.failures += 1;
+  if (breaker.state === 'half_open' || breaker.failures >= cfg.failureThreshold) {
+    breaker.state = 'open';
+    breaker.openedAt = Date.now();
+  }
+}
+
+/** Read-only breaker status, e.g. for a diagnostics page. */
+export function getCircuitStatus(key) {
+  const b = _breakers.get(key);
+  if (!b) return { key, state: 'closed', failures: 0 };
+  return { key, state: b.state, failures: b.failures };
+}
+
+export default {
+  fetchWithTimeout,
+  fetchWithCircuitBreaker,
+  getCircuitStatus,
+  CircuitOpenError,
+  DEFAULT_TIMEOUT_MS,
+};

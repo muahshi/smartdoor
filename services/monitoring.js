@@ -19,6 +19,12 @@
 
 import { supabase } from './supabase.js';
 
+// PHASE 10 ingest endpoint helper (see bottom of file for full rationale).
+function _logIngestUrl() {
+  const base = window.__SD_CONFIG__?.supabaseUrl || '';
+  return base ? base + '/functions/v1/log-client-error' : null;
+}
+
 // ─── RING BUFFER CONFIG ───────────────────────────────────────────────────────
 const RING_BUFFER_SIZE = 200;        // Last N events kept in memory
 const FLUSH_INTERVAL_MS = 30_000;    // Batch-flush to DB every 30s
@@ -161,6 +167,12 @@ export const monitor = {
 
   // Get alert status
   getAlerts: () => _checkAlerts(),
+
+  // Phase 10 — start a fresh correlation id for a new logical action
+  // (e.g. right before initiating a checkout or a WebRTC call attempt),
+  // and read the current one back to pass to a fetch() as 'x-request-id'.
+  newRequestId: () => { _requestId = _generateId(); return _requestId; },
+  getRequestId: _getRequestId,
 };
 
 // ─── CORE LOG FUNCTION ────────────────────────────────────────────────────────
@@ -174,6 +186,11 @@ function _log(level, category, message, meta = {}) {
     sessionId: _getSessionId(),
     userAgent:  navigator?.userAgent?.slice(0, 200) || null,
     url:        window?.location?.pathname || null,
+    // Phase 10 — correlation id so this exact event can be matched against
+    // any edge-function-side error_logs row logged for the same logical
+    // request (edge functions accept/echo the same id via the
+    // 'x-request-id' header — see _shared/requestId.ts).
+    requestId:  _getRequestId(),
   };
 
   // 1. Console output
@@ -255,31 +272,93 @@ function _checkAlerts() {
   return active;
 }
 
+// Phase 10: this used to be a pure console.error with a literal
+// "TODO: wire to admin notification" — no alert ever reached anyone outside
+// an open devtools console. Now persists to system_alerts (via the same
+// service-role endpoint used for error_logs, since RLS blocks a direct
+// client insert there too) so the admin System Health panel — which
+// already polls operations_health — can surface it.
+//
+// COOLDOWN: this is still a per-browser-tab decision (each visitor/owner's
+// tab tracks its own threshold independently), so many simultaneous tabs
+// hitting the same failure could each fire their own alert row within a
+// short window. A per-key, per-tab cooldown (sessionStorage) stops one tab
+// from re-alerting on every breach, but does NOT dedupe across different
+// users' tabs — see PRODUCTION_RISKS in the deployment notes for why a
+// future server-side aggregator (reading system_alerts on a schedule)
+// would be a more robust long-term fix than this client-triggered path.
+const _ALERT_COOLDOWN_MS = 15 * 60_000; // 15 min per alert key per tab
+function _alertCooldownKey(key) { return `sd_alert_cooldown_${key}`; }
+
 function _triggerAlert(key, count, threshold, lastEntry) {
-  const msg = `🚨 Alert: ${key} — ${count} errors in ${threshold.windowSecs}s`;
-  console.error(msg, lastEntry);
-  // TODO: Wire to admin notification (Supabase Edge Function / PushNotification)
-  // Example: fetch('/api/alert', { method: 'POST', body: JSON.stringify({ key, count, lastEntry }) })
+  const msg = `Alert: ${key} — ${count} errors in ${threshold.windowSecs}s`;
+  console.error('🚨', msg, lastEntry);
+
+  try {
+    const cdKey = _alertCooldownKey(key);
+    const last = Number(sessionStorage.getItem(cdKey) || 0);
+    if (Date.now() - last < _ALERT_COOLDOWN_MS) return; // already alerted recently from this tab
+    sessionStorage.setItem(cdKey, String(Date.now()));
+  } catch (_) { /* sessionStorage unavailable — proceed without cooldown */ }
+
+  const url = _logIngestUrl();
+  if (!url) return;
+
+  const level = (key === 'payment_failure' || key === 'auth_failure') ? 'critical' : 'warning';
+
+  // Fire-and-forget — an alert dispatch must never itself throw or block
+  // the app; failures here just mean the alert stays console-only for
+  // this tab, same as before this fix existed.
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      events: [],
+      alert: {
+        alertKey:   key,
+        level,
+        message:    msg,
+        count,
+        windowSecs: threshold.windowSecs,
+        meta:       { lastEntry },
+        requestId:  _getRequestId(),
+      },
+    }),
+  }).catch((err) => console.error('[Monitoring] Alert dispatch failed:', err));
 }
 
 // ─── DB FLUSH ─────────────────────────────────────────────────────────────────
+// Phase 10: this used to call `supabase.from('error_logs').insert(...)`
+// directly, which error_logs' RLS policy has always silently rejected for
+// the anon/authenticated client (see _logIngestUrl() comment above). Now
+// posts to the log-client-error Edge Function, which performs the same
+// insert with the service role instead.
 async function _flushToDB() {
   if (_pending.length === 0) return;
 
+  const url = _logIngestUrl();
+  if (!url) return; // config not loaded yet — try again next cycle
+
   const batch = _pending.splice(0, 50); // Max 50 per flush
   try {
-    await supabase.from('error_logs').insert(
-      batch.map(e => ({
-        level:       e.level,
-        category:    e.category,
-        message:     e.message,
-        meta:        e.meta,
-        session_id:  e.sessionId,
-        user_agent:  e.userAgent,
-        url:         e.url,
-        created_at:  e.ts,
-      }))
-    );
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        events: batch.map(e => ({
+          level:       e.level,
+          category:    e.category,
+          message:     e.message,
+          meta:        e.meta,
+          sessionId:   e.sessionId,
+          userAgent:   e.userAgent,
+          url:         e.url,
+          requestId:   e.requestId,
+          ts:          e.ts,
+        })),
+      }),
+    });
+    if (!res.ok) throw new Error(`log-client-error HTTP ${res.status}`);
   } catch (err) {
     // Can't log to DB → put back and try next cycle (but cap re-queues)
     if (_pending.length < 100) {
@@ -371,6 +450,25 @@ async function _check(name, fn) {
     monitor.warn(Category.SYSTEM, `Health check failed: ${name}`, { error: err.message });
     return { status: 'error', error: err.message, latencyMs: Math.round(performance.now() - t0) };
   }
+}
+
+// ─── CORRELATION / REQUEST ID (Phase 10) ──────────────────────────────────────
+// One id per "logical unit of work" in the tab (e.g. one QR-scan flow, one
+// checkout attempt) so a client-side error and any edge-function-side
+// error_logs row it triggered can be joined on the same value. Callers that
+// want a fresh id per action (rather than the whole-tab default) can call
+// monitor.newRequestId() and pass it through explicitly — most call sites
+// don't need to, since sharing one id per tab-lifetime is still far better
+// than no correlation at all.
+let _requestId = null;
+function _getRequestId() {
+  if (!_requestId) _requestId = _generateId();
+  return _requestId;
+}
+function _generateId() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return 'req_' + Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 // ─── SESSION ID ───────────────────────────────────────────────────────────────
