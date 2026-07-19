@@ -26,6 +26,9 @@
  *   warranty_list / warranty_create / warranty_claim_update
  *   product_sku_list / product_sku_upsert / product_sku_toggle
  *   operations_health   — edge fn + AI + realtime + background job + error health
+ *                         (Phase 10: now also payment success rate, push
+ *                         delivery rate, pg_cron job health, open system_alerts)
+ *   alert_resolve       — Phase 10: acknowledge/resolve a system_alerts row
  *   backup_list / backup_trigger
  *
  * Permissions enforced server-side per the admin role/RBAC system.
@@ -2021,6 +2024,10 @@ serve(async (req) => {
       const [
         edgeHealthRes, errorLogsRes, errorCountRes, webhookFailRes,
         aiScreeningsRes, rtcAttemptsRes, rtcPresenceRes, renewalLogRes,
+        // Phase 10 additions — real gaps: payment success rate, push
+        // delivery reliability, pg_cron job visibility, open alerts.
+        // All read from existing tables/functions — no new business logic.
+        ordersRes, pushDeliveryRes, cronHealthRes, openAlertsRes,
       ] = await Promise.all([
         // Reuse the existing public health-check function instead of
         // re-implementing its dependency checks here.
@@ -2033,6 +2040,10 @@ serve(async (req) => {
         db.from('rtc_call_attempts').select('outcome, fallback_triggered').gte('created_at', since24h),
         db.from('rtc_presence_events').select('event_type', { count: 'exact', head: false }).gte('created_at', since24h),
         db.from('renewal_engine_logs').select('*').order('run_at', { ascending: false }).limit(5),
+        db.from('orders').select('payment_status').gte('created_at', since24h),
+        db.from('push_delivery_logs').select('sent_count, failed_count, subscriptions_total, skipped').gte('created_at', since24h),
+        db.rpc('get_cron_job_health').then((r) => r).catch(() => ({ data: null, error: null })),
+        db.from('system_alerts').select('id, alert_key, level, message, count, status, created_at').eq('status', 'open').order('created_at', { ascending: false }).limit(20),
       ]);
 
       const errorCounts = { warn: 0, error: 0, fatal: 0 };
@@ -2049,6 +2060,32 @@ serve(async (req) => {
       const rtcSuccess = rtcRows.filter((r) => r.outcome === 'connected' || r.outcome === 'answered').length;
       const rtcFallbacks = rtcRows.filter((r) => r.fallback_triggered).length;
 
+      // Phase 10 — Payment success rate. Reuses the existing orders table
+      // (payment_status: pending | paid | failed | refunded) — no new
+      // schema, this is purely a new read/aggregation.
+      const orderRows = (ordersRes.data || []) as any[];
+      const paidCount = orderRows.filter((o) => o.payment_status === 'paid').length;
+      const failedCount = orderRows.filter((o) => o.payment_status === 'failed').length;
+      const decidedOrders = paidCount + failedCount; // excludes still-pending
+      const paymentSuccessRate = decidedOrders > 0 ? paidCount / decidedOrders : null;
+
+      // Phase 10 — Push notification delivery reliability, aggregated from
+      // push_delivery_logs (new table, written by supabase/functions/send-push).
+      const pushRows = (pushDeliveryRes.data || []) as any[];
+      const pushAttempted = pushRows.filter((p) => !p.skipped);
+      const pushSentTotal = pushAttempted.reduce((s, p) => s + (p.sent_count || 0), 0);
+      const pushFailedTotal = pushAttempted.reduce((s, p) => s + (p.failed_count || 0), 0);
+      const pushTargeted = pushSentTotal + pushFailedTotal;
+      const pushDeliveryRate = pushTargeted > 0 ? pushSentTotal / pushTargeted : null;
+      const pushSkippedCounts: Record<string, number> = {};
+      for (const p of pushRows) {
+        if (p.skipped) pushSkippedCounts[p.skipped] = (pushSkippedCounts[p.skipped] || 0) + 1;
+      }
+
+      // Phase 10 — pg_cron job health via get_cron_job_health() (sql/62).
+      // Degrades to an empty array if pg_cron isn't available/enabled.
+      const cronJobs = (cronHealthRes && (cronHealthRes as any).data) || [];
+
       return Response.json({
         success: true,
         health: {
@@ -2060,10 +2097,51 @@ serve(async (req) => {
             callAttempts24h: rtcRows.length, successfulCalls24h: rtcSuccess,
             fallbacksTriggered24h: rtcFallbacks, presenceEvents24h: rtcPresenceRes.count || 0,
           },
-          backgroundJobs: { renewalEngine: renewalLogRes.data || [] },
+          backgroundJobs: {
+            renewalEngine: renewalLogRes.data || [],
+            // Phase 10 — scheduled maintenance jobs (sql/49), previously invisible.
+            scheduledJobs: cronJobs,
+          },
+          payments: {
+            // Phase 10 — reliability metric, computed from existing orders table.
+            paid24h: paidCount, failed24h: failedCount, successRate24h: paymentSuccessRate,
+          },
+          notifications: {
+            // Phase 10 — reliability metric, from new push_delivery_logs table.
+            targeted24h: pushTargeted, delivered24h: pushSentTotal,
+            deliveryRate24h: pushDeliveryRate, skipped24h: pushSkippedCounts,
+          },
+          alerts: {
+            // Phase 10 — durable alert records (new system_alerts table),
+            // replacing the console-only stub in services/monitoring.js.
+            open: openAlertsRes.data || [],
+          },
           timestamp: new Date().toISOString(),
         },
       }, { headers });
+    }
+
+    // Phase 10 — acknowledge/resolve a durable system_alerts row (the fix
+    // for _triggerAlert() previously never persisting/surfacing anywhere).
+    if (type === 'alert_resolve') {
+      if (!adminCan(ctx, 'system', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
+      const alertId = body.alert_id as string;
+      if (!alertId) return Response.json({ success: false, message: 'alert_id required' }, { status: 400, headers });
+
+      const { error } = await db.from('system_alerts').update({
+        status: 'resolved', acknowledged_by: ctx.id, acknowledged_at: new Date().toISOString(),
+      }).eq('id', alertId);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
+
+      await db.from('admin_audit_logs').insert({
+        admin_id: ctx.id, admin_email: ctx.email, action: 'alert_resolved',
+        resource: 'system_alerts', resource_id: alertId, metadata: {},
+        created_at: new Date().toISOString(),
+      });
+
+      return Response.json({ success: true }, { headers });
     }
 
     // ══════════════════════════════════════════════
