@@ -4,19 +4,31 @@
  *
  * Admin-only refund initiation.
  * Service role key required — frontend se direct accessible nahi.
+ *
+ * SECURITY HARDENING (Phase 9): this function was documented as
+ * "admin-only" but had no actual server-side enforcement of that — any
+ * caller with the public anon key could invoke it directly and trigger a
+ * real Razorpay refund for any order/invoice. Now gated the same way as
+ * every other admin Edge Function (verifyAdminSession + adminCan), using
+ * the existing 'orders'/'subscriptions' write permission the RBAC schema
+ * already defines (no new resource key needed).
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { restrictedCors } from "../_shared/cors.ts";
+import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from "../_shared/adminAuth.ts";
 
 const RAZORPAY_KEY_ID      = Deno.env.get("RAZORPAY_KEY_ID")!;
 const RAZORPAY_KEY_SECRET  = Deno.env.get("RAZORPAY_KEY_SECRET")!;
-const SUPABASE_URL         = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 serve(async (req) => {
+  const corsHeaders = restrictedCors(req.headers.get("origin"));
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const supabase = getServiceClient();
+
+  const ctx = await verifyAdminSession(req, supabase);
+  if (!ctx) return adminAuthError(corsHeaders);
 
   try {
     const { order_id, invoice_id, amount = 0, reason = "Customer requested refund" } = await req.json();
@@ -25,7 +37,10 @@ serve(async (req) => {
       return Response.json({ success: false, message: "order_id or invoice_id required." }, { status: 400, headers: corsHeaders });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const requiredResource = invoice_id ? "subscriptions" : "orders";
+    if (!adminCan(ctx, requiredResource, "write") && !adminCan(ctx, "*", "write")) {
+      return Response.json({ success: false, message: "Permission denied." }, { status: 403, headers: corsHeaders });
+    }
 
     // ── SaaS subscription invoice refund path (Admin Controls → Refund support) ──
     // Kept as a separate branch rather than reusing the `payments` table
@@ -112,7 +127,7 @@ serve(async (req) => {
           amount:              refundAmount / 100,
           reason,
           credit_note_id:      creditNoteId,
-          initiated_by:        "admin",
+          initiated_by:        ctx.email || "admin",
         });
       } catch (e) {
         console.warn("[razorpay-refund] refund_ledger insert failed (non-fatal):", (e as Error).message);
@@ -220,7 +235,7 @@ serve(async (req) => {
         amount:              refundAmount / 100,
         reason,
         credit_note_id:      creditNoteId,
-        initiated_by:        "admin",
+        initiated_by:        ctx.email || "admin",
       });
     } catch (e) {
       console.warn("[razorpay-refund] refund_ledger insert failed (non-fatal):", (e as Error).message);
