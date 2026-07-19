@@ -19,6 +19,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import * as exotel from '../_shared/providers/exotel.ts';
 import * as twilio from '../_shared/providers/twilio.ts';
+import { signCallCallback, verifyCallCallback } from '../_shared/callbackAuth.ts';
 
 const TERMINAL_FAILURE_STATUSES = ['no-answer', 'no_answer', 'busy', 'failed'];
 
@@ -32,6 +33,18 @@ serve(async (req) => {
     const callId = url.searchParams.get('call_id');
     if (!callId) {
       return Response.json({ success: false, message: 'Missing call_id' }, { status: 400, headers: corsHeaders });
+    }
+
+    // SECURITY (Phase 9): this endpoint has no other request authentication
+    // (neither Exotel nor Twilio callback signing is wired up here), so an
+    // HMAC token minted by initiate-call at call-creation time is required
+    // — without it, anyone who obtained/guessed a call_logs id could inject
+    // fake status transitions (including triggering the family-fallback
+    // dial-out below).
+    const sig = url.searchParams.get('sig');
+    if (!(await verifyCallCallback(callId, sig))) {
+      console.error(`[call-status-webhook] Rejected unsigned/invalid callback for call_id=${callId}`);
+      return Response.json({ success: false, message: 'Invalid signature' }, { status: 403, headers: corsHeaders });
     }
 
     const form = await req.formData();
@@ -115,7 +128,8 @@ async function _tryNextFamilyMember(supabaseAdmin: any, callLog: any) {
 
   if (!newCallLog) return;
 
-  const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-webhook?call_id=${newCallLog.id}`;
+  const fallbackSig = await signCallCallback(newCallLog.id);
+  const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-webhook?call_id=${newCallLog.id}${fallbackSig ? `&sig=${fallbackSig}` : ''}`;
   const providerModule = callLog.provider === 'twilio' ? twilio : exotel;
 
   // Note: this fallback leg dials the next family member's number directly;
