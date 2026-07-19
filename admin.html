@@ -605,7 +605,12 @@
 </head>
 <body>
 
-<!-- monitoring-bootstrap removed: non-critical, was causing ES module chain issues -->
+<!-- monitoring-bootstrap (ES module) removed: was causing ES module chain issues.
+     Phase 10: js/adminErrorCapture.js is a plain classic script (no imports,
+     no module chain participation) that captures window.onerror /
+     unhandledrejection and posts to the log-client-error Edge Function —
+     see that file's header comment for why this approach was chosen. -->
+<script src="js/adminErrorCapture.js"></script>
 
 <!-- Mobile sidebar overlay — tap to close -->
 <div id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -1328,6 +1333,9 @@
         <div class="metric-card"><div class="metric-label">AI Screenings (24h)</div><div class="metric-value" id="oh-ai-count">—</div><div class="metric-sub" id="oh-ai-confidence">—</div></div>
         <div class="metric-card"><div class="metric-label">Realtime Calls (24h)</div><div class="metric-value" id="oh-rtc-count">—</div><div class="metric-sub" id="oh-rtc-detail">—</div></div>
         <div class="metric-card"><div class="metric-label">Webhook Failures (24h)</div><div class="metric-value" id="oh-webhook-fail">—</div><div class="metric-sub">Razorpay / integrations</div></div>
+        <!-- Phase 10 — reliability metrics: payment success rate + notification delivery rate -->
+        <div class="metric-card"><div class="metric-label">Payment Success Rate (24h)</div><div class="metric-value" id="oh-payment-rate">—</div><div class="metric-sub" id="oh-payment-detail">—</div></div>
+        <div class="metric-card"><div class="metric-label">Push Delivery Rate (24h)</div><div class="metric-value" id="oh-push-rate">—</div><div class="metric-sub" id="oh-push-detail">—</div></div>
       </div>
 
       <div class="grid-2">
@@ -1336,8 +1344,16 @@
           <div id="edgeFunctionHealthList"><div class="empty-state"><div class="spinner"></div></div></div>
         </div>
         <div class="card">
-          <div class="card-header"><span class="card-title">🔄 Background Jobs (Renewal Engine)</span></div>
+          <div class="card-header"><span class="card-title">🔄 Background Jobs (Renewal Engine + Scheduled Maintenance)</span></div>
           <div id="backgroundJobsList"><div class="empty-state"><div class="spinner"></div></div></div>
+        </div>
+      </div>
+
+      <!-- Phase 10 — durable alert records (system_alerts), replacing the previously console-only alert stub -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">🚨 Open Alerts</span></div>
+        <div id="openAlertsList">
+          <div class="empty-state"><div class="icon">✅</div><div class="text">No open alerts</div></div>
         </div>
       </div>
 
@@ -2782,6 +2798,14 @@ async function loadOperationsHealth() {
   set('oh-rtc-detail', h.realtime ? `${h.realtime.successfulCalls24h} connected · ${h.realtime.fallbacksTriggered24h} fallback` : '—');
   set('oh-webhook-fail', h.integrations?.webhookFailures24h ?? 0);
 
+  // Phase 10 — payment success rate + push delivery rate
+  const payRate = h.payments?.successRate24h;
+  set('oh-payment-rate', payRate != null ? (payRate * 100).toFixed(0) + '%' : '—');
+  set('oh-payment-detail', h.payments ? `${h.payments.paid24h} paid · ${h.payments.failed24h} failed` : '—');
+  const pushRate = h.notifications?.deliveryRate24h;
+  set('oh-push-rate', pushRate != null ? (pushRate * 100).toFixed(0) + '%' : '—');
+  set('oh-push-detail', h.notifications ? `${h.notifications.delivered24h}/${h.notifications.targeted24h} delivered` : '—');
+
   const efEl = document.getElementById('edgeFunctionHealthList');
   if (efEl) {
     const checks = edge.checks || {};
@@ -2804,12 +2828,43 @@ async function loadOperationsHealth() {
   const bjEl = document.getElementById('backgroundJobsList');
   if (bjEl) {
     const runs = h.backgroundJobs?.renewalEngine || [];
-    bjEl.innerHTML = runs.length
+    const renewalHtml = runs.length
       ? runs.map(r => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:12px;color:var(--muted)">${fmtDate(r.run_at)}</span>
           <span style="font-size:12px">${r.processed||0} processed · ${r.skipped||0} skipped${r.errors_count?' · <span style=\"color:#EF4444\">'+r.errors_count+' errors</span>':''}</span>
         </div>`).join('')
       : '<div class="empty-state"><div class="text">No renewal engine runs logged yet</div></div>';
+
+    const cronJobs = h.backgroundJobs?.scheduledJobs || [];
+    const cronHtml = cronJobs.length
+      ? '<div style="margin-top:10px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">Scheduled Maintenance</div>'
+        + cronJobs.map(j => {
+            const color = j.last_status === 'succeeded' ? '#10B981' : j.last_status === 'failed' ? '#EF4444' : '#6B7280';
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:12px">${escapeHtml(j.jobname||'')}</span>
+              <div style="display:flex;align-items:center;gap:6px;font-size:11px">
+                <div style="width:7px;height:7px;border-radius:50%;background:${color}"></div>
+                <span>${j.last_run_at ? fmtDate(j.last_run_at) : 'never run'}${j.duration_ms!=null?' · '+Math.round(j.duration_ms)+'ms':''}</span>
+              </div>
+            </div>`;
+          }).join('')
+      : '<div style="margin-top:10px;font-size:11px;color:var(--muted)">No pg_cron job history available on this instance</div>';
+
+    bjEl.innerHTML = renewalHtml + cronHtml;
+  }
+
+  const alertsEl = document.getElementById('openAlertsList');
+  if (alertsEl) {
+    const openAlerts = h.alerts?.open || [];
+    alertsEl.innerHTML = openAlerts.length
+      ? openAlerts.map(a => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div><span class="badge badge-${a.level==='critical'?'danger':'warning'}">${escapeHtml(a.level)}</span> <span style="font-size:12px;margin-left:6px">${escapeHtml((a.message||'').slice(0,100))} (${a.count}×)</span></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:11px;color:var(--muted)">${fmtDate(a.created_at)}</span>
+            <button class="btn btn-ghost btn-sm" onclick="resolveSystemAlert('${a.id}')">Resolve</button>
+          </div>
+        </div>`).join('')
+      : '<div class="empty-state"><div class="icon">✅</div><div class="text">No open alerts</div></div>';
   }
 
   const errEl = document.getElementById('errorLogsList');
@@ -2825,6 +2880,14 @@ async function loadOperationsHealth() {
     }
   }
 }
+
+// Phase 10 — acknowledge/resolve a durable system_alerts row
+window.resolveSystemAlert = async function(alertId) {
+  const res = await adminCall('alert_resolve', { alert_id: alertId });
+  if (!res.success) { showToast('Error: ' + (res.message || 'Could not resolve alert'), 'error'); return; }
+  showToast('✅ Alert resolved', 'success');
+  loadOperationsHealth();
+};
 
 // ── SHIPMENT TRACKING ──
 let _shipmentFilter = 'all';
