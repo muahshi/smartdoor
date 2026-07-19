@@ -375,6 +375,9 @@ serve(async (req) => {
     // SYSTEM HEALTH
     // ══════════════════════════════════════════════
     if (type === 'system_health') {
+      if (!adminCan(ctx, 'analytics', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const start = Date.now();
       const [usersRes, qrRes, logsRes] = await Promise.all([
         db.from('users').select('id', { count: 'exact', head: true }),
@@ -665,6 +668,9 @@ serve(async (req) => {
 
     // ── TICKET HANDLERS ─────────────────────────────────────────────────────
     if (type === 'ticket_list') {
+      if (!adminCan(ctx, 'support', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const limit2 = Number((body as any).limit) || 50;
       const offset2 = Number((body as any).offset) || 0;
       let q = db.from('support_tickets')
@@ -678,6 +684,9 @@ serve(async (req) => {
     }
 
     if (type === 'ticket_stats') {
+      if (!adminCan(ctx, 'support', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { data: tsdata } = await db.from('support_tickets').select('id, status, priority');
       const ts = tsdata || [];
       return Response.json({ success: true, stats: {
@@ -691,24 +700,36 @@ serve(async (req) => {
     }
 
     if (type === 'ticket_detail') {
+      if (!adminCan(ctx, 'support', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { data: td } = await db.from('support_tickets').select('*').eq('id', (body as any).ticket_id).maybeSingle();
       const { data: tc } = await db.from('ticket_comments').select('*').eq('ticket_id', (body as any).ticket_id).order('created_at', { ascending: true });
       return Response.json({ success: true, ticket: td, comments: tc || [] }, { headers });
     }
 
     if (type === 'update_ticket') {
+      if (!adminCan(ctx, 'support', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { ticket_id: tid2, updates: tupdates } = body as any;
       await db.from('support_tickets').update({ ...tupdates, updated_at: new Date().toISOString() }).eq('id', tid2);
       return Response.json({ success: true }, { headers });
     }
 
     if (type === 'add_ticket_comment') {
+      if (!adminCan(ctx, 'support', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { ticket_id: tcid, admin_id: taid, content: tcontent, is_internal: tis } = body as any;
       await db.from('ticket_comments').insert({ ticket_id: tcid, content: tcontent, is_internal: !!tis, author_id: taid || ctx.id, author_type: 'admin', created_at: new Date().toISOString() });
       return Response.json({ success: true }, { headers });
     }
 
     if (type === 'create_ticket') {
+      if (!adminCan(ctx, 'support', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { subject: ts2, description: td2, priority: tp2, user_id: tu2, category: tc2 } = body as any;
       const tnum = 'TKT-' + Date.now().toString(36).toUpperCase();
       const { data: tnew } = await db.from('support_tickets').insert({ ticket_number: tnum, subject: ts2, description: td2, priority: tp2 || 'medium', status: 'open', user_id: tu2 || null, category: tc2 || 'general', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }).select().single();
@@ -717,6 +738,9 @@ serve(async (req) => {
 
     // ── COMMUNICATION LOGS ──────────────────────────────────────────────────
     if (type === 'communication_logs') {
+      if (!adminCan(ctx, 'communication', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const climit = Number((body as any).limit) || 100;
       const ctype = (body as any).type;
       const logs: any = {};
@@ -728,18 +752,27 @@ serve(async (req) => {
 
     // ── ADMIN TEAM ──────────────────────────────────────────────────────────
     if (type === 'admin_team') {
+      if (!adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { data: ateam } = await db.from('admin_users').select('id, email, full_name, is_active, last_login_at, role_id, admin_roles(name, label, color)').order('created_at', { ascending: false });
       return Response.json({ success: true, team: ateam || [] }, { headers });
     }
 
     // ── QR MANAGEMENT ───────────────────────────────────────────────────────
     if (type === 'qr_search') {
+      if (!adminCan(ctx, 'qr', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { plate_id: qpid } = body as any;
       const { data: qplate } = await db.from('plates').select('plate_id, status, qr_image_url, qr_svg_url, owner_id, created_at').eq('plate_id', qpid).maybeSingle();
       return Response.json({ success: true, plate: qplate }, { headers });
     }
 
     if (type === 'qr_deactivate') {
+      if (!adminCan(ctx, 'qr', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { plate_id: dpid, reason: dreason } = body as any;
       await db.from('plates').update({ status: 'suspended', updated_at: new Date().toISOString() }).eq('plate_id', dpid);
       await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'qr_deactivate', resource: 'plates', resource_id: dpid, notes: dreason || 'Admin action' });
@@ -747,6 +780,9 @@ serve(async (req) => {
     }
 
     if (type === 'qr_reactivate') {
+      if (!adminCan(ctx, 'qr', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { plate_id: rpid } = body as any;
       // FIX: isPlateActive() requires activation_date != null. Stamp it here so the
       // QR scan path (visitorExperience → isPlateActive) resolves to 'ready'.
@@ -757,6 +793,9 @@ serve(async (req) => {
 
     // ── MANUFACTURING ────────────────────────────────────────────────────────
     if (type === 'manufacturing_queue') {
+      if (!adminCan(ctx, 'manufacturing', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const mstatus = (body as any).status;
       let mq = db.from('manufacturing').select('*, plates(plate_id, status), orders(order_number, total_amount)').order('created_at', { ascending: false });
       if (mstatus) mq = mq.eq('production_status', mstatus);
@@ -765,6 +804,9 @@ serve(async (req) => {
     }
 
     if (type === 'manufacturing_counts') {
+      if (!adminCan(ctx, 'manufacturing', 'read') && !adminCan(ctx, '*', 'read')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { data: mrows } = await db.from('manufacturing').select('production_status');
       const mr = mrows || [];
       const cnt = (s: string) => mr.filter((r: any) => r.production_status === s).length;
@@ -772,6 +814,9 @@ serve(async (req) => {
     }
 
     if (type === 'update_manufacturing_status') {
+      if (!adminCan(ctx, 'manufacturing', 'write') && !adminCan(ctx, '*', 'write')) {
+        return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
+      }
       const { id: muid, status: mustatus } = body as any;
       await db.from('manufacturing').update({ production_status: mustatus, updated_at: new Date().toISOString() }).eq('id', muid);
       await db.from('admin_audit_logs').insert({ admin_id: ctx.id, admin_email: ctx.email, action: 'update_manufacturing_status', resource: 'manufacturing', resource_id: muid, after_data: { production_status: mustatus } });
