@@ -272,20 +272,15 @@
     const orderId   = params.get('order_id');
 
     if (!tokenHash || !plateId) {
-      // Also support direct link with just plate_id for admin-initiated onboarding
-      if (plateId && !tokenHash) {
-        // Fetch order info to pre-fill
-        const { data: plate } = await supabase
-          .from('plates').select('owner_id, plate_id').eq('plate_id', plateId).single();
-        if (plate) {
-          state.plateId = plate.plate_id;
-          state.ownerId = plate.owner_id;
-          document.getElementById('display-plate-id').textContent = plate.plate_id;
-          if (orderId) state.orderId = orderId;
-          showStep('step-info');
-          return;
-        }
-      }
+      // SECURITY (Phase 9): a plate_id-only link (no token_hash) used to be
+      // accepted here as an "admin-initiated onboarding" fallback, trusting
+      // the plate_id to look up owner_id with zero verification. Every
+      // activation link this codebase actually generates (verify-razorpay-
+      // payment, razorpay-webhook) always includes token_hash, so that
+      // fallback had no legitimate caller — it only gave anyone who knew a
+      // plate_id (printed on the physical nameplate / encoded in its public
+      // QR code) a way to reach the account-setup flow with no proof of
+      // identity. Removed; a magic-link token_hash is now required.
       showStep('step-error');
       return;
     }

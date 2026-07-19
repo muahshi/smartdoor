@@ -58,6 +58,13 @@ self.addEventListener('fetch', (event) => {
   let host = '';
   try { host = new URL(event.request.url).hostname; } catch (_) {}
   if (host === 'api.anthropic.com' || host === 'api.groq.com') return;
+  // SECURITY (Phase 9): never cache Supabase REST/Edge Function responses —
+  // these can carry per-session, per-owner, or admin data. Only static
+  // site assets should ever land in Cache Storage.
+  const path = (() => { try { return new URL(event.request.url).pathname; } catch (_) { return ''; } })();
+  if (host.endsWith('.supabase.co') || path.startsWith('/functions/') || path.startsWith('/rest/') || path.startsWith('/auth/')) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request).then((response) => {
