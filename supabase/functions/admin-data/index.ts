@@ -73,68 +73,15 @@ serve(async (req) => {
         return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       }
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-      const thirtyDaysOut = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      // PHASE 11 PERF FIX: was 11 parallel queries pulling full rows for
+      // users/orders/subscriptions/manufacturing/support_tickets/plates and
+      // reducing them here in JS — unbounded payload that grows with every
+      // row in the platform. Now a single Postgres RPC does all counting/
+      // summing server-side (sql/63_admin_dashboard_aggregation.sql).
+      const { data: metrics, error } = await db.rpc('get_admin_dashboard_metrics');
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
 
-      const [
-        usersRes, ordersRes, subsRes, mfgRes, ticketsRes, platesRes,
-        msgsTodayRes, voiceTodayRes, newUsersMonthRes, newUsersLastMonthRes,
-        renewalRes,
-      ] = await Promise.all([
-        db.from('users').select('id', { count: 'exact', head: true }),
-        db.from('orders').select('id, payment_status, total_amount, created_at'),
-        db.from('subscriptions').select('id, status, plan'),
-        db.from('manufacturing').select('id, production_status', { count: 'exact', head: false }),
-        db.from('support_tickets').select('id, status', { count: 'exact', head: false }),
-        db.from('plates').select('id, status', { count: 'exact', head: false }),
-        db.from('message_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
-        db.from('voice_notes').select('id', { count: 'exact', head: true }).gte('created_at', todayStart),
-        db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', monthStart),
-        db.from('users').select('id', { count: 'exact', head: true }).gte('created_at', lastMonthStart).lt('created_at', monthStart),
-        db.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active').lte('expiry_date', thirtyDaysOut).gte('expiry_date', now.toISOString()),
-      ]);
-
-      const orders = ordersRes.data || [];
-      const subs = subsRes.data || [];
-      const mfg = mfgRes.data || [];
-      const tickets = ticketsRes.data || [];
-      const plates = platesRes.data || [];
-
-      const paidOrders = orders.filter((o: any) => o.payment_status === 'paid');
-      const revenueThisMonth = paidOrders
-        .filter((o: any) => new Date(o.created_at) >= new Date(monthStart))
-        .reduce((s: number, o: any) => s + (o.total_amount || 0), 0);
-
-      const newThisMonth = newUsersMonthRes.count || 0;
-      const newLastMonth = newUsersLastMonthRes.count || 0;
-      const growthPct = newLastMonth > 0
-        ? (((newThisMonth - newLastMonth) / newLastMonth) * 100).toFixed(1)
-        : null;
-
-      return Response.json({
-        success: true,
-        metrics: {
-          totalCustomers: usersRes.count || 0,
-          newCustomersThisMonth: newThisMonth,
-          customerGrowthPct: growthPct,
-          activeSubscriptions: subs.filter((s: any) => s.status === 'active').length,
-          expiringSoon: renewalRes.count || 0,
-          revenueThisMonth,
-          pendingOrders: orders.filter((o: any) => o.payment_status === 'pending').length,
-          paidOrders: paidOrders.length,
-          manufacturingQueue: mfg.filter((m: any) => ['queued', 'printing', 'quality_check'].includes(m.production_status)).length,
-          openTickets: tickets.filter((t: any) => t.status === 'open').length,
-          pendingTickets: tickets.filter((t: any) => t.status === 'pending').length,
-          totalPlates: plates.length,
-          activePlates: plates.filter((p: any) => p.status === 'active').length,
-          inactivePlates: plates.filter((p: any) => ['inactive', 'suspended'].includes(p.status)).length,
-          messagesToday: msgsTodayRes.count || 0,
-          voiceNotesToday: voiceTodayRes.count || 0,
-        },
-      }, { headers });
+      return Response.json({ success: true, metrics }, { headers });
     }
 
     // ══════════════════════════════════════════════
@@ -247,51 +194,14 @@ serve(async (req) => {
         return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       }
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+      // PHASE 11 PERF FIX: was fetching every paid order (all-time) plus
+      // every subscription into the edge function to sum/group in JS.
+      // Now a single Postgres RPC computes all sums server-side
+      // (sql/63_admin_dashboard_aggregation.sql).
+      const { data: financial, error } = await db.rpc('get_admin_financial_metrics');
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500, headers });
 
-      const [paymentsRes, refundsRes, subsRes] = await Promise.all([
-        db.from('orders').select('total_amount, payment_status, product_type, created_at').eq('payment_status', 'paid'),
-        db.from('orders').select('total_amount').eq('payment_status', 'refunded'),
-        db.from('subscriptions').select('plan, status, renewal_price'),
-      ]);
-
-      const all = paymentsRes.data || [];
-      const sum = (arr: any[]) => arr.reduce((s, o) => s + (o.total_amount || 0), 0);
-      const filterFrom = (from: string) => all.filter((o: any) => new Date(o.created_at) >= new Date(from));
-
-      const revenueToday = sum(filterFrom(todayStart));
-      const revenueMonth = sum(filterFrom(monthStart));
-      const revenueYear = sum(filterFrom(yearStart));
-
-      const subs = subsRes.data || [];
-      const planPrices: Record<string, number> = { hardware_only: 0, smartdoor_care: 299 };
-      let mrr = 0;
-      subs.filter((s: any) => s.status === 'active').forEach((s: any) => {
-        mrr += s.renewal_price ?? planPrices[s.plan] ?? 0;
-      });
-      mrr = Math.round(mrr / 12);
-
-      const productRevenue: Record<string, number> = { acrylic: 0, stainless: 0, teakwood: 0 };
-      all.forEach((o: any) => {
-        if (productRevenue[o.product_type] !== undefined) productRevenue[o.product_type] += o.total_amount || 0;
-      });
-
-      return Response.json({
-        success: true,
-        financial: {
-          revenueToday,
-          revenueMonth,
-          revenueYear,
-          mrr,
-          arr: mrr * 12,
-          totalRefunds: sum(refundsRes.data || []),
-          productRevenue,
-          totalPaidOrders: all.length,
-        },
-      }, { headers });
+      return Response.json({ success: true, financial }, { headers });
     }
 
     // ══════════════════════════════════════════════
@@ -410,21 +320,18 @@ serve(async (req) => {
         return Response.json({ success: false, message: 'Permission denied' }, { status: 403, headers });
       }
       const months = Math.min(Number((body as any).months || 6), 12);
-      const fromDate = new Date();
-      fromDate.setMonth(fromDate.getMonth() - months);
 
-      const { data } = await db
-        .from('orders')
-        .select('total_amount, created_at')
-        .eq('payment_status', 'paid')
-        .gte('created_at', fromDate.toISOString())
-        .order('created_at', { ascending: true });
+      // PHASE 11 PERF FIX: was fetching every paid order in the date range
+      // and grouping by month here in JS. Now a Postgres RPC does the
+      // GROUP BY server-side (sql/63_admin_dashboard_aggregation.sql);
+      // this handler keeps only the cheap, presentational job of filling
+      // in zero-revenue months and building chart labels.
+      const { data: rows, error: rpcError } = await db.rpc('get_admin_revenue_by_month', { p_months: months });
+      if (rpcError) return Response.json({ success: false, message: rpcError.message }, { status: 500, headers });
 
       const grouped: Record<string, number> = {};
-      for (const o of (data || [])) {
-        const d = new Date(o.created_at);
-        const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        grouped[key] = (grouped[key] || 0) + (o.total_amount || 0);
+      for (const row of (rows || [])) {
+        grouped[row.month_key] = Number(row.total) || 0;
       }
 
       const labels: string[] = [];
