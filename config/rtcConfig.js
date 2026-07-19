@@ -150,6 +150,9 @@ export const RTC_MONITORING_EVENTS = Object.freeze({
   RTC_RECONNECTED: 'rtc_reconnected',             // recovered within the grace window
   RTC_POST_CONNECT_DISCONNECT: 'rtc_post_connect_disconnect', // permanent teardown after a live call
   RTC_CALL_CLAIMED_ELSEWHERE: 'rtc_call_claimed_elsewhere',   // another owner tab/device answered first
+
+  // Added — Production Audit fix (getUserMedia hang in in-app browsers).
+  RTC_GUM_TIMEOUT: 'rtc_gum_timeout',   // mic prompt never resolved/rejected within GUM_TIMEOUT_MS
 });
 
 /**
@@ -181,6 +184,54 @@ export const RTC_MONITORING_EVENTS = Object.freeze({
  * improve connectivity, never regress it.
  */
 const TURN_FETCH_TIMEOUT_MS = 2500;
+
+/**
+ * PRODUCTION FIX (getUserMedia hang in in-app browsers).
+ *
+ * Root cause of callers/owners stuck on "Connecting…" forever: in-app
+ * WebViews (WhatsApp, Instagram, etc.) sometimes never resolve or reject
+ * navigator.mediaDevices.getUserMedia() at all — the mic permission
+ * prompt is silently swallowed by the host app chrome instead of being
+ * shown, so the bare `await getUserMedia()` call in services/webrtcCall.js
+ * and services/webrtcOwnerCall.js hangs indefinitely with no error to
+ * catch and no timeout to fall back on.
+ *
+ * getUserMediaWithTimeout() wraps the call in the same
+ * Promise.race(...)-with-setTimeout pattern already used by
+ * fetchIceServers() above, so a hung prompt now rejects with a
+ * `gum_timeout` Error after GUM_TIMEOUT_MS instead of hanging forever,
+ * letting the existing masked-call fallback fire like any other
+ * mic-unavailable reason.
+ */
+export const GUM_TIMEOUT_MS = 10000;
+
+export function getUserMediaWithTimeout(constraints, timeoutMs = GUM_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('gum_timeout'));
+    }, timeoutMs);
+
+    navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+      if (settled) {
+        // Timeout already fired and the caller moved on — release the
+        // mic immediately instead of leaving it held open in the background.
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve(stream);
+    }).catch((err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
 
 export async function fetchIceServers(supabaseClient, { ownerId, plateId } = {}) {
   const stunOnly = getIceServers();
@@ -217,6 +268,8 @@ export async function fetchIceServers(supabaseClient, { ownerId, plateId } = {})
 export default {
   getIceServers,
   fetchIceServers,
+  getUserMediaWithTimeout,
+  GUM_TIMEOUT_MS,
   RTC_CONFIG_DEFAULTS,
   WEBRTC_CONNECT_TIMEOUT_MS,
   RTC_MONITORING_EVENTS,
