@@ -234,6 +234,9 @@ serve(async (req: Request) => {
             : (nowMins >= startMins || nowMins < endMins);
 
           if (withinQuietHours) {
+            supabase.from('push_delivery_logs').insert({
+              owner_id: ownerId, event_type: type, row_id: String(rowId), skipped: 'quiet_hours',
+            }).then(() => {}, (e: unknown) => console.error('[send-push] push_delivery_logs insert failed:', e));
             return new Response(JSON.stringify({ success: true, skipped: 'quiet_hours' }), { status: 200, headers: corsHeaders });
           }
         }
@@ -247,6 +250,9 @@ serve(async (req: Request) => {
       const key = `${ownerId}:${plateId || '-'}:${type}`;
       const last = _recentEvents.get(key) || 0;
       if (Date.now() - last < throttleMs) {
+        supabase.from('push_delivery_logs').insert({
+          owner_id: ownerId, event_type: type, row_id: String(rowId), skipped: 'throttled',
+        }).then(() => {}, (e: unknown) => console.error('[send-push] push_delivery_logs insert failed:', e));
         return new Response(JSON.stringify({ success: true, skipped: 'throttled' }), { status: 200, headers: corsHeaders });
       }
       _recentEvents.set(key, Date.now());
@@ -259,6 +265,9 @@ serve(async (req: Request) => {
 
     if (subsErr) throw subsErr;
     if (!subs || !subs.length) {
+      supabase.from('push_delivery_logs').insert({
+        owner_id: ownerId, event_type: type, row_id: String(rowId), skipped: 'no_subscriptions',
+      }).then(() => {}, (e: unknown) => console.error('[send-push] push_delivery_logs insert failed:', e));
       return new Response(JSON.stringify({ success: true, sent: 0, reason: 'no_subscriptions' }), { status: 200, headers: corsHeaders });
     }
 
@@ -361,6 +370,26 @@ serve(async (req: Request) => {
 
     if (stale.length) {
       await supabase.from('push_subscriptions').delete().in('id', stale);
+    }
+
+    // Phase 10 — delivery outcome used to only ever reach console.error on
+    // failure; nothing was persisted, so "notification delivery" as a
+    // reliability metric was structurally unreportable. Best-effort insert
+    // (never blocks the response — a logging failure must not turn a
+    // successful/partial push send into an error for the caller).
+    try {
+      await supabase.from('push_delivery_logs').insert({
+        owner_id: ownerId,
+        event_type: type,
+        row_id: String(rowId),
+        subscriptions_total: subs.length,
+        sent_count: sent,
+        failed_count: subs.length - sent - stale.length,
+        stale_cleaned_count: stale.length,
+        skipped: null,
+      });
+    } catch (logErr) {
+      console.error('[send-push] push_delivery_logs insert failed:', logErr);
     }
 
     return new Response(JSON.stringify({ success: true, sent, total: subs.length, cleaned: stale.length }), {
