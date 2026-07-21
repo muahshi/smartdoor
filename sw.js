@@ -1,7 +1,7 @@
 // Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
-const CACHE_NAME = 'smartdoor-v9'; // bumped: Phase 6 — production hardening (badge count reliability, fetch timeouts, diagnostic log gating)
+const CACHE_NAME = 'smartdoor-v10'; // bumped: force-purge stale cached JS from the jsdelivr→vendor supabase-js hotfix
 const STATIC_ASSETS = [
   '/',
   '/index.html',
