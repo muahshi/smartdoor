@@ -806,10 +806,6 @@ const DashboardModule = (() => {
   }
 
   async function _addMember(name, phone) {
-    if (state.familyMembers.length >= 4) {
-      showToast('Maximum 4 family members allowed', 'danger');
-      return;
-    }
     const result = await addFamilyMember(state.owner.id, { name, phone });
     if (result.success) {
       state.familyMembers.push({
