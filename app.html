@@ -437,7 +437,7 @@
       transition: all 0.2s;
       border: none;
       background: none;
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.5);
     }
 
     .bottom-nav-item.active {
@@ -523,7 +523,7 @@
     .inbox-row .inbox-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 0.84rem; color: #fff; display: flex; align-items: center; gap: 6px; }
     .inbox-row .inbox-preview { font-size: 0.74rem; color: rgba(255,255,255,0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
     .inbox-row .inbox-right { text-align: right; flex-shrink: 0; }
-    .inbox-row .inbox-time { font-size: 0.65rem; color: rgba(255,255,255,0.35); }
+    .inbox-row .inbox-time { font-size: 0.65rem; color: rgba(255,255,255,0.5); }
     .inbox-unread-dot { background: #00A2E8; color: #fff; border-radius: 20px; font-size: 0.62rem; font-weight: 700; padding: 1px 6px; margin-top: 4px; display: inline-block; }
     .inbox-tag-pill { font-size: 0.6rem; padding: 1px 7px; border-radius: 10px; background: rgba(139,92,246,0.15); color: #C4B5FD; font-weight: 600; }
     /* Phase 7C — Communication Center */
@@ -540,7 +540,7 @@
     .inbox-bubble.ai { align-self: flex-start; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.2); color: #E2ECF4; border-bottom-left-radius: 4px; }
     .inbox-bubble.owner { align-self: flex-end; background: rgba(0,162,232,0.18); color: #fff; border-bottom-right-radius: 4px; }
     .inbox-bubble.system { align-self: center; max-width: 90%; background: transparent; border: none; color: rgba(255,255,255,0.4); font-size: 0.72rem; text-align: center; padding: 4px 10px; }
-    .inbox-bubble .inbox-bubble-meta { font-size: 0.6rem; color: rgba(255,255,255,0.35); margin-top: 4px; display: flex; gap: 4px; align-items: center; justify-content: flex-end; }
+    .inbox-bubble .inbox-bubble-meta { font-size: 0.6rem; color: rgba(255,255,255,0.5); margin-top: 4px; display: flex; gap: 4px; align-items: center; justify-content: flex-end; }
     .inbox-menu-item:hover { background: rgba(255,255,255,0.06); }
     .inbox-quick-chip {
       flex-shrink: 0; padding: 6px 12px; border-radius: 16px; font-size: 0.72rem; font-weight: 600;
@@ -723,27 +723,27 @@
       <!-- Quick Actions (Phase 4 — all wired to existing features only) -->
       <div class="os-eyebrow" style="margin-bottom:8px;">Quick Actions</div>
       <div class="quick-actions-grid">
-        <div class="quick-action-tile" onclick="document.querySelector('.tab-btn[data-tab=settings]')?.click()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="document.querySelector('.tab-btn[data-tab=settings]')?.click()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">settings</span></div>
           <div class="quick-action-label">Settings</div>
         </div>
-        <div class="quick-action-tile" onclick="document.querySelector('.tab-btn[data-tab=settings]')?.click(); setTimeout(()=>{document.getElementById('family-members-list')?.scrollIntoView({behavior:'smooth',block:'center'});},350);">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="document.querySelector('.tab-btn[data-tab=settings]')?.click(); setTimeout(()=>{document.getElementById('family-members-list')?.scrollIntoView({behavior:'smooth',block:'center'});},350);">
           <div class="quick-action-icon"><span class="material-symbols-rounded">family_restroom</span></div>
           <div class="quick-action-label">Family</div>
         </div>
-        <div class="quick-action-tile" onclick="ActivityCenter.open()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="ActivityCenter.open()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">assignment</span></div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
-        <div class="quick-action-tile" onclick="NotificationCenter.open()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="NotificationCenter.open()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">notifications</span></div>
           <div class="quick-action-label">Notifications</div>
         </div>
-        <div class="quick-action-tile" onclick="OwnerPremium.openShareAccess()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="OwnerPremium.openShareAccess()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">share</span></div>
           <div class="quick-action-label">Share Access</div>
         </div>
-        <div class="quick-action-tile qa-danger" onclick="window.showModal?.('sos-modal')">
+        <div class="quick-action-tile qa-danger" role="button" tabindex="0" onclick="window.showModal?.('sos-modal')">
           <div class="quick-action-icon" style="background:rgba(239,68,68,0.15);"><span class="material-symbols-rounded">emergency</span></div>
           <div class="quick-action-label" style="color:#F87171;">Emergency</div>
         </div>
@@ -774,7 +774,7 @@
       <div class="dash-card" style="margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">AI Intent Breakdown</div>
-          <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);">Last 30 days</div>
+          <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);">Last 30 days</div>
         </div>
         <div id="intent-chart"></div>
       </div>
@@ -785,7 +785,7 @@
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">QR Scan Heatmap</div>
           <span style="font-size:0.62rem;padding:2px 8px;border-radius:5px;background:rgba(168,85,247,0.12);color:#A855F7;font-weight:700;">PREVIEW</span>
         </div>
-        <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-bottom:12px;">Scan density by hour, last 12 weeks</div>
+        <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-bottom:12px;">Scan density by hour, last 12 weeks</div>
         <div id="qr-heatmap" class="heatmap-grid"></div>
       </div>
 
@@ -793,7 +793,7 @@
       <div class="dash-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Live Visitor Logs</div>
-          <div style="font-size:0.7rem;color:#00A2E8;font-weight:600;cursor:pointer;" onclick="ActivityCenter.open()">View All</div>
+          <div role="button" tabindex="0" style="font-size:0.7rem;color:#00A2E8;font-weight:600;cursor:pointer;" onclick="ActivityCenter.open()">View All</div>
         </div>
         <div id="visitor-logs"></div>
       </div>
@@ -864,13 +864,13 @@
           <div class="inbox-chip" data-filter="archived">Archived</div>
         </div>
         <div id="inbox-list"></div>
-        <div id="inbox-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.35);font-size:0.82rem;">No conversations yet. When a visitor messages or chats with your AI receptionist, it'll show up here.</div>
+        <div id="inbox-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.5);font-size:0.82rem;">No conversations yet. When a visitor messages or chats with your AI receptionist, it'll show up here.</div>
       </div>
 
       <!-- Phase 7C: Smart Communication Center (grouped visitor view) -->
       <div id="comm-center-panel" style="display:none;">
         <input type="text" id="comm-search" class="settings-input" placeholder="🔍 Search by label, category, or plate…" style="margin-bottom:6px;" />
-        <div style="font-size:0.64rem;color:rgba(255,255,255,0.35);margin:0 2px 10px;line-height:1.4;">Searches owner-assigned labels, categories, and plate ID. SmartDoor never stores visitor names or phone numbers.</div>
+        <div style="font-size:0.64rem;color:rgba(255,255,255,0.5);margin:0 2px 10px;line-height:1.4;">Searches owner-assigned labels, categories, and plate ID. SmartDoor never stores visitor names or phone numbers.</div>
         <div class="os-eyebrow" style="margin-bottom:6px;">Date Range</div>
         <div class="inbox-chips" id="comm-date-chips">
           <div class="inbox-chip active" data-range="all">All Time</div>
@@ -890,7 +890,7 @@
           <div class="inbox-chip" data-group="followup">Follow-Up</div>
         </div>
         <div id="comm-list"></div>
-        <div id="comm-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.35);font-size:0.82rem;">No visitors in this group yet.</div>
+        <div id="comm-empty" style="display:none;text-align:center;padding:40px 12px;color:rgba(255,255,255,0.5);font-size:0.82rem;">No visitors in this group yet.</div>
       </div>
     </div>
 
@@ -902,21 +902,21 @@
           <div id="inbox-thread-title" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Conversation</div>
           <div id="inbox-thread-subtitle" style="font-size:0.68rem;color:rgba(255,255,255,0.4);"></div>
         </div>
-        <button onclick="DashboardModule.togglePinActive()" id="inbox-pin-btn" title="Pin" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">push_pin</span></button>
-        <button onclick="DashboardModule.generateSummaryActive()" title="AI Summary" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">psychology</span></button>
+        <button onclick="DashboardModule.togglePinActive()" id="inbox-pin-btn" title="Pin" aria-label="Pin" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">push_pin</span></button>
+        <button onclick="DashboardModule.generateSummaryActive()" title="AI Summary" aria-label="AI Summary" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">psychology</span></button>
         <button onclick="DashboardModule.toggleInboxMenu()" title="More" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer;">⋮</button>
       </div>
       <div id="inbox-menu" style="display:none;position:absolute;top:54px;right:12px;background:#0c1a2c;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:6px;z-index:20;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-        <div class="inbox-menu-item" onclick="DashboardModule.resolveActive()" style="padding:8px 10px;font-size:0.8rem;color:#fff;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:0.95rem;">task_alt</span> Mark Resolved</div>
-        <div class="inbox-menu-item" onclick="DashboardModule.archiveActive()" style="padding:8px 10px;font-size:0.8rem;color:#fff;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:0.95rem;">archive</span> Archive</div>
-        <div class="inbox-menu-item" onclick="DashboardModule.deleteActive()" style="padding:8px 10px;font-size:0.8rem;color:#f87171;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:0.95rem;">delete</span> Delete</div>
+        <div class="inbox-menu-item" role="button" tabindex="0" onclick="DashboardModule.resolveActive()" style="padding:8px 10px;font-size:0.8rem;color:#fff;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:0.95rem;">task_alt</span> Mark Resolved</div>
+        <div class="inbox-menu-item" role="button" tabindex="0" onclick="DashboardModule.archiveActive()" style="padding:8px 10px;font-size:0.8rem;color:#fff;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:0.95rem;">archive</span> Archive</div>
+        <div class="inbox-menu-item" role="button" tabindex="0" onclick="DashboardModule.deleteActive()" style="padding:8px 10px;font-size:0.8rem;color:#f87171;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:8px;"><span class="material-symbols-rounded" style="font-size:0.95rem;">delete</span> Delete</div>
       </div>
       <div id="inbox-summary-banner" style="display:none;margin:10px 16px 0;padding:10px 12px;background:rgba(0,162,232,0.08);border:1px solid rgba(0,162,232,0.2);border-radius:10px;font-size:0.76rem;color:#8ecdf0;"></div>
       <div id="inbox-thread-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;"></div>
       <div id="inbox-typing-indicator" style="display:none;padding:0 16px 6px;font-size:0.7rem;color:rgba(255,255,255,0.4);">Visitor is typing…</div>
       <div id="inbox-quick-replies" style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;"></div>
       <div style="display:flex;gap:8px;padding:10px 16px 16px;border-top:1px solid rgba(255,255,255,0.07);align-items:center;">
-        <button id="inbox-voice-btn" title="Record voice reply" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#fff;width:38px;height:38px;border-radius:10px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded">mic</span></button>
+        <button id="inbox-voice-btn" title="Record voice reply" aria-label="Record voice reply" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#fff;width:38px;height:38px;border-radius:10px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded">mic</span></button>
         <input type="text" id="inbox-reply-input" placeholder="Type a reply…" class="settings-input" style="flex:1;margin:0;" maxlength="500" />
         <button id="inbox-reply-send" class="btn-primary" style="padding:10px 16px;flex-shrink:0;">Send</button>
       </div>
@@ -949,7 +949,7 @@
       <!-- Status Manager -->
       <div class="dash-card" style="margin-bottom:12px;">
         <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;margin-bottom:10px;">Status Manager</div>
-        <div style="font-size:0.75rem;color:rgba(255,255,255,0.35);margin-bottom:10px;">Choose status shown to visitors</div>
+        <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);margin-bottom:10px;">Choose status shown to visitors</div>
 
         <div class="status-option selected-status" data-status="available" data-label="Available">
           <span class="material-symbols-rounded" style="font-size:1rem;">check_circle</span>
@@ -1012,7 +1012,7 @@
           <span class="material-symbols-rounded" style="font-size:1.1rem;">smart_toy</span>
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">AI Status Customizer</div>
         </div>
-        <div style="font-size:0.75rem;color:rgba(255,255,255,0.35);margin-bottom:8px;">Describe your situation...</div>
+        <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);margin-bottom:8px;">Describe your situation...</div>
         <textarea
           id="ai-status-input"
           placeholder="e.g. Doctor appointment at 6pm, back by 8pm..."
@@ -1048,7 +1048,7 @@
         <div class="settings-field-group">
           <label class="settings-label">Visitor Welcome Title</label>
           <input type="text" id="set-visitor-welcome-title" class="settings-input" placeholder="e.g. Welcome to Our Home" maxlength="80" />
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:4px;">Shown as the big heading on your visitor page</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:4px;">Shown as the big heading on your visitor page</div>
         </div>
         <div class="settings-field-group">
           <label class="settings-label">Residence Name</label>
@@ -1081,7 +1081,7 @@
             <option value="female">Female Voice</option>
             <option value="male">Male Voice</option>
           </select>
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:4px;">Applies to the AI receptionist's spoken replies on your visitor page</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:4px;">Applies to the AI receptionist's spoken replies on your visitor page</div>
         </div>
         <div class="settings-field-group">
           <button type="button" class="settings-input" style="cursor:pointer;text-align:left;background:rgba(0,162,232,0.1);border-color:rgba(0,162,232,0.3);color:#7DD3FC;font-weight:600;" onclick="window.AIReceptionistRules?.open()"><span class="material-symbols-rounded" style="font-size:0.95rem;vertical-align:-2px;">smart_toy</span> AI Receptionist Rules — Amazon Auto Allow, Family Auto Connect…</button>
@@ -1137,7 +1137,7 @@
       <div class="dash-card" style="margin-bottom:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;">Family Routing</div>
-          <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);">Drag to reorder</div>
+          <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">Drag to reorder</div>
         </div>
         <div id="family-members-list" style="display:flex;flex-direction:column;gap:6px;"></div>
         <button id="add-member-btn" style="
@@ -1153,7 +1153,7 @@
       <!-- Night Security -->
       <div class="dash-card" style="margin-bottom:12px;">
         <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.85rem;color:#fff;margin-bottom:4px;"><span class="material-symbols-rounded" style="font-size:0.9rem;vertical-align:-2px;">nightlight</span> Raat Ka Security Rule</div>
-        <div style="font-size:0.75rem;color:rgba(255,255,255,0.35);margin-bottom:12px;">Auto night mode with strict access control</div>
+        <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);margin-bottom:12px;">Auto night mode with strict access control</div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
           <div>
@@ -1211,7 +1211,7 @@
             <span class="premium-seal" id="sub-plan-badge"><span class="material-symbols-rounded" style="font-size:0.85rem;vertical-align:-2px;">auto_awesome</span> Premium Included</span>
             <!-- Shown only for the complimentary hardware-bundled plan (js/dashboard.js toggles display) -->
             <div style="font-size:0.72rem;color:rgba(255,255,255,0.45);margin-top:4px;" id="sub-included-line">Included with your SmartDoor Purchase</div>
-            <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);margin-top:2px;display:none;" id="sub-started-line"></div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-top:2px;display:none;" id="sub-started-line"></div>
             <div style="font-size:0.75rem;color:rgba(255,255,255,0.4);margin-top:6px;" id="sub-renewal-line">Loading…</div>
           </div>
           <div style="padding:4px 10px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.25);border-radius:6px;font-size:0.7rem;color:#22C55E;font-weight:700;font-family:'Space Grotesk',sans-serif;">ACTIVE</div>
@@ -1274,7 +1274,7 @@
           <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#00A2E8,#0078D7);display:flex;align-items:center;justify-content:center;font-size:1.1rem;"><span class="material-symbols-rounded sd-icon-fill">home</span></div>
           <div>
             <div style="font-size:0.82rem;font-weight:700;color:#fff;font-family:'Space Grotesk',sans-serif;" id="owner-panel-name">…</div>
-            <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);">Owner</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">Owner</div>
           </div>
         </div>
       </div>
@@ -1300,27 +1300,27 @@
     <div class="dash-section">
       <div class="dash-section-title">Quick Actions</div>
       <div class="quick-actions-grid" style="grid-template-columns:repeat(6,1fr);">
-        <div class="quick-action-tile" onclick="document.getElementById('desktop-inbox-anchor')?.scrollIntoView({behavior:'smooth',block:'start'})">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="document.getElementById('desktop-inbox-anchor')?.scrollIntoView({behavior:'smooth',block:'start'})">
           <div class="quick-action-icon"><span class="material-symbols-rounded">settings</span></div>
           <div class="quick-action-label">Settings</div>
         </div>
-        <div class="quick-action-tile" onclick="document.getElementById('family-members-list')?.scrollIntoView({behavior:'smooth',block:'center'})">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="document.getElementById('family-members-list')?.scrollIntoView({behavior:'smooth',block:'center'})">
           <div class="quick-action-icon"><span class="material-symbols-rounded">family_restroom</span></div>
           <div class="quick-action-label">Family</div>
         </div>
-        <div class="quick-action-tile" onclick="ActivityCenter.open()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="ActivityCenter.open()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">assignment</span></div>
           <div class="quick-action-label">Visitor Logs</div>
         </div>
-        <div class="quick-action-tile" onclick="NotificationCenter.open()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="NotificationCenter.open()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">notifications</span></div>
           <div class="quick-action-label">Notifications</div>
         </div>
-        <div class="quick-action-tile" onclick="OwnerPremium.openShareAccess()">
+        <div class="quick-action-tile" role="button" tabindex="0" onclick="OwnerPremium.openShareAccess()">
           <div class="quick-action-icon"><span class="material-symbols-rounded">share</span></div>
           <div class="quick-action-label">Share Access</div>
         </div>
-        <div class="quick-action-tile qa-danger" onclick="window.showModal?.('sos-modal')">
+        <div class="quick-action-tile qa-danger" role="button" tabindex="0" onclick="window.showModal?.('sos-modal')">
           <div class="quick-action-icon" style="background:rgba(239,68,68,0.15);"><span class="material-symbols-rounded">emergency</span></div>
           <div class="quick-action-label" style="color:#F87171;">Emergency</div>
         </div>
@@ -1367,29 +1367,29 @@
           <!-- Conversation list -->
           <div style="max-height:560px;overflow-y:auto;">
             <div id="inbox-list-d"></div>
-            <div id="inbox-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.35);font-size:0.78rem;">No conversations yet.</div>
+            <div id="inbox-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.5);font-size:0.78rem;">No conversations yet.</div>
           </div>
           <!-- Thread pane -->
           <div class="dash-card" style="display:flex;flex-direction:column;margin-bottom:0;padding:0;overflow:hidden;">
-            <div id="inbox-thread-empty-d" style="flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:0.82rem;padding:40px;">Select a conversation to view the thread</div>
+            <div id="inbox-thread-empty-d" style="flex:1;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.5);font-size:0.82rem;padding:40px;">Select a conversation to view the thread</div>
             <div id="inbox-thread-panel-d" style="display:none;flex-direction:column;flex:1;min-height:0;">
               <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.07);">
                 <div style="flex:1;min-width:0;">
                   <div id="inbox-thread-title-d" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">Conversation</div>
                   <div id="inbox-thread-subtitle-d" style="font-size:0.68rem;color:rgba(255,255,255,0.4);"></div>
                 </div>
-                <button onclick="DashboardModule.togglePinActive()" id="inbox-pin-btn-d" title="Pin" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">push_pin</span></button>
-                <button onclick="DashboardModule.generateSummaryActive()" title="AI Summary" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">psychology</span></button>
-                <button onclick="DashboardModule.resolveActive()" title="Mark Resolved" style="background:none;border:none;font-size:0.95rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:0.95rem;">task_alt</span></button>
-                <button onclick="DashboardModule.archiveActive()" title="Archive" style="background:none;border:none;font-size:0.95rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:0.95rem;">archive</span></button>
-                <button onclick="DashboardModule.deleteActive()" title="Delete" style="background:none;border:none;font-size:0.95rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:0.95rem;">delete</span></button>
+                <button onclick="DashboardModule.togglePinActive()" id="inbox-pin-btn-d" title="Pin" aria-label="Pin" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">push_pin</span></button>
+                <button onclick="DashboardModule.generateSummaryActive()" title="AI Summary" aria-label="AI Summary" style="background:none;border:none;font-size:1rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1rem;">psychology</span></button>
+                <button onclick="DashboardModule.resolveActive()" title="Mark Resolved" aria-label="Mark Resolved" style="background:none;border:none;font-size:0.95rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:0.95rem;">task_alt</span></button>
+                <button onclick="DashboardModule.archiveActive()" title="Archive" aria-label="Archive" style="background:none;border:none;font-size:0.95rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:0.95rem;">archive</span></button>
+                <button onclick="DashboardModule.deleteActive()" title="Delete" aria-label="Delete" style="background:none;border:none;font-size:0.95rem;cursor:pointer;"><span class="material-symbols-rounded" style="font-size:0.95rem;">delete</span></button>
               </div>
               <div id="inbox-summary-banner-d" style="display:none;margin:10px 16px 0;padding:10px 12px;background:rgba(0,162,232,0.08);border:1px solid rgba(0,162,232,0.2);border-radius:10px;font-size:0.76rem;color:#8ecdf0;"></div>
               <div id="inbox-thread-messages-d" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;max-height:360px;"></div>
               <div id="inbox-typing-indicator-d" style="display:none;padding:0 16px 6px;font-size:0.7rem;color:rgba(255,255,255,0.4);">Visitor is typing…</div>
               <div id="inbox-quick-replies-d" style="display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;"></div>
               <div style="display:flex;gap:8px;padding:10px 16px 16px;border-top:1px solid rgba(255,255,255,0.07);align-items:center;">
-                <button id="inbox-voice-btn-d" title="Record voice reply" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#fff;width:38px;height:38px;border-radius:10px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded">mic</span></button>
+                <button id="inbox-voice-btn-d" title="Record voice reply" aria-label="Record voice reply" style="background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.3);color:#fff;width:38px;height:38px;border-radius:10px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span class="material-symbols-rounded">mic</span></button>
                 <input type="text" id="inbox-reply-input-d" placeholder="Type a reply…" class="settings-input" style="flex:1;margin:0;" maxlength="500" />
                 <button id="inbox-reply-send-d" class="btn-primary" style="padding:10px 16px;flex-shrink:0;">Send</button>
               </div>
@@ -1402,7 +1402,7 @@
       <div id="comm-center-panel-d" style="display:none;margin-top:12px;">
         <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:4px;">
           <input type="text" id="comm-search-d" class="settings-input" placeholder="🔍 Search by label, category, or plate…" style="max-width:320px;margin:0;" />
-          <div style="font-size:0.66rem;color:rgba(255,255,255,0.35);flex:1;min-width:220px;line-height:1.4;">Searches owner-assigned labels, categories, and plate ID. SmartDoor never stores visitor names or phone numbers.</div>
+          <div style="font-size:0.66rem;color:rgba(255,255,255,0.5);flex:1;min-width:220px;line-height:1.4;">Searches owner-assigned labels, categories, and plate ID. SmartDoor never stores visitor names or phone numbers.</div>
         </div>
         <div class="inbox-chips" id="comm-date-chips-d" style="margin-top:10px;">
           <div class="inbox-chip active" data-range="all">All Time</div>
@@ -1421,7 +1421,7 @@
           <div class="inbox-chip" data-group="followup">Follow-Up</div>
         </div>
         <div id="comm-list-d" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
-        <div id="comm-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.35);font-size:0.78rem;">No visitors in this group yet.</div>
+        <div id="comm-empty-d" style="display:none;text-align:center;padding:30px 10px;color:rgba(255,255,255,0.5);font-size:0.78rem;">No visitors in this group yet.</div>
       </div>
     </div>
 
@@ -1432,7 +1432,7 @@
       <div>
         <div class="dash-section-title">Status Manager</div>
         <div class="dash-card" style="margin-bottom:16px;">
-          <div style="font-size:0.75rem;color:rgba(255,255,255,0.35);margin-bottom:10px;">Choose status shown to visitors</div>
+          <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);margin-bottom:10px;">Choose status shown to visitors</div>
 
           <div class="status-option selected-status" data-status="available" data-label="Available" style="margin-bottom:6px;">
             <span class="material-symbols-rounded" style="font-size:0.9rem;">check_circle</span>
@@ -1468,7 +1468,7 @@
           <div class="settings-field-group">
             <label class="settings-label">Visitor Welcome Title</label>
             <input type="text" id="set-visitor-welcome-title-d" class="settings-input" placeholder="e.g. Welcome to Our Home" maxlength="80" />
-            <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:4px;">Shown as the big heading on your visitor page</div>
+            <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-top:4px;">Shown as the big heading on your visitor page</div>
           </div>
           <div class="settings-field-group">
             <label class="settings-label">Residence Name</label>
@@ -1554,7 +1554,7 @@
         <!-- Family Routing -->
         <div class="dash-section-title">Family Routing</div>
         <div class="dash-card">
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-bottom:8px;">Drag to reorder · Priority 1 rings first</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-bottom:8px;">Drag to reorder · Priority 1 rings first</div>
           <div id="family-members-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
           <button id="add-member-btn" style="
             width:100%;padding:7px;background:rgba(0,162,232,0.08);
@@ -1569,7 +1569,7 @@
       <div>
         <div class="dash-section-title">AI Status Customizer</div>
         <div class="dash-card" style="margin-bottom:16px;">
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-bottom:8px;">Describe your situation...</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-bottom:8px;">Describe your situation...</div>
           <textarea
             id="ai-status-input"
             placeholder="Doctor appointment at 6pm..."
@@ -1586,7 +1586,7 @@
           "><span class="material-symbols-rounded" style="font-size:0.95rem;vertical-align:-2px;">auto_awesome</span> Generate with AI</button>
 
           <div style="margin-top:10px;">
-            <div style="font-size:0.7rem;color:rgba(255,255,255,0.3);margin-bottom:6px;font-family:'Space Grotesk',sans-serif;">AI Generated Message</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-bottom:6px;font-family:'Space Grotesk',sans-serif;">AI Generated Message</div>
             <div id="ai-status-output" style="min-height:60px;padding:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:0.78rem;color:rgba(255,255,255,0.5);line-height:1.6;">
               Your generated message will appear here...
             </div>
@@ -1600,7 +1600,7 @@
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div>
               <div style="font-size:0.8rem;font-weight:600;color:#fff;">Call Forwarding</div>
-              <div style="font-size:0.7rem;color:rgba(255,255,255,0.35);">Masks your real number</div>
+              <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);">Masks your real number</div>
             </div>
             <label class="toggle-switch">
               <input type="checkbox" id="privacy-toggle" checked />
@@ -1609,7 +1609,7 @@
             </label>
           </div>
           <div style="text-align:center;padding:12px 0;">
-            <div style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-bottom:4px;">Call Forwarding is</div>
+            <div style="font-size:0.72rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">Call Forwarding is</div>
             <div style="font-family:'Space Grotesk',sans-serif;font-weight:900;font-size:1.6rem;color:#22C55E;" id="privacy-status-text">ON</div>
             <!-- Shield visual -->
             <div style="margin-top:8px;display:flex;justify-content:center;">
@@ -1626,11 +1626,11 @@
         <div class="dash-card">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
             <div>
-              <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);margin-bottom:4px;">FROM</div>
+              <div style="font-size:0.65rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">FROM</div>
               <input type="time" id="night-start" class="input-field" style="padding:7px;font-size:0.78rem;"/>
             </div>
             <div>
-              <div style="font-size:0.65rem;color:rgba(255,255,255,0.35);margin-bottom:4px;">TO</div>
+              <div style="font-size:0.65rem;color:rgba(255,255,255,0.5);margin-bottom:4px;">TO</div>
               <input type="time" id="night-end" class="input-field" style="padding:7px;font-size:0.78rem;"/>
             </div>
           </div>
@@ -1715,7 +1715,7 @@
           <span style="font-size:0.6rem;padding:2px 7px;border-radius:5px;background:rgba(168,85,247,0.12);color:#A855F7;font-weight:700;">PREVIEW</span>
         </div>
         <div class="dash-card" style="margin-bottom:16px;">
-          <div style="font-size:0.68rem;color:rgba(255,255,255,0.35);margin-bottom:10px;">Scan density by hour, last 12 weeks</div>
+          <div style="font-size:0.68rem;color:rgba(255,255,255,0.5);margin-bottom:10px;">Scan density by hour, last 12 weeks</div>
           <div id="qr-heatmap-desktop" class="heatmap-grid"></div>
         </div>
 
@@ -1956,7 +1956,7 @@
 
       if (unread > 0) {
         rows += `
-          <div class="sd-dropdown-item" onclick="SDHeader.openInbox()">
+          <div class="sd-dropdown-item" role="button" tabindex="0" onclick="SDHeader.openInbox()">
             <div class="sd-dropdown-icon" style="background:rgba(0,162,232,0.15);">💬</div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:0.82rem;font-weight:600;color:#fff;">${unread} unread message${unread === 1 ? '' : 's'}</div>
@@ -1975,7 +1975,7 @@
       const pushIconBg = state === 'granted' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)';
 
       rows += `
-        <div class="sd-dropdown-item" onclick="SDHeader.togglePush()">
+        <div class="sd-dropdown-item" role="button" tabindex="0" onclick="SDHeader.togglePush()">
           <div class="sd-dropdown-icon" style="background:${pushIconBg};">${pushIcon}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:0.82rem;font-weight:600;color:#fff;">${pushLabel}</div>
@@ -2005,17 +2005,17 @@
           </div>
         </div>
         <div class="sd-dropdown-body">
-          <div class="sd-dropdown-item" onclick="SDHeader.openSettings('${variant}')">
+          <div class="sd-dropdown-item" role="button" tabindex="0" onclick="SDHeader.openSettings('${variant}')">
             <div class="sd-dropdown-icon">⚙️</div>
             <div style="font-size:0.85rem;font-weight:600;color:#fff;">Settings</div>
           </div>
-          <div class="sd-dropdown-item" onclick="SDHeader.openSettings('${variant}')">
+          <div class="sd-dropdown-item" role="button" tabindex="0" onclick="SDHeader.openSettings('${variant}')">
             <div class="sd-dropdown-icon">👤</div>
             <div style="font-size:0.85rem;font-weight:600;color:#fff;">My Profile</div>
           </div>
         </div>
         <div class="sd-dropdown-footer">
-          <div class="sd-dropdown-item danger" onclick="SDHeader.signOut()">
+          <div class="sd-dropdown-item danger" role="button" tabindex="0" onclick="SDHeader.signOut()">
             <div class="sd-dropdown-icon" style="background:rgba(239,68,68,0.12);">🚪</div>
             <div style="font-size:0.85rem;font-weight:600;">Sign Out</div>
           </div>
