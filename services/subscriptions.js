@@ -32,13 +32,19 @@ const PLANS = {
   enterprise:  { name: 'Enterprise', price: 9999, renewal_price: 9999, features: ['Unlimited calls', '365-day history', 'AI Receptionist', 'Analytics', '20 family members', 'Dedicated Support'] },
 };
 
-// ────────── GET SUBSCRIPTION (UNCHANGED) ──────────
+// ────────── GET SUBSCRIPTION ──────────
 export async function getSubscription(ownerId) {
   const { data, error } = await supabase
     .from('subscriptions')
     .select('*')
     .eq('owner_id', ownerId)
     .eq('status', 'active')
+    // DEFENSIVE FIX: no unique constraint on (owner_id, status) — if 2+
+    // 'active' rows ever exist for one owner, .maybeSingle() alone 406s on
+    // PostgREST ("multiple rows returned"). order+limit(1) makes the
+    // newest active subscription win deterministically before the single-row fetch.
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle(); // FIX: was .single() — 0 active-subscription rows is a
                     // normal state (e.g. hardware_only owners), not an error.
                     // .single() forces a 406 from PostgREST in that case.

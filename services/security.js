@@ -5,6 +5,7 @@
 
 import { supabase } from './supabase.js';
 import { sanitize } from './sanitize.js';
+import { getUsageSummary } from './usageLimits.js';
 
 // ────────── GET SECURITY RULES ──────────
 export async function getSecurityRules(ownerId) {
@@ -71,19 +72,25 @@ export async function getFamilyMembers(ownerId) {
 // ────────── ADD FAMILY MEMBER ──────────
 // NOTE: priority 1 is reserved for the primary owner (call_logs.routed_to_priority
 // defaults to 1 for the owner's own leg — see call-status-webhook's family
-// routing fallback). Family members occupy tiers 2, 3, 4, matching the
-// Primary Owner → Member 2 → Member 3 → Member 4 routing order.
+// routing fallback). Family members occupy tiers starting at 2, in routing
+// order (Primary Owner → Member 2 → Member 3 → ...); how many tiers an
+// owner can fill is governed by their plan's family_members_limit below,
+// not a fixed number of tiers.
 export async function addFamilyMember(ownerId, { name, phone, relationship = 'family' }) {
-  // Count existing members (was previously checked against a 1-row query,
-  // which could never report more than 1 member — fixed to a real count).
-  const { count, error: countErr } = await supabase
-    .from('family_members')
-    .select('id', { count: 'exact', head: true })
-    .eq('owner_id', ownerId);
-
-  if (countErr) return { success: false, error: countErr.message };
-  if ((count || 0) >= 3) {
-    return { success: false, error: 'Maximum 3 family members allowed (tiers 2–4 after the primary owner).' };
+  // FIX: was a hardcoded ">= 3" cap regardless of plan. Now reuses the same
+  // get_usage_summary RPC that already powers the Subscription Dashboard's
+  // "family" usage bar (services/usageLimits.js → getUsageSummary), so the
+  // limit enforced here always matches the owner's current plan
+  // (Free=2 / Premium=5 / Enterprise=20 — services/plans.js, sql/46) with
+  // no duplicated plan-lookup logic and no new config.
+  const { success: usageOk, usage } = await getUsageSummary(ownerId);
+  const used  = usage?.family?.used ?? 0;
+  const limit = usageOk && usage?.family?.limit != null ? usage.family.limit : 2; // fail-safe: Free plan's limit if usage lookup fails
+  if (limit !== -1 && used >= limit) {
+    return {
+      success: false,
+      error: `Maximum ${limit} family member${limit === 1 ? '' : 's'} allowed on your current plan. Upgrade to add more.`,
+    };
   }
 
   const { data: existing } = await supabase
