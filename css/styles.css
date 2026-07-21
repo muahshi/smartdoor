@@ -443,7 +443,7 @@ body {
   box-shadow: 0 0 0 3px rgba(0,162,232,0.1);
 }
 
-.input-field::placeholder { color: rgba(255,255,255,0.3); }
+.input-field::placeholder { color: rgba(255,255,255,0.5); }
 
 /* --- Navbar --- */
 .navbar {
@@ -1048,7 +1048,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.38);
+  color: rgba(255,255,255,0.5);
 }
 
 /* --- Confidence meter (AI receptionist) --- */
@@ -1228,7 +1228,7 @@ body {
 .sd-dropdown-empty {
   padding: 28px 16px;
   text-align: center;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.5);
   font-size: 0.78rem;
 }
 
@@ -1648,7 +1648,7 @@ body {
 
 .ac-network-chip {
   font-size: 0.62rem;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.5);
   white-space: nowrap;
 }
 
@@ -2026,7 +2026,7 @@ body {
 .nc-row-title { font-size: 0.84rem; font-weight: 700; color: #fff; }
 .nc-row-unread .nc-row-title { font-weight: 800; }
 .nc-row-body { font-size: 0.76rem; color: rgba(255,255,255,0.55); margin-top: 2px; }
-.nc-row-meta { font-size: 0.68rem; color: rgba(255,255,255,0.35); margin-top: 4px; }
+.nc-row-meta { font-size: 0.68rem; color: rgba(255,255,255,0.5); margin-top: 4px; }
 
 .nc-row-delete {
   background: none;
@@ -2044,7 +2044,7 @@ body {
 .nc-empty, .nc-loading {
   text-align: center;
   padding: 40px 12px;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255,255,255,0.5);
   font-size: 0.85rem;
 }
 
@@ -2083,7 +2083,7 @@ body {
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .nc-pref-row-label { font-size: 0.82rem; color: #E2ECF4; }
-.nc-pref-hint { font-size: 0.7rem; color: rgba(255,255,255,0.35); margin-top: 6px; line-height: 1.5; }
+.nc-pref-hint { font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-top: 6px; line-height: 1.5; }
 
 .nc-mini-toggle { transform: scale(0.85); transform-origin: right center; }
 
