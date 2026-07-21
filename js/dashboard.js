@@ -2081,4 +2081,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// Accessibility: make elements with role="button" (clickable <div>s used
+// for quick actions, menu items, and dropdown items) operable via keyboard.
+// Delegated on document so it also covers items rendered later (e.g. inbox
+// menu / profile dropdown items built dynamically). Purely additive — does
+// not alter any existing onclick behavior, just triggers the same click.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+  const target = e.target.closest('[role="button"]');
+  if (!target) return;
+  // Don't interfere with native interactive elements or nested inputs.
+  if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'INPUT') return;
+  e.preventDefault();
+  target.click();
+});
+
 window.DashboardModule = DashboardModule;
