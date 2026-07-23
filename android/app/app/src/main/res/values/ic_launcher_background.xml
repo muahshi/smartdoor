@@ -1,5 +1,0 @@
-<resources>
-    <!-- Placeholder brand color for launcher icon background — swap for
-         final brand asset when a real icon is provided. -->
-    <color name="ic_launcher_background">#0F172A</color>
-</resources>
