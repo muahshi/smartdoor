@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -22,23 +23,54 @@ android {
     }
 
     // Build variants: env (dev/staging/prod) x buildType (debug/release).
-    // No base URLs / API config wired in yet — that lands in the networking phase.
-    // This dimension exists now so later phases only ADD config, not restructure Gradle.
+    // Phase A1.2: Supabase URL/anon key are injected as BuildConfig fields,
+    // sourced from environment variables at build time — same pattern the
+    // web app uses (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Nothing is
+    // hardcoded here; an empty value just means the field is unset locally.
+    // Actual project URL/anon key values live in CI secrets / local.properties,
+    // not in source control.
     flavorDimensions += "env"
     productFlavors {
         create("dev") {
             dimension = "env"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
+            buildConfigField("String", "ENVIRONMENT_NAME", "\"dev\"")
+            buildConfigField(
+                "String", "SUPABASE_URL",
+                "\"${System.getenv("SMARTDOOR_DEV_SUPABASE_URL") ?: ""}\""
+            )
+            buildConfigField(
+                "String", "SUPABASE_ANON_KEY",
+                "\"${System.getenv("SMARTDOOR_DEV_SUPABASE_ANON_KEY") ?: ""}\""
+            )
         }
         create("staging") {
             dimension = "env"
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
+            buildConfigField("String", "ENVIRONMENT_NAME", "\"staging\"")
+            buildConfigField(
+                "String", "SUPABASE_URL",
+                "\"${System.getenv("SMARTDOOR_STAGING_SUPABASE_URL") ?: ""}\""
+            )
+            buildConfigField(
+                "String", "SUPABASE_ANON_KEY",
+                "\"${System.getenv("SMARTDOOR_STAGING_SUPABASE_ANON_KEY") ?: ""}\""
+            )
         }
         create("prod") {
             dimension = "env"
             // no suffix — this is the Play Store identity
+            buildConfigField("String", "ENVIRONMENT_NAME", "\"prod\"")
+            buildConfigField(
+                "String", "SUPABASE_URL",
+                "\"${System.getenv("SMARTDOOR_PROD_SUPABASE_URL") ?: ""}\""
+            )
+            buildConfigField(
+                "String", "SUPABASE_ANON_KEY",
+                "\"${System.getenv("SMARTDOOR_PROD_SUPABASE_ANON_KEY") ?: ""}\""
+            )
         }
     }
 
@@ -69,6 +101,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -91,6 +124,21 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // Phase A1.2 — Core Infrastructure.
+    // These are configured (client provider, DI modules) but not called from
+    // any screen or business flow yet — that starts in A1.3.
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.postgrest)
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.realtime)
+    implementation(libs.ktor.client.android)
+
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.coroutines.android)
+
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.security.crypto)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
