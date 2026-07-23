@@ -4,26 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
 import dagger.hilt.android.AndroidEntryPoint
+import `in`.mysmartdoor.app.navigation.SmartDoorNavHost
+import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
 
 /**
- * Single activity for Phase A1.1.
- *
- * No navigation graph yet — this just renders a placeholder screen inside
- * the Material 3 theme, proving Compose + Hilt + theming are wired
- * correctly end to end. In a later phase this becomes the NavHost
- * container once Navigation-Compose is introduced.
+ * Single activity for the whole app. Phase A1.1 rendered a static
+ * placeholder Scaffold here to prove Compose + Hilt + theming worked
+ * end to end; Phase A1.3 replaces that placeholder with the real
+ * navigation graph ([SmartDoorNavHost]). No other change to this file —
+ * it stays a thin host for the theme + nav graph and picks up new
+ * screens automatically as they're added to the graph in later phases.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -32,33 +27,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SmartDoorTheme {
-                SmartDoorScaffoldPlaceholder()
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    SmartDoorNavHost()
+                }
             }
         }
-    }
-}
-
-@Composable
-private fun SmartDoorScaffoldPlaceholder() {
-    Scaffold { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "SmartDoor — Project Scaffold Ready",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun SmartDoorScaffoldPlaceholderPreview() {
-    SmartDoorTheme {
-        SmartDoorScaffoldPlaceholder()
     }
 }

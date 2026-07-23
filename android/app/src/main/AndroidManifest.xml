@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- No permissions declared in A1.1. Camera, mic, notifications, etc.
-         are added in the phases that actually implement those features. -->
+    <!-- Phase A1.2: INTERNET is the only permission needed for the network
+         client (Supabase/Ktor) to compile and operate. Camera, mic,
+         notifications, etc. are added in the phases that actually
+         implement those features. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".SmartDoorApplication"

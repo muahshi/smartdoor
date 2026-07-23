@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">SmartDoor</string>
+
+    <!-- Phase A1.3 — App shell & navigation foundation. -->
+    <string name="nav_back">Back</string>
 </resources>
