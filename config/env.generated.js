@@ -1,2 +1,2 @@
-# This file is auto-generated at build time
-# See scripts/build-env.js
+// This file is auto-generated at build time
+// See scripts/build-env.js
