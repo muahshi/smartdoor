@@ -209,17 +209,40 @@ RULES:
     _busy = true;
     renderLog();
 
+    // Phase 3.1B: analytics only — never awaited, never affects the chat
+    // flow below. See js/aiConsultantAnalytics.js.
+    const _startedAt = (global.performance && global.performance.now) ? global.performance.now() : Date.now();
+
     const result = await askConsultant(trimmed);
     _busy = false;
 
+    const _latencyMs = ((global.performance && global.performance.now) ? global.performance.now() : Date.now()) - _startedAt;
+
     if (result.ok) {
       _history.push({ role: 'assistant', content: result.content });
+      if (global.AIConsultantAnalytics) {
+        global.AIConsultantAnalytics.trackMessageSent(_latencyMs, trimmed);
+        const mentioned = _mentionedProductKey(result.content);
+        if (mentioned) global.AIConsultantAnalytics.trackRecommendationShown(mentioned);
+      }
     } else if (result.rateLimited) {
       _history.push({ role: 'assistant', content: `We're getting a lot of questions right now — please wait a few seconds and try again, or email ${(global.SD_ConsultantKB?.brand?.supportEmail) || 'support@mysmartdoor.in'}.` });
+      if (global.AIConsultantAnalytics) global.AIConsultantAnalytics.trackMessageError();
     } else {
       _history.push({ role: 'assistant', content: `I'm having trouble connecting right now. You can reach our team directly at ${(global.SD_ConsultantKB?.brand?.supportEmail) || 'support@mysmartdoor.in'}, or browse the products below.` });
+      if (global.AIConsultantAnalytics) global.AIConsultantAnalytics.trackMessageError();
     }
     renderLog();
+  }
+
+  /** Best-effort detection of which catalog product (if any) the assistant's reply
+   * recommended, purely for the "recommendations shown" analytics counter — never
+   * used to alter the reply itself. */
+  function _mentionedProductKey(replyText) {
+    const products = (global.SD_Catalog && global.SD_Catalog.products) || [];
+    const lower = (replyText || '').toLowerCase();
+    const hit = products.find((p) => p.name && lower.includes(String(p.name).toLowerCase()));
+    return hit ? hit.key : null;
   }
 
   function bind() {
@@ -230,7 +253,14 @@ RULES:
     const chips = _root.querySelectorAll('.ai-consult-chip');
     const ctas = _root.querySelectorAll('.ai-consult-cta');
 
-    bubble.addEventListener('click', () => { _open = !_open; render(); if (_open) input && input.focus(); });
+    bubble.addEventListener('click', () => {
+      _open = !_open;
+      render();
+      if (_open) {
+        input && input.focus();
+        if (global.AIConsultantAnalytics) global.AIConsultantAnalytics.trackSessionStart();
+      }
+    });
     if (closeBtn) closeBtn.addEventListener('click', () => { _open = false; render(); });
     if (form) form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -239,7 +269,11 @@ RULES:
       handleUserMessage(val);
     });
     chips.forEach((chip) => chip.addEventListener('click', () => handleUserMessage(chip.textContent)));
-    ctas.forEach((cta) => cta.addEventListener('click', () => goToProduct(cta.getAttribute('data-key'))));
+    ctas.forEach((cta) => cta.addEventListener('click', () => {
+      const key = cta.getAttribute('data-key');
+      if (global.AIConsultantAnalytics) global.AIConsultantAnalytics.trackConfigureClick(key);
+      goToProduct(key);
+    }));
   }
 
   function init() {

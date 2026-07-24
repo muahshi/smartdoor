@@ -84,6 +84,26 @@ function injectPhase13UI() {
         <h3>Fulfillment Pipeline</h3>
         <div id="pipeline-bars"></div>
       </div>
+
+      <!-- ════ AI CONSULTANT ANALYTICS (Phase 3.1B — additive, does not touch cards above) ════ -->
+      <div id="ai-consultant-analytics" style="margin-top:32px">
+        <h3>🤖 AI Product Consultant — Last 30 Days</h3>
+        <div id="ai-consultant-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin:16px 0">
+          <div class="kpi-card" id="kpi-ai-sessions-started"><div class="kpi-value">—</div><div class="kpi-label">Sessions Started</div></div>
+          <div class="kpi-card" id="kpi-ai-sessions-completed"><div class="kpi-value">—</div><div class="kpi-label">Sessions Completed (Configured)</div></div>
+          <div class="kpi-card" id="kpi-ai-conversation-length"><div class="kpi-value">—</div><div class="kpi-label">Avg Conversation Length</div></div>
+          <div class="kpi-card" id="kpi-ai-recommendations"><div class="kpi-value">—</div><div class="kpi-label">Recommendations Shown</div></div>
+          <div class="kpi-card" id="kpi-ai-configure-clicks"><div class="kpi-value">—</div><div class="kpi-label">Configure Clicks</div></div>
+          <div class="kpi-card" id="kpi-ai-latency"><div class="kpi-value">—</div><div class="kpi-label">Avg AI Latency</div></div>
+          <div class="kpi-card" id="kpi-ai-error-rate"><div class="kpi-value" style="color:#ef4444">—</div><div class="kpi-label">Error Rate</div></div>
+          <div class="kpi-card" id="kpi-ai-abandonment"><div class="kpi-value" style="color:#f59e0b">—</div><div class="kpi-label">Abandonment Rate</div></div>
+        </div>
+        <h4>Conversion Funnel</h4>
+        <div id="ai-consultant-funnel-bars"></div>
+        <h4 style="margin-top:20px">Top Questions</h4>
+        <div id="ai-consultant-top-questions" style="font-size:13px;color:#9ca3af"></div>
+        <div id="ai-consultant-error" style="color:#ef4444;display:none;margin-top:8px"></div>
+      </div>
     </div>
 
     <!-- ════ BULK PROVISION PANEL ════ -->
@@ -252,6 +272,75 @@ async function loadAnalytics() {
       </div>`;
     }).join('');
   }
+
+  // Independent call/render — a failure here must never blank the KPI
+  // cards or pipeline above.
+  loadAIConsultantAnalytics();
+}
+
+// ────────────────────────────────────────────────
+// AI CONSULTANT ANALYTICS (Phase 3.1B — additive)
+// ────────────────────────────────────────────────
+async function loadAIConsultantAnalytics() {
+  const errEl = document.getElementById('ai-consultant-error');
+  if (errEl) errEl.style.display = 'none';
+
+  const res = await callAdmin('admin-analytics', { type: 'ai_consultant_funnel', days: 30 });
+
+  if (!res.success || !res.funnel) {
+    if (errEl) {
+      errEl.textContent = res.error || 'Failed to load AI consultant analytics.';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
+
+  const f = res.funnel;
+  const set = (id, val) => {
+    const el = document.querySelector(`#${id} .kpi-value`);
+    if (el) el.textContent = val;
+  };
+
+  set('kpi-ai-sessions-started', f.sessions_started ?? 0);
+  set('kpi-ai-sessions-completed', f.sessions_completed ?? 0);
+  set('kpi-ai-conversation-length', f.avg_conversation_length ?? 0);
+  set('kpi-ai-recommendations', f.recommendations_shown ?? 0);
+  set('kpi-ai-configure-clicks', f.configure_clicks ?? 0);
+  set('kpi-ai-latency', `${f.avg_latency_ms ?? 0}ms`);
+  set('kpi-ai-error-rate', `${Math.round((f.error_rate ?? 0) * 100)}%`);
+  set('kpi-ai-abandonment', `${Math.round((f.abandonment_rate ?? 0) * 100)}%`);
+
+  const funnelContainer = document.getElementById('ai-consultant-funnel-bars');
+  if (funnelContainer && f.funnel) {
+    const stages = [
+      ['opened', 'Opened Widget'],
+      ['messaged', 'Sent a Message'],
+      ['recommended', 'Got a Recommendation'],
+      ['configured', 'Clicked Configure'],
+    ];
+    const max = Math.max(1, ...stages.map(([k]) => f.funnel[k] || 0));
+    funnelContainer.innerHTML = stages.map(([k, label]) => {
+      const count = f.funnel[k] || 0;
+      const pct = Math.round((count / max) * 100);
+      return `<div class="pipeline-bar">
+        <div class="pipeline-bar-label">${label}</div>
+        <div class="pipeline-bar-track"><div class="pipeline-bar-fill" style="width:${pct}%"></div></div>
+        <div class="pipeline-bar-count">${count}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const questionsContainer = document.getElementById('ai-consultant-top-questions');
+  if (questionsContainer) {
+    const questions = f.top_questions || [];
+    questionsContainer.innerHTML = questions.length
+      ? questions.map(q => `<div>“${escapeHtmlAdmin(q.question_text)}” — asked ${q.times_asked}×</div>`).join('')
+      : '<div>No repeated questions yet.</div>';
+  }
+}
+
+function escapeHtmlAdmin(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 // ────────────────────────────────────────────────
