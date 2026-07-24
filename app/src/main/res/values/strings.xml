@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">SmartDoor</string>
+
+    <!-- Phase A1.3 — App shell & navigation foundation. -->
+    <string name="nav_back">Back</string>
+
+    <!-- Phase A1.4 — Login UI foundation (presentation layer only). -->
+    <string name="login_title">Welcome to SmartDoor</string>
+
+    <!-- Phase A1.5 — swapped from the phone/OTP placeholder to the real
+         Owner Login fields (Plate ID + 4-digit PIN), matching login.html
+         and the verify-pin Edge Function on the production website. -->
+    <string name="login_subtitle">Enter your Plate ID and 4-digit PIN to access your dashboard</string>
+    <string name="login_plate_id_label">Plate ID</string>
+    <string name="login_plate_id_placeholder">SD-ABX9K7</string>
+    <string name="login_plate_id_hint">Found on your Smart Door nameplate or welcome email</string>
+    <string name="login_plate_id_input_description">Plate ID input field</string>
+    <string name="login_pin_label">4-Digit PIN</string>
+    <string name="login_pin_input_description">4-digit PIN input field</string>
+    <string name="login_remember_device">Remember this device for 30 days</string>
+    <string name="login_continue_button">Login to Dashboard</string>
+    <string name="login_continue_loading_description">Logging in, please wait</string>
+    <string name="login_terms_notice">By continuing, you agree to SmartDoor\'s Terms of Service and Privacy Policy.</string>
+</resources>
