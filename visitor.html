@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="Smart Door — Visitor Experience" />
+  <meta name="description" content="My Smart Door — Visitor Experience" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#060d1a" />
-  <title>Smart Door</title>
+  <title>My Smart Door</title>
   <link rel="icon" href="/images/favicon.ico" />
   <link rel="apple-touch-icon" href="/images/favicon-192x192.png" />
   <base href="/" />
@@ -478,7 +478,7 @@
 <div class="shell" id="shell">
   <div class="loading-wrap" id="loading-state">
     <div class="spinner"></div>
-    <div style="font-size:0.8rem;color:rgba(255,255,255,0.35);margin-top:4px;">Loading Smart Door…</div>
+    <div style="font-size:0.8rem;color:rgba(255,255,255,0.35);margin-top:4px;">Loading My Smart Door…</div>
   </div>
 </div>
 
@@ -611,7 +611,7 @@
       'Known Guest / Family': 'Swagat hai! Maalik ko aapke aane ki soochana de di gayi hai. Kripya thoda pratiksha karein.',
       'General Visitor':  'Aapka swagat hai! Maalik ko soochana de di gayi hai. Kripya thodi der pratiksha karein.',
     };
-    return map[intent] || 'Namaste! Aapka Smart Door mein swagat hai. Maalik ko soochana de di gayi hai.';
+    return map[intent] || 'Namaste! Aapka My Smart Door mein swagat hai. Maalik ko soochana de di gayi hai.';
   }
 
   initVoice();
@@ -755,7 +755,7 @@
         if (convId) {
           sendConvMessage({
             conversationId: convId, ownerId: plate.owner_id, plateId: plate.plate_id,
-            senderType: 'system', text: '📲 Visitor opened the Smart Door page (QR scan)',
+            senderType: 'system', text: '📲 Visitor opened the My Smart Door page (QR scan)',
           }).catch(() => {});
         }
         _triggerPush(plate.owner_id, plate.plate_id, 'qr_scan', rowId, convId);
@@ -780,8 +780,8 @@
       <div class="pending-wrap">
         <div class="pending-icon">🚪</div>
         <div class="pending-title" style="color:#f87171;">Plate Not Found</div>
-        <div class="pending-sub">This Smart Door plate doesn't exist. Please check the QR code or contact support.</div>
-        <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
+        <div class="pending-sub">This My Smart Door plate doesn't exist. Please check the QR code or contact support.</div>
+        <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ MY SMART DOOR</div>
       </div>`;
   }
 
@@ -790,8 +790,8 @@
       <div class="pending-wrap">
         <div class="pending-icon">⏸️</div>
         <div class="pending-title" style="color:#f59e0b;">Temporarily Suspended</div>
-        <div class="pending-sub">This Smart Door plate has been temporarily suspended. Contact my Smart Door for more information.</div>
-        <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ SMART DOOR</div>
+        <div class="pending-sub">This My Smart Door plate has been temporarily suspended. Contact My Smart Door support for more information.</div>
+        <div style="margin-top:36px;font-size:0.6rem;color:rgba(255,255,255,0.15);font-family:'Space Grotesk',sans-serif;letter-spacing:2px;">⊙ MY SMART DOOR</div>
       </div>`;
   }
 
@@ -834,7 +834,7 @@
         <div class="sd-logo-wrap">
           <div class="sd-logo-icon">🔒</div>
           <div class="sd-logo-text">
-            <div class="sd-logo-name">SMART DOOR</div>
+            <div class="sd-logo-name">MY SMART DOOR</div>
             <div class="sd-logo-tagline">Home Privacy. Smarter Living.</div>
           </div>
         </div>
@@ -951,7 +951,7 @@
         <div class="footer-lock">
           🔒 Your privacy is our priority. Secure. Encrypted. Private.
         </div>
-        <div class="footer-powered">⊙ Smart Door · Home Privacy · Smarter Living</div>
+        <div class="footer-powered">⊙ My Smart Door · Home Privacy · Smarter Living</div>
       </div>
     `;
 
@@ -1213,7 +1213,7 @@
         const isRepeat    = historyLen > 1;
         const isReturning = !!document.querySelector('[data-returning="true"]');
 
-        const systemPrompt = `You are ${aiName}, a warm and professional AI receptionist for Smart Door — a premium home privacy system deployed at the residence of "${ownerLabel}" in India.
+        const systemPrompt = `You are ${aiName}, a warm and professional AI receptionist for My Smart Door — a premium home privacy system deployed at the residence of "${ownerLabel}" in India.
 
 CURRENT CONTEXT:
 - Time: ${timeOfDay} (${hour}:00), ${dayName}${isWeekend ? ' (weekend)' : ''}

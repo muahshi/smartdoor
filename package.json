@@ -2,7 +2,7 @@
   "name": "smartdoor",
   "version": "1.0.0",
   "private": true,
-  "description": "Smart Door — Home Privacy OS",
+  "description": "My Smart Door — Home Privacy OS",
   "scripts": {
     "build": "node scripts/build-env.js",
     "dev": "node scripts/build-env.js && npx serve . -p 3000",

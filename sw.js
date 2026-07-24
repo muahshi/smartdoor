@@ -1,4 +1,4 @@
-// Smart Door Service Worker v2.0 — PWA Polish
+// My Smart Door Service Worker v2.0 — PWA Polish
 // v2.0: Premium PWA notifications — high priority, rich actions, badge count,
 //       louder doorbell sound trigger, strong vibration.
 const CACHE_NAME = 'smartdoor-v10'; // bumped: force-purge stale cached JS from the jsdelivr→vendor supabase-js hotfix
@@ -158,7 +158,7 @@ self.addEventListener('push', (event) => {
       ? [300, 100, 300]
       : [200];
 
-  const title = data.title || (isSOS ? '🚨 SOS EMERGENCY!' : '🔔 Smart Door Alert');
+  const title = data.title || (isSOS ? '🚨 SOS EMERGENCY!' : '🔔 My Smart Door Alert');
 
   // FIX (notification pipeline audit): this used to tag every doorbell-type
   // push ('bell_ring', 'visitor_scan', 'sos') with the SAME fixed string
@@ -304,4 +304,4 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-console.log('[SW] Smart Door v2.0 loaded');
+console.log('[SW] My Smart Door v2.0 loaded');

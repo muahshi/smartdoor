@@ -1,8 +1,8 @@
-# Smart Door
+# My Smart Door
 
-> India's 1st Smart Nameplate System. Smart Door hides a homeowner's real phone number from delivery agents, strangers, salespeople, and unwanted callers, while giving visitors a premium digital intercom experience through a QR code on the nameplate — powered by an AI receptionist, smart call routing, and cloud calling.
+> India's 1st Smart Nameplate System. My Smart Door hides a homeowner's real phone number from delivery agents, strangers, salespeople, and unwanted callers, while giving visitors a premium digital intercom experience through a QR code on the nameplate — powered by an AI receptionist, smart call routing, and cloud calling.
 
-Smart Door is built and founded by Mubashir Hasan, an AI Systems Architect based in Bhopal, Madhya Pradesh, India.
+My Smart Door is built and founded by Mubashir Hasan, an AI Systems Architect based in Bhopal, Madhya Pradesh, India.
 
 Key facts:
 - Product: Smart Nameplate (QR-based digital intercom + number-masking system)

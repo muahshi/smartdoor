@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Door — Activate Your Plate</title>
+  <title>My Smart Door — Activate Your Plate</title>
   <link rel="icon" href="/images/favicon.ico" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -78,7 +78,7 @@
 <div class="card">
   <div class="logo">
     <svg width="28" height="28" viewBox="0 0 40 40"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00D4FF"/><stop offset="100%" style="stop-color:#0060B0"/></linearGradient></defs><path d="M20 4 L33 11 L33 22 Q33 31 20 35 Q7 31 7 22 L7 11 Z" fill="url(#g1)" opacity=".9"/><circle cx="20" cy="18" r="4" fill="rgba(0,0,0,.55)"/><rect x="18" y="21.5" width="4" height="6" rx="1.5" fill="rgba(0,0,0,.55)"/></svg>
-    <div><div class="logo-text">SMART DOOR</div><div class="logo-sub">HOME PRIVACY OS</div></div>
+    <div><div class="logo-text">MY SMART DOOR</div><div class="logo-sub">HOME PRIVACY OS</div></div>
   </div>
 
   <!-- STEP 0: Loading / Token Verification -->
@@ -90,7 +90,7 @@
   <!-- STEP 1: Basic Info -->
   <div class="step" id="step-info">
     <h1>Welcome! 🎉</h1>
-    <p class="sub">Your payment is confirmed. Let's set up your Smart Door account. Your plate ID is <strong id="display-plate-id" style="color:#00A2E8;"></strong>.</p>
+    <p class="sub">Your payment is confirmed. Let's set up your My Smart Door account. Your plate ID is <strong id="display-plate-id" style="color:#00A2E8;"></strong>.</p>
     <div class="err" id="err-info"></div>
     <label>Your Full Name *</label>
     <input id="ob-name" type="text" placeholder="e.g. Rahul Sharma" autocomplete="name" />
@@ -104,7 +104,7 @@
   <!-- STEP 2: PIN Setup -->
   <div class="step" id="step-pin">
     <h1>Set Your PIN</h1>
-    <p class="sub">Choose a 4-digit PIN to log in to your Smart Door dashboard.</p>
+    <p class="sub">Choose a 4-digit PIN to log in to your My Smart Door dashboard.</p>
     <div class="err" id="err-pin"></div>
     <label>Create PIN (4 digits)</label>
     <div class="pin-row"><input id="ob-pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" /></div>
@@ -128,7 +128,7 @@
   <div class="step" id="step-done">
     <div class="success-icon">🏠</div>
     <h1 style="text-align:center;">You're Live!</h1>
-    <p class="sub" style="text-align:center;">Your Smart Door is being manufactured. Once it arrives, scan the QR to activate it.</p>
+    <p class="sub" style="text-align:center;">Your My Smart Door is being manufactured. Once it arrives, scan the QR to activate it.</p>
     <p style="text-align:center; color:rgba(255,255,255,.35); font-size:.8rem; margin-bottom:28px;" id="done-plate-id"></p>
     <button class="btn" onclick="window.location.href='/login'">Go to Dashboard →</button>
   </div>
