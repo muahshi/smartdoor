@@ -33,23 +33,24 @@ export const corsHeaders = {
 };
 
 /**
+ * Whether `origin` is one of our known frontends (production, dev, or a
+ * Vercel preview URL). Factored out of restrictedCors() (Phase 3.1A) so
+ * functions that need to actually REJECT a disallowed origin — not just
+ * pick response headers — can reuse the same allow-list instead of
+ * re-implementing it. restrictedCors() below is unchanged in behavior.
+ */
+export function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if ([...PRODUCTION_ORIGINS, ...DEV_ORIGINS].includes(origin)) return true;
+  return VERCEL_PREVIEW_PATTERN.test(origin);
+}
+
+/**
  * Restricted CORS — auth, payment, admin functions.
  * Allows production domains + dev origins + Vercel preview URLs.
  */
 export function restrictedCors(origin: string | null): Record<string, string> {
-  let isAllowed = false;
-
-  if (origin) {
-    // Check exact string matches first
-    if ([...PRODUCTION_ORIGINS, ...DEV_ORIGINS].includes(origin)) {
-      isAllowed = true;
-    }
-    // Check Vercel preview pattern
-    else if (VERCEL_PREVIEW_PATTERN.test(origin)) {
-      isAllowed = true;
-    }
-  }
-
+  const isAllowed = isAllowedOrigin(origin);
   const allowedOrigin = isAllowed ? origin! : PRODUCTION_ORIGINS[0];
 
   return {

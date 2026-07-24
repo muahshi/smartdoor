@@ -467,6 +467,7 @@
 <div class="bg-layer"></div>
 
 <script src="config/env.generated.js?v=2"></script>
+<script src="js/aiSessionClient.js"></script>
 <script type="module" src="js/monitoring-bootstrap.js"></script>
 <!-- TEMPORARY — forensic debug overlay for third-party-visitor WebRTC
      signaling investigation. Enabled only via ?debug=1 or
@@ -1250,9 +1251,15 @@ LANGUAGE:
 Always reply ONLY with this valid JSON (no markdown, no backticks):
 {"intent":"<classified intent>","priority":"Low|Normal|High|Critical","action":"Leave Message|Notify Owner|Ring Bell + Notify|Bypass All Rules|Blocked","color":"#hex","emoji":"<single emoji>","response":"<English 1-2 sentences>","hinglish_response":"<Hinglish Roman 1-2 sentences>","hindi_tts":"<pure Devanagari for TTS, no Roman>","confidence":0.9,"suggest_action":"bell|text|voice|call|none"}`;
 
+        // Phase 3.1A: groq-proxy now requires a short-lived AI session
+        // token — see js/aiSessionClient.js (loaded classic-script above).
+        const aiHeaders = window.AISessionClient
+          ? await window.AISessionClient.groqHeaders()
+          : { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` };
+
         const res = await fetch(`${supabaseUrl}/functions/v1/groq-proxy`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` },
+          headers: aiHeaders,
           body: JSON.stringify({
             // FIX (stabilization audit): llama3-70b-8192 was decommissioned by
             // Groq — every call to groq-proxy was failing and silently falling

@@ -99,9 +99,16 @@ Respond in the visitor's language (Hindi/Hinglish if they spoke Hindi/Hinglish, 
     // Live voice-turn latency budget: bounded so a stalled request falls
     // back to _fallbackTurn() (below) instead of leaving the visitor's
     // voice receptionist silently stuck mid-conversation.
+    // Phase 3.1A: groq-proxy now requires a short-lived AI session token —
+    // see js/aiSessionClient.js, loaded classic-script before this module
+    // on visitor.html so window.AISessionClient exists here.
+    const headers = window.AISessionClient
+      ? await window.AISessionClient.groqHeaders()
+      : { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+
     const res = await fetchWithTimeout(`${url}/functions/v1/groq-proxy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      headers,
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         max_tokens: 300,

@@ -50,13 +50,17 @@ const GroqService = (() => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), CONFIG.timeout);
 
+      // Phase 3.1A: groq-proxy now requires a short-lived AI session
+      // token (see js/aiSessionClient.js) — falls back to the base
+      // headers if the client script isn't loaded on this page, in
+      // which case the proxy will reject with 401 same as before.
+      const headers = window.AISessionClient
+        ? await window.AISessionClient.groqHeaders()
+        : { 'Content-Type': 'application/json', 'apikey': CONFIG.anonKey, 'Authorization': `Bearer ${CONFIG.anonKey}` };
+
       const response = await fetch(CONFIG.proxyUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': CONFIG.anonKey,
-          'Authorization': `Bearer ${CONFIG.anonKey}`,
-        },
+        headers,
         body: JSON.stringify({
           model: mergedOptions.model,
           messages: messages,

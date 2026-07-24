@@ -22,9 +22,11 @@
  *     product.html, or navigates to the existing /products/<key> route
  *     (see js/productsPage.js) — the same route the catalog cards already use.
  *
- * SECURITY NOTE: groq-proxy is now reachable from an anonymous public page.
- * See supabase/functions/groq-proxy/index.ts for the IP rate limit added
- * alongside this file — do not ship this widget without that change deployed.
+ * SECURITY NOTE: groq-proxy is reachable from an anonymous public page.
+ * See supabase/functions/groq-proxy/index.ts for the IP rate limit, and
+ * (Phase 3.1A) js/aiSessionClient.js for the AI session token this widget
+ * now attaches to every call — do not ship this widget without
+ * aiSessionClient.js loaded before it on the page.
  */
 (function (global) {
   'use strict';
@@ -106,13 +108,14 @@ RULES:
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
+      // Phase 3.1A: groq-proxy now requires a short-lived AI session
+      // token — see js/aiSessionClient.js (loaded alongside this file).
+      const headers = global.AISessionClient
+        ? await global.AISessionClient.groqHeaders()
+        : { 'Content-Type': 'application/json', 'apikey': anonKey(), 'Authorization': `Bearer ${anonKey()}` };
       const res = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': anonKey(),
-          'Authorization': `Bearer ${anonKey()}`,
-        },
+        headers,
         body: JSON.stringify({ model: MODEL, messages, max_tokens: MAX_TOKENS, temperature: 0.6 }),
         signal: controller.signal,
       });

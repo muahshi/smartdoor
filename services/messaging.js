@@ -376,9 +376,17 @@ export async function getAISuggestedReplies({ lastVisitorText, intent }) {
     // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js.
     // Bounded shorter here (8s) since this feeds a UI suggestion chip and
     // has a static fallback ready — no reason to make the owner wait long.
+    // Phase 3.1A: groq-proxy now requires a short-lived AI session token —
+    // see js/aiSessionClient.js. This module is used from app.html (owner
+    // dashboard, classic-script-loaded there), so window.AISessionClient
+    // is expected to exist; falls back to base headers if not.
+    const headers = window.AISessionClient
+      ? await window.AISessionClient.groqHeaders()
+      : { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+
     const res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/groq-proxy`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      headers,
       body: JSON.stringify({
         model: 'llama-3.1-8b-instant',
         max_tokens: 120,
@@ -418,10 +426,27 @@ export async function generateAISummary(conversationId, ownerId, plateId) {
     let summary = null;
 
     if (supabaseUrl && anonKey) {
+      // Phase 3.1A: groq-proxy now caps combined message content at 16000
+      // chars (request-shape validation, see supabase/functions/groq-proxy/
+      // index.ts) — a 100-message transcript could exceed that. Trim to the
+      // most recent content rather than let a long-lived conversation's
+      // summary silently start failing; a summary doesn't need the full
+      // verbatim history anyway.
+      const MAX_TRANSCRIPT_CHARS = 8000;
+      const boundedTranscript = transcript.length > MAX_TRANSCRIPT_CHARS
+        ? '...(earlier messages trimmed)...\n' + transcript.slice(-MAX_TRANSCRIPT_CHARS)
+        : transcript;
+
+      // groq-proxy now requires a short-lived AI session token — see
+      // js/aiSessionClient.js.
+      const headers = window.AISessionClient
+        ? await window.AISessionClient.groqHeaders()
+        : { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+
       // PRODUCTION HARDENING (API timeout consistency) — see services/httpClient.js
       const res = await fetchWithTimeout(`${supabaseUrl}/functions/v1/groq-proxy`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+        headers,
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
           max_tokens: 150,
@@ -431,7 +456,7 @@ export async function generateAISummary(conversationId, ownerId, plateId) {
               role: 'system',
               content: 'Summarize this door-visitor conversation in 1-3 short lines for a busy homeowner. Include what the visitor wanted, what happened, and conversation duration if inferable. Plain text, no markdown.',
             },
-            { role: 'user', content: transcript },
+            { role: 'user', content: boundedTranscript },
           ],
         }),
       }, 12000);

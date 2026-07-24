@@ -120,9 +120,16 @@ Additional notes: ${freeText || 'n/a'}`;
       // services/httpClient.js. Callers already treat any thrown error as
       // "fall back to the non-AI path" (see the catch block below), so a
       // bounded timeout makes that fallback actually reachable.
+      // Phase 3.1A: groq-proxy now requires a short-lived AI session
+      // token — see js/aiSessionClient.js, loaded classic-script before
+      // this module on visitor.html so window.AISessionClient exists here.
+      const headers = window.AISessionClient
+        ? await window.AISessionClient.groqHeaders()
+        : { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+
       const res = await fetchWithTimeout(`${url}/functions/v1/groq-proxy`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+        headers,
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           max_tokens: 220,
