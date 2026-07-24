@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smart Door — Production Smoke Test
+ * My Smart Door — Production Smoke Test
  * scripts/smoke-test.js
  *
  * Phase 12 — Launch Readiness & Production Certification

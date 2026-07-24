@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Smart Door — Build-Time Environment Injection
+ * My Smart Door — Build-Time Environment Injection
  * scripts/build-env.js
  *
  * Phase 10 — Production Launch
  *
- * Smart Door has NO bundler (no Vite/Webpack/Next). All HTML pages load
+ * My Smart Door has NO bundler (no Vite/Webpack/Next). All HTML pages load
  * plain ES modules directly. That means `import.meta.env` in
  * config/environment.js NEVER resolves in the browser — it silently fell
  * back to development config in production.
@@ -233,7 +233,7 @@ const swOutput = firebaseFullyConfigured
 // Standard Firebase Web Push service worker
 // (https://firebase.google.com/docs/cloud-messaging/js/receive).
 //
-// NOTE: Smart Door does NOT register this file as its active service
+// NOTE: My Smart Door does NOT register this file as its active service
 // worker — services/push.js passes getToken() the existing /sw.js
 // registration instead, so sw.js's own 'push' listener (which already
 // renders every notification type this app sends, with actions/vibration/
@@ -253,7 +253,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const data  = payload.data || {};
-  const title = payload.notification?.title || data.title || '🔔 Smart Door Alert';
+  const title = payload.notification?.title || data.title || '🔔 My Smart Door Alert';
   const body  = payload.notification?.body  || data.body  || 'Someone is at your door!';
   self.registration.showNotification(title, {
     body,

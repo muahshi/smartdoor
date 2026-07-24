@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Smart Door — Production Config Validator
+ * My Smart Door — Production Config Validator
  * scripts/validate-production-config.js
  *
  * Phase 12 — Launch Readiness & Production Certification
