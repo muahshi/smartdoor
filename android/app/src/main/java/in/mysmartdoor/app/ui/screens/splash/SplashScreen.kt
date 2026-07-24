@@ -8,24 +8,41 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
+import kotlinx.coroutines.delay
 import `in`.mysmartdoor.app.R
+import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.SmartDoorScaffold
 import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
 
 /**
- * App entry screen. Purely presentational in A1.3 — it does not check auth
- * state or navigate anywhere on its own, because no session/auth check is
- * wired to the UI yet (that lands with the Login/Dashboard phases). Once it
- * does, this screen becomes the place that decides Routes.LOGIN vs
- * Routes.DASHBOARD as its start-up effect.
+ * App entry screen. In A1.3 this was purely presentational with nowhere to
+ * navigate to. Phase A1.4 adds the one piece of navigation this brief
+ * mandates — Splash to Login — as a plain timed transition, still with no
+ * auth/session check involved (that decision, Routes.LOGIN vs
+ * Routes.DASHBOARD, is a later phase; for now Login is unconditionally the
+ * next screen).
+ *
+ * [navController] is nullable so the Preview below can keep rendering the
+ * screen with no navigation graph attached.
  */
 @Composable
-fun SplashScreen() {
+fun SplashScreen(navController: NavHostController? = null) {
+    LaunchedEffect(navController) {
+        if (navController != null) {
+            delay(SPLASH_DISPLAY_DURATION_MS)
+            navController.navigate(Routes.LOGIN) {
+                popUpTo(Routes.SPLASH) { inclusive = true }
+            }
+        }
+    }
+
     SmartDoorScaffold { innerPadding ->
         Box(
             modifier = Modifier
@@ -48,6 +65,9 @@ fun SplashScreen() {
         }
     }
 }
+
+/** How long Splash stays visible before handing off to Login. */
+private const val SPLASH_DISPLAY_DURATION_MS = 1200L
 
 @Preview(showBackground = true)
 @Composable

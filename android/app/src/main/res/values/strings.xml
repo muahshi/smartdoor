@@ -3,4 +3,14 @@
 
     <!-- Phase A1.3 — App shell & navigation foundation. -->
     <string name="nav_back">Back</string>
+
+    <!-- Phase A1.4 — Login UI foundation (presentation layer only). -->
+    <string name="login_title">Welcome to SmartDoor</string>
+    <string name="login_subtitle">Enter your mobile number to continue</string>
+    <string name="login_phone_label">Mobile number</string>
+    <string name="login_phone_placeholder">98765 43210</string>
+    <string name="login_phone_input_description">Mobile number input field</string>
+    <string name="login_continue_button">Continue</string>
+    <string name="login_continue_loading_description">Continuing, please wait</string>
+    <string name="login_terms_notice">By continuing, you agree to SmartDoor\'s Terms of Service and Privacy Policy.</string>
 </resources>
