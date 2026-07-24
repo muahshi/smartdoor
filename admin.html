@@ -637,6 +637,9 @@
     <div class="nav-item" data-panel="financial" data-resource="analytics" onclick="switchPanel('financial', this)">
       <span class="nav-icon">💰</span> Financial
     </div>
+    <div class="nav-item" data-panel="aiInsights" data-resource="analytics" onclick="switchPanel('aiInsights', this)">
+      <span class="nav-icon">🤖</span> AI Insights
+    </div>
   </div>
 
   <div class="sidebar-section">
@@ -1230,6 +1233,73 @@
         <div class="card">
           <div class="card-header"><span class="card-title">Subscription Plans</span></div>
           <div class="chart-container"><canvas id="planChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ AI INSIGHTS PANEL (Phase 3.2 — additive, does not touch Analytics/Financial panels above) ══════════ -->
+    <div class="panel" id="panel-aiInsights">
+      <div class="section-header">
+        <span class="section-title">🤖 AI Product Consultant — Insights</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="aiInsightsDays" class="form-input" style="width:auto;padding:6px 10px;font-size:12px" onchange="loadAIInsights()">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAIInsights()">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <div class="metric-grid" id="aiInsightsMetricGrid">
+        <div class="metric-card"><div class="metric-label">Total AI Conversations</div><div class="metric-value" id="ai-total-conversations">—</div></div>
+        <div class="metric-card"><div class="metric-label">AI Conversion Rate</div><div class="metric-value" id="ai-conversion-rate">—</div></div>
+        <div class="metric-card"><div class="metric-label">Configure Button CTR</div><div class="metric-value" id="ai-cta-ctr">—</div></div>
+        <div class="metric-card"><div class="metric-label">Conversation Completion Rate</div><div class="metric-value" id="ai-completion-rate">—</div></div>
+        <div class="metric-card"><div class="metric-label">Avg Response Time</div><div class="metric-value" id="ai-avg-latency">—</div></div>
+        <div class="metric-card"><div class="metric-label">AI Error Rate</div><div class="metric-value" id="ai-error-rate" style="color:var(--danger)">—</div></div>
+      </div>
+      <div id="aiInsightsFunnelError" style="color:var(--danger);display:none;font-size:12px;margin:4px 0 12px"></div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Daily / Weekly / Monthly Trend</span></div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <button class="tab active" data-gran="day" onclick="setAiTrendGranularity('day', this)">Daily</button>
+            <button class="tab" data-gran="week" onclick="setAiTrendGranularity('week', this)">Weekly</button>
+            <button class="tab" data-gran="month" onclick="setAiTrendGranularity('month', this)">Monthly</button>
+          </div>
+          <div class="chart-container"><canvas id="aiTrendChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Conversion Funnel</span></div>
+          <div class="chart-container"><canvas id="aiFunnelChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Most Recommended vs. Most Selected Products</span></div>
+          <div class="chart-container"><canvas id="aiProductChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Visitor Intent Categories</span></div>
+          <div class="chart-container"><canvas id="aiIntentChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><span class="card-title">Top Visitor Questions</span></div>
+          <div id="aiTopQuestions" style="font-size:12px;color:var(--text2);max-height:260px;overflow:auto">
+            <div class="empty-state"><div class="spinner"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Business Insights</span></div>
+          <div id="aiBusinessInsights" style="font-size:12px;color:var(--text2);max-height:260px;overflow:auto">
+            <div class="empty-state"><div class="spinner"></div></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1938,6 +2008,7 @@ let currentPanel = 'dashboard';
 const PANEL_RBAC = {
   analytics:     { resource: 'analytics' },
   financial:     { revenueOnly: true },
+  aiInsights:    { resource: 'analytics' },
   provisioning:  { resource: 'customers', action: 'write' },
   customers:     { resource: 'customers' },
   orders:        { resource: 'orders' },
@@ -2005,7 +2076,8 @@ window.switchPanel = function(panelId, navEl) {
     manufacturing:['Manufacturing','Production Queue'], qr:['QR Management','QR Codes & Plates'],
     subscriptions:['Subscriptions','Subscription Management'], support:['Support Center','Ticket Management'],
     communication:['Communication','Calls, Voice Notes & Events'], analytics:['Analytics','Charts & Insights'],
-    financial:['Financial','Revenue & Metrics'], audit:['Audit Logs','System Activity'],
+    financial:['Financial','Revenue & Metrics'], aiInsights:['AI Insights','AI Product Consultant — Conversations & Conversion'],
+    audit:['Audit Logs','System Activity'],
     system:['System Health','Services & Usage'], team:['Admin Team','RBAC & User Management'],
     inventory:['Inventory','Raw Materials & Stock'], batches:['Batches','Production Batch Management'],
     dealerAssignment:['Dealer Assignment','Plate → Dealer Routing'], installations:['Installations','Installation Job Tracking'],
@@ -2058,6 +2130,7 @@ async function loadPanel(panelId) {
     case 'communication': await loadCommunication(); break;
     case 'analytics':     await loadAnalytics(); break;
     case 'financial':     await loadFinancial(); break;
+    case 'aiInsights':    await loadAIInsights(); break;
     case 'audit':         await loadAuditLogs(); break;
     case 'system':        await loadSystemHealth(); break;
     case 'team':          await loadTeam(); break;
@@ -3476,5 +3549,7 @@ window.submitCreateCustomer = async function() {
 };
 
 </script>
+<!-- Phase 3.2 — Owner/Admin AI Insights Dashboard (additive, classic script, shares globals with the inline script above) -->
+<script src="js/adminAIInsights.js"></script>
 </body>
 </html>
