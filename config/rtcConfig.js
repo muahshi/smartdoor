@@ -1,5 +1,5 @@
 /**
- * Smart Door — RTC Configuration Module (Phase 0)
+ * My Smart Door — RTC Configuration Module (Phase 0)
  * config/rtcConfig.js
  *
  * INFRASTRUCTURE VALIDATION ONLY. Nothing in this file is imported by any

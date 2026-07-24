@@ -1,5 +1,5 @@
 /**
- * Smart Door — Environment Configuration
+ * My Smart Door — Environment Configuration
  * config/environment.js
  *
  * Phase 9 — Beta Launch Operations
