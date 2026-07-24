@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Voice Receptionist, Conversation Engine
+ * My Smart Door — AI Voice Receptionist, Conversation Engine
  * services/aiVoiceReceptionist.js
  *
  * Production AI Voice Receptionist built on top of the existing AI Call

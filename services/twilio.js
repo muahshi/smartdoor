@@ -1,5 +1,5 @@
 /**
- * Smart Door — Twilio Provider (Secondary / Fallback)
+ * My Smart Door — Twilio Provider (Secondary / Fallback)
  * services/twilio.js
  *
  * Same security model as services/exotel.js — TWILIO_ACCOUNT_SID /

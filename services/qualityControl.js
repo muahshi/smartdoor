@@ -1,5 +1,5 @@
 /**
- * Smart Door — Quality Control & QR Validation
+ * My Smart Door — Quality Control & QR Validation
  * services/qualityControl.js
  *
  * Phase 11 — Real World Operations

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Owner Push Subscription Service (Phase 4c, FCM)
+ * My Smart Door — Owner Push Subscription Service (Phase 4c, FCM)
  * services/push.js
  *
  * Registers the owner's device for real background push (Firebase Cloud

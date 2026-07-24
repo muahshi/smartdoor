@@ -1,5 +1,5 @@
 /**
- * Smart Door — Society Analytics Service
+ * My Smart Door — Society Analytics Service
  * services/societyAnalytics.js
  *
  * Phase 13 — Society-wide analytics.

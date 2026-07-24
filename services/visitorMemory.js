@@ -1,5 +1,5 @@
 /**
- * Smart Door — Visitor Memory System
+ * My Smart Door — Visitor Memory System
  * services/visitorMemory.js
  *
  * Client for sql/41_visitor_memory.sql. Records a visit whenever a

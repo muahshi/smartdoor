@@ -1,5 +1,5 @@
 /**
- * Smart Door — Monitoring & Observability Layer
+ * My Smart Door — Monitoring & Observability Layer
  * services/monitoring.js
  *
  * Tracks: Errors, API failures, Supabase errors, Payment failures,

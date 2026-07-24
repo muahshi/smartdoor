@@ -1,5 +1,5 @@
 /**
- * Smart Door — Activation Engine
+ * My Smart Door — Activation Engine
  * services/activation.js
  *
  * REDESIGN (Activation Fix):

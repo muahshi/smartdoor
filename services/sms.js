@@ -1,5 +1,5 @@
 /**
- * Smart Door — SMS Service (Architecture)
+ * My Smart Door — SMS Service (Architecture)
  * services/sms.js
  *
  * Architecture only — production mein Edge Functions se call hoga.
@@ -57,7 +57,7 @@ export async function smsOrderPlaced(phone, { ownerName, orderNumber }) {
   return sendSms(SMS_TEMPLATES.ORDER_PLACED, phone, {
     name:         ownerName,
     order_number: orderNumber,
-    brand:        'Smart Door',
+    brand:        'My Smart Door',
   });
 }
 
@@ -108,11 +108,11 @@ export async function smsRenewalReminder(phone, { ownerName, daysLeft, expiryDat
  *
  * // DLT Template IDs — register karo MSG91 portal pe
  * const DLT_TEMPLATES: Record<string, { templateId: string; message: (...args: any[]) => string }> = {
- *   order_placed:     { templateId: "TID_XXXXXXX", message: (d) => `Dear ${d.name}, your Smart Door order ${d.order_number} has been placed. -Smart Door` },
- *   payment_success:  { templateId: "TID_XXXXXXX", message: (d) => `Payment of ${d.amount} received for order ${d.order_number}. Your plate is being manufactured. -Smart Door` },
- *   shipped:          { templateId: "TID_XXXXXXX", message: (d) => `Your Smart Door is on the way! Tracking: ${d.tracking_number} via ${d.courier}. -Smart Door` },
- *   delivered:        { templateId: "TID_XXXXXXX", message: (d) => `Smart Door ${d.plate_id} delivered! Visit ${d.app_url} to activate. -Smart Door` },
- *   renewal_reminder: { templateId: "TID_XXXXXXX", message: (d) => `Smart Door subscription expires in ${d.days_left} days. Renew at ${d.renew_url} -Smart Door` },
+ *   order_placed:     { templateId: "TID_XXXXXXX", message: (d) => `Dear ${d.name}, your My Smart Door order ${d.order_number} has been placed. -My Smart Door` },
+ *   payment_success:  { templateId: "TID_XXXXXXX", message: (d) => `Payment of ${d.amount} received for order ${d.order_number}. Your plate is being manufactured. -My Smart Door` },
+ *   shipped:          { templateId: "TID_XXXXXXX", message: (d) => `Your My Smart Door is on the way! Tracking: ${d.tracking_number} via ${d.courier}. -My Smart Door` },
+ *   delivered:        { templateId: "TID_XXXXXXX", message: (d) => `My Smart Door ${d.plate_id} delivered! Visit ${d.app_url} to activate. -My Smart Door` },
+ *   renewal_reminder: { templateId: "TID_XXXXXXX", message: (d) => `My Smart Door subscription expires in ${d.days_left} days. Renew at ${d.renew_url} -My Smart Door` },
  * };
  *
  * serve(async (req) => {

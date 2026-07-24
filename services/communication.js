@@ -1,5 +1,5 @@
 /**
- * Smart Door — Communication Engine (Orchestrator)
+ * My Smart Door — Communication Engine (Orchestrator)
  * services/communication.js
  *
  * This is the single entry point the UI (app.js / dashboard.js) talks to.
@@ -10,7 +10,7 @@
  * dashboard one place to pull "Call History / Messages / Emergency" from.
  *
  * ARCHITECTURE
- *   Visitor → Smart Door (this module) → Virtual Number (Edge Function + provider) → Owner
+ *   Visitor → My Smart Door (this module) → Virtual Number (Edge Function + provider) → Owner
  *   Owner number and visitor number are never exposed to each other or to the browser.
  */
 

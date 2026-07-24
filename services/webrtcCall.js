@@ -1,5 +1,5 @@
 /**
- * Smart Door — WebRTC Tap to Talk (Phase 2, Visitor Side)
+ * My Smart Door — WebRTC Tap to Talk (Phase 2, Visitor Side)
  * services/webrtcCall.js
  *
  * Implements ONLY the WebRTC attempt: presence check → mic capture →

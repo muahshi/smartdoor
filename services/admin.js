@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Core Service
+ * My Smart Door — Admin Core Service
  * services/admin.js
  *
  * RBAC, session management, audit logging for the Admin Super Panel.

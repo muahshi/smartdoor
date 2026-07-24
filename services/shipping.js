@@ -1,5 +1,5 @@
 /**
- * Smart Door — Shipping Integration
+ * My Smart Door — Shipping Integration
  * services/shipping.js
  *
  * Phase 9 — Beta Launch Operations

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Property Management Service
+ * My Smart Door — Property Management Service
  * services/propertyManagement.js
  *
  * Phase 13 — Apartment & Society Platform

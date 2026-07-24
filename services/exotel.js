@@ -1,5 +1,5 @@
 /**
- * Smart Door — Exotel Provider (Primary)
+ * My Smart Door — Exotel Provider (Primary)
  * services/exotel.js
  *
  * IMPORTANT — SECURITY MODEL:

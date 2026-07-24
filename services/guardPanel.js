@@ -1,5 +1,5 @@
 /**
- * Smart Door — Guard Panel Service
+ * My Smart Door — Guard Panel Service
  * services/guardPanel.js
  *
  * Phase 13 — Security Guard Interface Backend

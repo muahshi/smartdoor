@@ -1,5 +1,5 @@
 /**
- * Smart Door — Orders Service
+ * My Smart Door — Orders Service
  * services/orders.js
  *
  * Order lifecycle ka poora engine:

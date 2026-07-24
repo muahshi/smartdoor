@@ -1,5 +1,5 @@
 /**
- * Smart Door — GST Invoice PDF Service
+ * My Smart Door — GST Invoice PDF Service
  * services/gstInvoicePdf.js
  *
  * Phase 8B — GST Billing & Invoicing Platform.

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Logs Service
+ * My Smart Door — Logs Service
  * services/logs.js
  *
  * Handles: Logging all visitor events + realtime dashboard feed

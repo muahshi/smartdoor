@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Data Service
+ * My Smart Door — Admin Data Service
  * services/adminData.js
  *
  * ROOT CAUSE FIX: The admin panel (admin.html) was reading users, plates,

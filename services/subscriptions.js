@@ -1,5 +1,5 @@
 /**
- * Smart Door — Subscription Activation Service (Extended)
+ * My Smart Door — Subscription Activation Service (Extended)
  * services/subscriptions.js
  *
  * Phase 6 additions:

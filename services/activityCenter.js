@@ -1,5 +1,5 @@
 /**
- * Smart Door — Owner Activity Center
+ * My Smart Door — Owner Activity Center
  * services/activityCenter.js
  *
  * Client for sql/43_owner_activity_center.sql. This is the data layer for

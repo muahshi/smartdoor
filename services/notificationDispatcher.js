@@ -1,5 +1,5 @@
 /**
- * Smart Door — Notification Dispatcher (Production)
+ * My Smart Door — Notification Dispatcher (Production)
  * services/notificationDispatcher.js
  *
  * ROOT PROBLEM THIS FILE FIXES:
@@ -83,7 +83,7 @@ const EVENT_CONFIG = {
   },
   qr_scan: {
     title: '📲 Someone scanned your QR',
-    body: () => 'A visitor opened your Smart Door page.',
+    body: () => 'A visitor opened your My Smart Door page.',
     vibrate: [150],
     requireInteraction: false,
   },
@@ -113,7 +113,7 @@ const EVENT_CONFIG = {
   },
   status_reminder: {
     title: '⏰ Subscription Reminder',
-    body: (row) => row?.body || 'Your Smart Door subscription needs your attention.',
+    body: (row) => row?.body || 'Your My Smart Door subscription needs your attention.',
     vibrate: [150],
     requireInteraction: false,
   },

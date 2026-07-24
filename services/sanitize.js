@@ -1,5 +1,5 @@
 /**
- * Smart Door — Input Sanitization & Validation
+ * My Smart Door — Input Sanitization & Validation
  * services/sanitize.js
  *
  * All user input MUST pass through this before touching Supabase or

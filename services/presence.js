@@ -1,5 +1,5 @@
 /**
- * Smart Door — Owner Presence Service (Phase 1)
+ * My Smart Door — Owner Presence Service (Phase 1)
  * services/presence.js
  *
  * Detects whether an owner is "online" (dashboard open + connected) using

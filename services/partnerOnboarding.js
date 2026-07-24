@@ -1,5 +1,5 @@
 /**
- * Smart Door — Partner Onboarding Service
+ * My Smart Door — Partner Onboarding Service
  * services/partnerOnboarding.js
  *
  * PHASE 8C (PART 1): Thin client wrapper around the public

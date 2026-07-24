@@ -1,5 +1,5 @@
 /**
- * Smart Door — Replacement & Ownership Transfer
+ * My Smart Door — Replacement & Ownership Transfer
  * services/replacementTransfer.js
  *
  * Phase 11 — Real World Operations
@@ -211,7 +211,7 @@ export async function initiateTransfer(plateId, previousOwnerId, reason, notes =
  *
  * For safety, the new owner's family members / security rules are NOT
  * carried over — they start with a clean slate on first login, same as
- * any new Smart Door activation.
+ * any new My Smart Door activation.
  */
 export async function completeTransfer(transferId, newOwnerId, adminActor = 'admin') {
   try {

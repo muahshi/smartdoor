@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Analytics Service
+ * My Smart Door — Admin Analytics Service
  * services/analytics.js
  *
  * Revenue, orders, subscription, product performance analytics.

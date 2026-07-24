@@ -1,5 +1,5 @@
 /**
- * Smart Door — Plan Catalog Service
+ * My Smart Door — Plan Catalog Service
  * services/plans.js
  *
  * SaaS Launch — Subscription Plans.

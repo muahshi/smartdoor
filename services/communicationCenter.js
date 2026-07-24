@@ -1,5 +1,5 @@
 /**
- * Smart Door — Communication Center (Phase 7C)
+ * My Smart Door — Communication Center (Phase 7C)
  * services/communicationCenter.js
  *
  * PHASE 7C — ADDITIVE ONLY. No SQL migration, no new tables/columns, no

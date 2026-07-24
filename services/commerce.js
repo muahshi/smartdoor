@@ -1,5 +1,5 @@
 /**
- * Smart Door — Commerce Service (Phase 8A)
+ * My Smart Door — Commerce Service (Phase 8A)
  * services/commerce.js
  *
  * Two audiences, two call styles (mirrors the existing split between

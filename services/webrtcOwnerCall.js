@@ -1,5 +1,5 @@
 /**
- * Smart Door — WebRTC Tap to Talk (Phase 2, Owner Side)
+ * My Smart Door — WebRTC Tap to Talk (Phase 2, Owner Side)
  * services/webrtcOwnerCall.js
  *
  * Owner-side counterpart to services/webrtcCall.js. Listens on the

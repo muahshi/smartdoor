@@ -1,5 +1,5 @@
 /**
- * Smart Door — Invoices Service
+ * My Smart Door — Invoices Service
  * services/invoices.js
  *
  * SaaS Launch — Subscription Dashboard: Invoices / Payment History.

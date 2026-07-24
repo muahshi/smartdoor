@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Provisioning Service
+ * My Smart Door — Admin Provisioning Service
  * services/adminProvisioning.js
  *
  * Client-side facade for the Internal Admin Portal's provisioning

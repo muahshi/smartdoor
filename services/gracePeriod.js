@@ -1,5 +1,5 @@
 /**
- * Smart Door — Grace Period Engine
+ * My Smart Door — Grace Period Engine
  * services/gracePeriod.js
  *
  * Phase 11 — Real World Operations
@@ -81,7 +81,7 @@ export function getVisitorPermissions(lifecycleStatus) {
         allowText: true,
         allowSos: true,
         bannerType: 'grace',
-        bannerMessage: 'This Smart Door subscription has expired and is in its grace period. Some features are limited until renewal.',
+        bannerMessage: 'This My Smart Door subscription has expired and is in its grace period. Some features are limited until renewal.',
       };
 
     case 'expired_locked':
@@ -91,7 +91,7 @@ export function getVisitorPermissions(lifecycleStatus) {
         allowText: false,
         allowSos: true,
         bannerType: 'locked',
-        bannerMessage: 'This Smart Door subscription has expired. Renewal is required to restore full visitor access.',
+        bannerMessage: 'This My Smart Door subscription has expired. Renewal is required to restore full visitor access.',
       };
 
     default:

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Auth Service
+ * My Smart Door — Auth Service
  * services/auth.js
  *
  * Login flow: Plate ID + 4-digit PIN

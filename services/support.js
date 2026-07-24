@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Support Service
+ * My Smart Door — Admin Support Service
  * services/support.js
  *
  * Ticket management, assignment, internal notes.

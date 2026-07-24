@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Receptionist (pre-call screening)
+ * My Smart Door — AI Receptionist (pre-call screening)
  * services/aiReceptionist.js
  *
  * Client for sql/52_ai_call_screening.sql. This is the AI layer that
@@ -94,7 +94,7 @@ export async function classifyCallPurpose(answers = {}, context = {}) {
   const { url, anonKey } = _cfg();
   if (url && anonKey) {
     try {
-      const systemPrompt = `You are ${aiName}, an AI receptionist for Smart Door screening a visitor BEFORE connecting their call to ${ownerLabel}. You understand Hindi, Hinglish (Hindi written in Latin script, e.g. "main uske dost hoon"), English, and natural code-mixing between them — classify correctly regardless of which language or mix the visitor used, and never ask the visitor to switch languages.
+      const systemPrompt = `You are ${aiName}, an AI receptionist for My Smart Door screening a visitor BEFORE connecting their call to ${ownerLabel}. You understand Hindi, Hinglish (Hindi written in Latin script, e.g. "main uske dost hoon"), English, and natural code-mixing between them — classify correctly regardless of which language or mix the visitor used, and never ask the visitor to switch languages.
 
 Classify the visitor into exactly one of these types, using this guide to disambiguate close categories:
 ${VISITOR_TYPE_GUIDE}

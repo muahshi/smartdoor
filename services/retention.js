@@ -1,5 +1,5 @@
 /**
- * Smart Door — Retention Engine
+ * My Smart Door — Retention Engine
  * services/retention.js
  *
  * Phase 11 — Real World Operations

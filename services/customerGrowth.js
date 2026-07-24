@@ -1,5 +1,5 @@
 /**
- * Smart Door — Customer Growth Service
+ * My Smart Door — Customer Growth Service
  * services/customerGrowth.js
  *
  * Phase 12 — First 100 Customers

@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Receptionist Analytics
+ * My Smart Door — AI Receptionist Analytics
  * services/aiReceptionistAnalytics.js
  *
  * PHASE 4 — ADDITIVE ONLY. Client for the get_ai_receptionist_insights RPC

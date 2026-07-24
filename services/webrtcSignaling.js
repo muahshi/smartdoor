@@ -1,5 +1,5 @@
 /**
- * Smart Door — WebRTC Signaling Relay (Phase 2)
+ * My Smart Door — WebRTC Signaling Relay (Phase 2)
  * services/webrtcSignaling.js
  *
  * Relays SDP offer/answer and ICE candidates between visitor and owner

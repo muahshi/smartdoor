@@ -1,5 +1,5 @@
 /**
- * Smart Door — Visitor Experience Orchestrator
+ * My Smart Door — Visitor Experience Orchestrator
  * services/visitorExperience.js
  *
  * REDESIGN (Activation Fix):

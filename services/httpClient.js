@@ -1,5 +1,5 @@
 /**
- * Smart Door — Shared HTTP Client (Production Hardening — Phase 6)
+ * My Smart Door — Shared HTTP Client (Production Hardening — Phase 6)
  * services/httpClient.js
  *
  * PRODUCTION GAP FIXED: js/groq.js and services/envValidator.js already

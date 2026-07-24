@@ -1,5 +1,5 @@
 /**
- * Smart Door — Voice Notes Service
+ * My Smart Door — Voice Notes Service
  * services/voiceNotes.js
  *
  * Handles: in-browser recording (MediaRecorder), upload to Supabase Storage

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Feature Flags Service (Phase 1)
+ * My Smart Door — Feature Flags Service (Phase 1)
  * services/featureFlags.js
  *
  * Reads the global WebRTC flags (feature_flags table, sql/38_webrtc_

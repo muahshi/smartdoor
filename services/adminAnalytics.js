@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Analytics Service
+ * My Smart Door — Admin Analytics Service
  * services/adminAnalytics.js
  *
  * Phase 13 — Analytics Dashboard Metrics

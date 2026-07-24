@@ -1,5 +1,5 @@
 /**
- * Smart Door — WhatsApp Provider Abstraction
+ * My Smart Door — WhatsApp Provider Abstraction
  * services/whatsapp.js
  *
  * ARCHITECTURE ONLY — not wired into any live flow yet.

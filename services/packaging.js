@@ -1,6 +1,6 @@
 // Phase 2A Production Persistence Fix
 /**
- * Smart Door — Packaging System
+ * My Smart Door — Packaging System
  * services/packaging.js
  *
  * Phase 11 — Real World Operations
@@ -50,7 +50,7 @@ export function generatePackingSlipHTML(order, manufacturing) {
     .map(escapeHtml)
     .join(', ') || '—';
   const body = `
-    <h1>📦 Smart Door — Packing Slip</h1>
+    <h1>📦 My Smart Door — Packing Slip</h1>
     <div class="meta">Order ${escapeHtml(order.order_number)} · ${new Date().toLocaleString('en-IN')}</div>
     <table>
       <tr><th>Customer</th><td>${escapeHtml(order.customer_name) || '—'}</td></tr>
@@ -71,7 +71,7 @@ export function generatePackingSlipHTML(order, manufacturing) {
 export function generateBoxLabelHTML(manufacturing, shipment = {}) {
   const body = `
     <div style="text-align:center;border:3px solid #1a1a1a;padding:24px;border-radius:8px;">
-      <div style="font-size:11px;letter-spacing:2px;color:#666;">SMART DOOR</div>
+      <div style="font-size:11px;letter-spacing:2px;color:#666;">MY SMART DOOR</div>
       <div style="font-size:32px;font-weight:800;margin:10px 0;">${escapeHtml(manufacturing.plate_id)}</div>
       <div style="font-size:13px;margin-bottom:6px;">AWB: ${escapeHtml(shipment.awbNumber) || 'PENDING'}</div>
       <div style="font-size:13px;color:#444;">${escapeHtml(manufacturing.house_number)} ${escapeHtml(manufacturing.plate_name)}</div>
@@ -109,7 +109,7 @@ export function generateCustomerCardHTML(manufacturing) {
   const url = getQrUrl(manufacturing.plate_id);
   const body = `
     <div style="border:1px solid #ddd;border-radius:12px;padding:24px;text-align:center;background:#fafafa;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">🏠 Welcome to Smart Door</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">🏠 Welcome to My Smart Door</div>
       <div style="font-size:12px;color:#555;margin-bottom:16px;">Your Plate ID</div>
       <div style="font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:16px;">${escapeHtml(manufacturing.plate_id)}</div>
       <div class="qr-box" style="margin:0 auto 16px;">QR Code</div>

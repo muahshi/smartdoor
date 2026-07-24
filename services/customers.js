@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Customers Service
+ * My Smart Door — Admin Customers Service
  * services/customers.js
  *
  * Full customer management for Admin Super Panel.

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Renewal Engine
+ * My Smart Door — Renewal Engine
  * services/renewalEngine.js
  *
  * Phase 9 — Beta Launch Operations
@@ -147,8 +147,8 @@ async function _sendViaChannel(channel, owner, data, window) {
     switch (channel) {
       case 'in_app': {
         const body = data.daysLeft > 0
-          ? `Your Smart Door subscription expires in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'} on ${data.expiryDate}. Renew now to keep your plate active.`
-          : `Your Smart Door subscription has expired. Renew at ${data.renewalPrice}/year to restore all features.`;
+          ? `Your My Smart Door subscription expires in ${data.daysLeft} day${data.daysLeft === 1 ? '' : 's'} on ${data.expiryDate}. Renew now to keep your plate active.`
+          : `Your My Smart Door subscription has expired. Renew at ${data.renewalPrice}/year to restore all features.`;
 
         await supabase.from('notifications').insert({
           owner_id:  owner.id,
@@ -226,17 +226,17 @@ async function _sendViaChannel(channel, owner, data, window) {
 // ────────── MESSAGE TEMPLATES ──────────
 
 function _getEmailSubject(window, data) {
-  if (window.days === 0) return `⚠️ Smart Door Subscription Expired — Renew Now`;
-  if (window.days === 1) return `🔔 Last Chance: Smart Door Subscription Expires Tomorrow`;
-  if (window.days === 7) return `⏰ 7 Days Left: Renew Your Smart Door Subscription`;
-  if (window.days === 30) return `Smart Door Subscription Renews in 30 Days`;
-  return `Early Renewal Offer — Smart Door`;
+  if (window.days === 0) return `⚠️ My Smart Door Subscription Expired — Renew Now`;
+  if (window.days === 1) return `🔔 Last Chance: My Smart Door Subscription Expires Tomorrow`;
+  if (window.days === 7) return `⏰ 7 Days Left: Renew Your My Smart Door Subscription`;
+  if (window.days === 30) return `My Smart Door Subscription Renews in 30 Days`;
+  return `Early Renewal Offer — My Smart Door`;
 }
 
 function _getSMSMessage(window, data) {
   if (window.days === 0)
-    return `Smart Door subscription expired. Renew at ${data.renewalPrice}/yr: ${data.renewalLink}`;
-  return `Smart Door sub expires in ${data.daysLeft}d (${data.expiryDate}). Renew ${data.renewalPrice}/yr: ${data.renewalLink}`;
+    return `My Smart Door subscription expired. Renew at ${data.renewalPrice}/yr: ${data.renewalLink}`;
+  return `My Smart Door sub expires in ${data.daysLeft}d (${data.expiryDate}). Renew ${data.renewalPrice}/yr: ${data.renewalLink}`;
 }
 
 // ────────── GET RENEWAL STATUS FOR OWNER ──────────

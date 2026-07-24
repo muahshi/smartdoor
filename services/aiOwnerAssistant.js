@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Owner Assistant
+ * My Smart Door — AI Owner Assistant
  * services/aiOwnerAssistant.js
  *
  * PHASE 5 — ADDITIVE ONLY. No SQL migration except sql/55 (owner-feedback

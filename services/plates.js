@@ -1,5 +1,5 @@
 /**
- * Smart Door — Plates Service
+ * My Smart Door — Plates Service
  * services/plates.js
  *
  * Handles: QR slug lookup, plate activation check, visitor PWA data loading
@@ -150,7 +150,7 @@ export async function getMyPlate(ownerId) {
 
 // ────────── GENERATE UNIQUE PLATE ID ──────────
 /**
- * Generates a unique Smart Door plate ID
+ * Generates a unique My Smart Door plate ID
  * Format: SD-XXXXXXX (2 letters + 1 digit + 1 letter + 1 digit + 2 letters)
  * Example: SD-ABX9K7
  */

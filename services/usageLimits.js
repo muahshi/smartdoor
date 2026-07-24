@@ -1,5 +1,5 @@
 /**
- * Smart Door — Usage Limits & Feature Gating Service
+ * My Smart Door — Usage Limits & Feature Gating Service
  * services/usageLimits.js
  *
  * SaaS Launch — Feature Gating + Usage Limits.

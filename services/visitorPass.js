@@ -1,5 +1,5 @@
 /**
- * Smart Door — Visitor Pass Service
+ * My Smart Door — Visitor Pass Service
  * services/visitorPass.js
  *
  * Phase 13 — Visitor Pass System

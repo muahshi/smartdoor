@@ -1,5 +1,5 @@
 /**
- * Smart Door — Society Admin Service
+ * My Smart Door — Society Admin Service
  * services/societyAdmin.js
  *
  * Phase 13 — Society Admin Panel Backend

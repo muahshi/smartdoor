@@ -1,5 +1,5 @@
 /**
- * Smart Door — Unified Messaging Service (Phase 4)
+ * My Smart Door — Unified Messaging Service (Phase 4)
  * services/messaging.js
  *
  * Single conversation thread per visitor session per plate. Merges what

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Rate Limiting Service
+ * My Smart Door — Rate Limiting Service
  * services/rateLimiter.js
  *
  * Protects against: spam calls, repeated QR scans, voice note flooding, SOS abuse.

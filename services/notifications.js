@@ -1,5 +1,5 @@
 /**
- * Smart Door — Notification Engine
+ * My Smart Door — Notification Engine
  * services/notifications.js
  *
  * Handles: Bell Ring, Voice Note, Call Request, Emergency Alert, Status Change.
@@ -540,7 +540,7 @@ export async function notifyQRGenerated(ownerId, plateId) {
   return dispatch({
     ownerId, type: 'status_change',
     title: '📱 QR Code Generated',
-    body: `Your Smart Door QR code for ${plateId} is ready.`,
+    body: `Your My Smart Door QR code for ${plateId} is ready.`,
     payload: { plateId }, priority: 'normal', channels: ['in_app'],
   });
 }
@@ -549,7 +549,7 @@ export async function notifyManufacturingStarted(ownerId, plateId) {
   return dispatch({
     ownerId, type: 'status_change',
     title: '🏭 In Production',
-    body: 'Your Smart Door nameplate is being manufactured.',
+    body: 'Your My Smart Door nameplate is being manufactured.',
     payload: { plateId }, priority: 'normal', channels: ['in_app'],
   });
 }
@@ -567,7 +567,7 @@ export async function notifyShipped(ownerId, plateId, trackingNumber) {
   return dispatch({
     ownerId, type: 'status_change',
     title: '🚚 Shipped!',
-    body: trackingNumber ? `Tracking: ${trackingNumber}` : 'Your Smart Door is on the way.',
+    body: trackingNumber ? `Tracking: ${trackingNumber}` : 'Your My Smart Door is on the way.',
     payload: { plateId, trackingNumber: trackingNumber || null }, priority: 'high', channels: ['in_app'],
   });
 }
@@ -576,7 +576,7 @@ export async function notifyDelivered(ownerId, plateId) {
   return dispatch({
     ownerId, type: 'status_change',
     title: '🏠 Delivered!',
-    body: `Your Smart Door plate ${plateId} has been delivered. Scan the QR to activate.`,
+    body: `Your My Smart Door plate ${plateId} has been delivered. Scan the QR to activate.`,
     payload: { plateId }, priority: 'high', channels: ['in_app'],
   });
 }
@@ -584,8 +584,8 @@ export async function notifyDelivered(ownerId, plateId) {
 export async function notifyActivated(ownerId, plateId) {
   return dispatch({
     ownerId, type: 'status_change',
-    title: '✅ Smart Door Activated!',
-    body: `Your Smart Door ${plateId} is live. Visitors can now reach you.`,
+    title: '✅ My Smart Door Activated!',
+    body: `Your My Smart Door ${plateId} is live. Visitors can now reach you.`,
     payload: { plateId }, priority: 'high', channels: ['in_app'],
   });
 }
@@ -594,7 +594,7 @@ export async function notifyVisitorScan(ownerId, plateId) {
   return dispatch({
     ownerId, type: 'bell',
     title: '👁️ Someone scanned your QR',
-    body: 'A visitor viewed your Smart Door page.',
+    body: 'A visitor viewed your My Smart Door page.',
     payload: { plateId }, priority: 'normal', channels: ['in_app'],
   });
 }
@@ -606,7 +606,7 @@ export async function notifySubscriptionExpiry(ownerId, plateId, daysLeft) {
     title: expired ? '⚠️ Subscription Expired' : `⏳ Subscription expiring in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`,
     body: expired
       ? 'Renew your SmartDoor Care plan to keep full features active.'
-      : 'Renew now to avoid any interruption to your Smart Door.',
+      : 'Renew now to avoid any interruption to your My Smart Door.',
     payload: { plateId, daysLeft }, priority: daysLeft <= 7 ? 'high' : 'normal', channels: ['in_app'],
   });
 }

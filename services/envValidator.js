@@ -1,5 +1,5 @@
 /**
- * Smart Door — Startup Environment Validator
+ * My Smart Door — Startup Environment Validator
  * services/envValidator.js
  *
  * Run at app boot (before any service initializes) to catch:
@@ -187,7 +187,7 @@ export function showEnvError(validationResult) {
   `;
   banner.innerHTML = `
     <div style="color:#EF4444;font-weight:bold;margin-bottom:8px">
-      ⚠️ Smart Door — Configuration Error
+      ⚠️ My Smart Door — Configuration Error
     </div>
     ${validationResult.errors.map(e => `<div>❌ ${e}</div>`).join('')}
     ${validationResult.warnings.map(w => `<div style="color:#F59E0B">⚠️ ${w}</div>`).join('')}

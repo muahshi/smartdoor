@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Insight Cards Service
+ * My Smart Door — AI Insight Cards Service
  * services/aiInsights.js
  *
  * PHASE 7B — ADDITIVE ONLY. No SQL migration. No auth/RBAC/notification/

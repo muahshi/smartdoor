@@ -1,5 +1,5 @@
 /**
- * Smart Door — Email Service
+ * My Smart Door — Email Service
  * services/email.js
  *
  * Provider: Resend (primary)

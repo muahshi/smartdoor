@@ -1,5 +1,5 @@
 /**
- * Smart Door — Customer Success Service
+ * My Smart Door — Customer Success Service
  * services/customerSuccess.js
  *
  * Phase 9 — Beta Launch Operations

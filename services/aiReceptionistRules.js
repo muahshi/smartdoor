@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Voice Receptionist, Owner Rules Engine
+ * My Smart Door — AI Voice Receptionist, Owner Rules Engine
  * services/aiReceptionistRules.js
  *
  * Client for sql/53_ai_voice_receptionist.sql. Lets an owner define
