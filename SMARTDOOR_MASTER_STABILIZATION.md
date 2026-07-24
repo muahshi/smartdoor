@@ -96,7 +96,7 @@
 | A11 | `manufacturing` row not auto-created when order enters production | MEDIUM | Gap | admin-data/update_order |
 | A12 | Subscription plan names inconsistent (starter/hardware_only etc) | MEDIUM | Known | sql/17_plan_migration.sql |
 | A13 | `visitor.html` owner name fallback shows 'Resident' if RPC missing | MEDIUM | Documented | plates.js + Migration 21 |
-| A14 | `guard.html` / `society-admin.html` duplicate identical files (gaurd.html) | LOW | Typo | root dir |
+| A14 | `guard.html` / `society-admin.html` duplicate identical files (gaurd.html) | LOW | Documented interim reuse (RC-1) — see comment header in society-admin.html; real Society Admin frontend for services/societyAdmin.js still not built | root dir |
 | A15 | `renewal-engine-cron` not scheduled in Supabase | LOW | Gap | Supabase Dashboard |
 
 ---

@@ -1,3 +1,18 @@
+<!--
+  KNOWN GAP — tracked as A14 in SMARTDOOR_MASTER_STABILIZATION.md, confirmed accidental
+  (copy/paste duplicate of guard.html, not a deliberate design decision).
+
+  A dedicated Society Admin backend already exists (services/societyAdmin.js +
+  the `society_admins` table in sql/14_property_management_schema.sql — tower/unit/
+  resident management, analytics, guard oversight) but has never been wired to any
+  frontend. This file is the guard gate-panel served verbatim at the /society/:path*
+  route as an interim stand-in, NOT a finished society-admin experience.
+
+  Do not let this file silently diverge from guard.html — any fix applied to one
+  must be applied to the other until the real Society Admin frontend (services/
+  societyAdmin.js) is built. That build-out is out of scope for RC-1 (feature work,
+  not a bug fix) and should be scoped as its own phase.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
