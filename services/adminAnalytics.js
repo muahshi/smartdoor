@@ -85,3 +85,13 @@ export async function getRevenueMetrics() {
 export async function getFulfillmentPipeline() {
   return callAdminFunction(FUNCTION_NAME, { type: 'fulfillment_pipeline' });
 }
+
+/**
+ * getAIConsultantFunnel(days = 30)
+ * Phase 3.1B — AI Product Consultant analytics: session funnel
+ * (opened → messaged → recommended → configured), avg conversation
+ * length, avg AI latency, error rate, abandonment rate, top questions.
+ */
+export async function getAIConsultantFunnel(days = 30) {
+  return callAdminFunction(FUNCTION_NAME, { type: 'ai_consultant_funnel', days });
+}
