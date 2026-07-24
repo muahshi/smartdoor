@@ -1,6 +1,6 @@
 {
-  "name": "Smart Door — Home Privacy System",
-  "short_name": "SmartDoor",
+  "name": "My Smart Door — Home Privacy System",
+  "short_name": "My Smart Door",
   "description": "India's 1st Smart Nameplate. Protect your privacy. Secure your home.",
   "start_url": "/app.html",
   "scope": "/",

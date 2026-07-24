@@ -16,6 +16,8 @@
     { "source": "/admin",          "destination": "/admin.html" },
     { "source": "/partner",        "destination": "/partner-portal.html" },
     { "source": "/onboarding",     "destination": "/onboarding.html" },
+    { "source": "/products",       "destination": "/products.html" },
+    { "source": "/products/:slug", "destination": "/product.html?slug=:slug" },
     { "source": "/gate/:path*",    "destination": "/guard.html" },
     { "source": "/society/:path*", "destination": "/society-admin.html" },
     { "source": "/p/:slug",        "destination": "/visitor.html?plate=:slug" },
