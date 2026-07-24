@@ -1,3 +1,4 @@
+// Phase 2A Production Persistence Fix
 /**
  * Smart Door — Edge Function: razorpay-webhook
  * supabase/functions/razorpay-webhook/index.ts
@@ -337,16 +338,44 @@ async function handlePaymentCaptured(
     body: { plate_id: plateId, order_id: order.id },
   }).catch((e: Error) => console.warn("[razorpay-webhook] QR generation dispatch failed:", e.message));
 
-  await supabase.from("manufacturing").insert({
+  // Phase 2A fix: identical root cause and fix as verify-razorpay-payment —
+  // house_number/font_style previously read from fields that never held this
+  // data; plate_name now uses the actual "Name to Print on Plate" text
+  // (order.house_name) instead of the buyer's account name, with a fallback
+  // for pre-Phase-2A orders. Keeps webhook-completed orders identical to
+  // orders fulfilled via the fast (verify-razorpay-payment) path.
+  const webhookCustomization = (order.customization && typeof order.customization === "object") ? order.customization : {};
+  const { error: manufacturingError } = await supabase.from("manufacturing").insert({
     order_id: order.id,
     plate_id: plateId,
-    plate_name: order.customer_name,
-    house_number: order.shipping_address?.houseNumber || "",
-    font_style: order.notes?.fontStyle || "modern",
+    plate_name: order.house_name || order.customer_name,
+    house_name: order.house_name || null,
+    house_number: order.house_number || "",
+    font_style: order.font_style || "modern",
     product_type: order.product_type,
+    finish: webhookCustomization.finish || null,
+    plate_size: webhookCustomization.size || null,
+    symbol: webhookCustomization.symbol || null,
+    qr_style: webhookCustomization.qrStyle || null,
+    logo_file_name: webhookCustomization.logoFileName || null,
+    customization: webhookCustomization,
     qr_slug: plateId,
     production_status: "queued",
   });
+
+  // Hardening (Phase 2A): same reasoning as verify-razorpay-payment — the
+  // order is already marked 'paid' by this point, so a failed insert here
+  // must not be silently lost. Reuses the existing logError() helper
+  // (writes to error_logs, same as every other failure path in this file)
+  // instead of introducing a new logging mechanism.
+  if (manufacturingError) {
+    console.error("[razorpay-webhook] Manufacturing record insert FAILED — order paid but not queued for production:", manufacturingError.message, { orderId: order.id, plateId });
+    await logError(supabase, "Manufacturing insert failed after successful payment capture (webhook path)", {
+      orderId: order.id,
+      plateId,
+      error: manufacturingError.message,
+    });
+  }
 
   await supabase.from("tracking_events").insert([
     { order_id: order.id, event_type: "payment_verified", event_label: "Payment Verified (webhook)", actor: "system" },

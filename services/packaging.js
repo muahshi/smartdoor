@@ -1,3 +1,4 @@
+// Phase 2A Production Persistence Fix
 /**
  * Smart Door — Packaging System
  * services/packaging.js
@@ -17,6 +18,7 @@
 
 import { supabase } from './supabase.js';
 import { getQrUrl } from './qr.js';
+import { escapeHtml } from './sanitize.js';
 
 const BRAND_STYLES = `
   body { font-family: Arial, sans-serif; color:#1a1a1a; margin:0; }
@@ -39,17 +41,26 @@ function _wrap(title, body) {
 // ────────── 1. PACKING SLIP ──────────
 export function generatePackingSlipHTML(order, manufacturing) {
   const addr = order.shipping_address || {};
+  // Hardening: all order/manufacturing fields below are customer-controlled
+  // (directly entered at checkout or, for logo_file_name, an unconstrained
+  // browser filename) and are escaped before insertion — this document is
+  // printed/viewed by warehouse and admin staff.
+  const addressLine = [addr.line1, addr.city, addr.state, addr.pincode, addr.country]
+    .filter(Boolean)
+    .map(escapeHtml)
+    .join(', ') || '—';
   const body = `
     <h1>📦 Smart Door — Packing Slip</h1>
-    <div class="meta">Order ${order.order_number} · ${new Date().toLocaleString('en-IN')}</div>
+    <div class="meta">Order ${escapeHtml(order.order_number)} · ${new Date().toLocaleString('en-IN')}</div>
     <table>
-      <tr><th>Customer</th><td>${order.customer_name || '—'}</td></tr>
-      <tr><th>Phone</th><td>${order.customer_phone || '—'}</td></tr>
-      <tr><th>Email</th><td>${order.customer_email || '—'}</td></tr>
-      <tr><th>Shipping Address</th><td>${[addr.line1, addr.city, addr.state, addr.pincode, addr.country].filter(Boolean).join(', ') || '—'}</td></tr>
-      <tr><th>Plate ID</th><td><strong>${manufacturing.plate_id}</strong></td></tr>
-      <tr><th>Product Type</th><td>${manufacturing.product_type}</td></tr>
-      <tr><th>House No. / Name</th><td>${manufacturing.house_number || '—'} · ${manufacturing.plate_name || '—'}</td></tr>
+      <tr><th>Customer</th><td>${escapeHtml(order.customer_name) || '—'}</td></tr>
+      <tr><th>Phone</th><td>${escapeHtml(order.customer_phone) || '—'}</td></tr>
+      <tr><th>Email</th><td>${escapeHtml(order.customer_email) || '—'}</td></tr>
+      <tr><th>Shipping Address</th><td>${addressLine}</td></tr>
+      <tr><th>Plate ID</th><td><strong>${escapeHtml(manufacturing.plate_id)}</strong></td></tr>
+      <tr><th>Product Type</th><td>${escapeHtml(manufacturing.product_type)}</td></tr>
+      <tr><th>House No. / Name</th><td>${escapeHtml(manufacturing.house_number) || '—'} · ${escapeHtml(manufacturing.plate_name) || '—'}</td></tr>
+      <tr><th>Customization</th><td>Size: ${escapeHtml(manufacturing.plate_size) || '—'} · Finish: ${escapeHtml(manufacturing.finish) || '—'} · Symbol: ${escapeHtml(manufacturing.symbol) || '—'} · QR Style: ${escapeHtml(manufacturing.qr_style) || '—'}${manufacturing.logo_file_name ? ` · Logo: ${escapeHtml(manufacturing.logo_file_name)}` : ''}</td></tr>
       <tr><th>Order Total</th><td>₹${order.total_amount}</td></tr>
     </table>
   `;
@@ -61,9 +72,9 @@ export function generateBoxLabelHTML(manufacturing, shipment = {}) {
   const body = `
     <div style="text-align:center;border:3px solid #1a1a1a;padding:24px;border-radius:8px;">
       <div style="font-size:11px;letter-spacing:2px;color:#666;">SMART DOOR</div>
-      <div style="font-size:32px;font-weight:800;margin:10px 0;">${manufacturing.plate_id}</div>
-      <div style="font-size:13px;margin-bottom:6px;">AWB: ${shipment.awbNumber || 'PENDING'}</div>
-      <div style="font-size:13px;color:#444;">${manufacturing.house_number || ''} ${manufacturing.plate_name || ''}</div>
+      <div style="font-size:32px;font-weight:800;margin:10px 0;">${escapeHtml(manufacturing.plate_id)}</div>
+      <div style="font-size:13px;margin-bottom:6px;">AWB: ${escapeHtml(shipment.awbNumber) || 'PENDING'}</div>
+      <div style="font-size:13px;color:#444;">${escapeHtml(manufacturing.house_number)} ${escapeHtml(manufacturing.plate_name)}</div>
       <div style="margin-top:16px;font-size:10px;color:#999;">HANDLE WITH CARE · FRAGILE</div>
     </div>
   `;
@@ -76,16 +87,16 @@ export function generateQRVerificationSheetHTML(manufacturing, qc = {}) {
   const row = (label, ok) => `<tr><td>${label}</td><td>${ok ? '✅ Verified' : '❌ Not Verified'}</td></tr>`;
   const body = `
     <h1>🔍 QR Verification Sheet</h1>
-    <div class="meta">Plate ${manufacturing.plate_id} · ${new Date().toLocaleString('en-IN')}</div>
+    <div class="meta">Plate ${escapeHtml(manufacturing.plate_id)} · ${new Date().toLocaleString('en-IN')}</div>
     <div style="display:flex;gap:20px;align-items:flex-start;">
-      <div class="qr-box">QR: ${manufacturing.plate_id}</div>
+      <div class="qr-box">QR: ${escapeHtml(manufacturing.plate_id)}</div>
       <table style="flex:1;">
-        <tr><th>Encoded URL</th><td>${url}</td></tr>
+        <tr><th>Encoded URL</th><td>${escapeHtml(url)}</td></tr>
         ${row('QR Verified', qc.qr_verified)}
         ${row('Text Verified', qc.text_verified)}
         ${row('Material Verified', qc.material_verified)}
         ${row('Packaging Verified', qc.packaging_verified)}
-        <tr><th>Approved By</th><td>${qc.approved_by || '—'}</td></tr>
+        <tr><th>Approved By</th><td>${escapeHtml(qc.approved_by) || '—'}</td></tr>
         <tr><th>Approved At</th><td>${qc.approved_at ? new Date(qc.approved_at).toLocaleString('en-IN') : '—'}</td></tr>
       </table>
     </div>
@@ -100,10 +111,10 @@ export function generateCustomerCardHTML(manufacturing) {
     <div style="border:1px solid #ddd;border-radius:12px;padding:24px;text-align:center;background:#fafafa;">
       <div style="font-size:14px;font-weight:700;margin-bottom:8px;">🏠 Welcome to Smart Door</div>
       <div style="font-size:12px;color:#555;margin-bottom:16px;">Your Plate ID</div>
-      <div style="font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:16px;">${manufacturing.plate_id}</div>
+      <div style="font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:16px;">${escapeHtml(manufacturing.plate_id)}</div>
       <div class="qr-box" style="margin:0 auto 16px;">QR Code</div>
       <div style="font-size:11px;color:#666;">Scan or visit:</div>
-      <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${url}</div>
+      <div style="font-size:12px;color:#1a1a1a;font-weight:600;">${escapeHtml(url)}</div>
       <div style="font-size:11px;color:#666;margin-top:14px;">Login at mysmartdoor.in/login with your Plate ID + PIN to finish setup.</div>
     </div>
   `;

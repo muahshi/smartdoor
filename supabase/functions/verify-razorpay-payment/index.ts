@@ -1,3 +1,4 @@
+// Phase 2A Production Persistence Fix
 /**
  * Smart Door — Edge Function: verify-razorpay-payment
  * supabase/functions/verify-razorpay-payment/index.ts
@@ -245,16 +246,56 @@ serve(async (req) => {
     }
 
     // ── 9. Create Manufacturing record ──
-    await supabase.from("manufacturing").insert({
-      order_id:         orderId,
-      plate_id:         plateId,
-      plate_name:       order.customer_name,
-      house_number:     order.shipping_address?.houseNumber || "",
-      font_style:       order.notes?.fontStyle || "modern",
-      product_type:     order.product_type,
-      qr_slug:          plateId,
+    // Phase 2A fix: previously read house_number from order.shipping_address
+    // (never set there) and font_style from order.notes (a plain TEXT column,
+    // never JSON) — both always produced empty/default values. These now
+    // come from the order columns create-razorpay-order actually persists.
+    // plate_name also previously used the buyer's account name
+    // (order.customer_name) instead of the "Name to Print on Plate" text the
+    // customer entered in the configurator (order.house_name) — corrected
+    // below, with a fallback to customer_name only for pre-Phase-2A orders
+    // that never captured a house_name.
+    const orderCustomization = (order.customization && typeof order.customization === "object") ? order.customization : {};
+    const { error: manufacturingError } = await supabase.from("manufacturing").insert({
+      order_id:          orderId,
+      plate_id:          plateId,
+      plate_name:        order.house_name || order.customer_name,
+      house_name:        order.house_name || null,
+      house_number:      order.house_number || "",
+      font_style:        order.font_style || "modern",
+      product_type:      order.product_type,
+      finish:            orderCustomization.finish || null,
+      plate_size:        orderCustomization.size || null,
+      symbol:            orderCustomization.symbol || null,
+      qr_style:          orderCustomization.qrStyle || null,
+      logo_file_name:    orderCustomization.logoFileName || null,
+      customization:     orderCustomization,
+      qr_slug:           plateId,
       production_status: "queued",
     });
+
+    // Hardening (Phase 2A): payment has already been captured and the order
+    // already marked 'paid' by this point — we cannot roll that back here,
+    // nor should the customer be shown a failure for something that is now
+    // an ops/fulfillment problem, not a payment problem. But a failed insert
+    // here previously vanished silently: the customer would be charged with
+    // no manufacturing record ever created, and nobody would know. This
+    // makes that failure loud (console) and durable (error_logs, already
+    // used by razorpay-webhook for the same purpose) without changing the
+    // success response returned to the customer.
+    if (manufacturingError) {
+      console.error("[verify-payment] Manufacturing record insert FAILED — order paid but not queued for production:", manufacturingError.message, { orderId, plateId });
+      try {
+        await supabase.from("error_logs").insert({
+          level:    "fatal",
+          category: "payment",
+          message:  "[verify-payment] Manufacturing insert failed after successful payment capture",
+          meta:     { orderId, plateId, error: manufacturingError.message },
+        });
+      } catch (_e) {
+        // Never let logging failure mask the underlying issue or break the response.
+      }
+    }
 
     // ── 10. Tracking events ──
     const trackingInserts = [

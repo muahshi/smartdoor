@@ -1,3 +1,4 @@
+// Phase 2A Production Persistence Fix
 /**
  * Smart Door — Admin Manufacturing Service
  * services/manufacturing.js
@@ -7,6 +8,7 @@
 
 import { supabase } from './supabase.js';
 import { adminAuditLog } from './admin.js';
+import { escapeHtml } from './sanitize.js';
 
 // ────────── STATUS CONSTANTS ──────────
 
@@ -197,20 +199,35 @@ export async function getQRAuditHistory(plateId) {
 // Generates printable production sheet HTML (use window.print() or html2pdf)
 
 export function generateProductionSheetHTML(items) {
+  // Phase 2A — Finish, Plate Size, Symbol, QR Style and Logo File are now
+  // persisted end-to-end (see manufacturing.finish/plate_size/symbol/
+  // qr_style/logo_file_name) and are surfaced here so the production floor
+  // sees exactly what the customer configured, not just name + house number.
+  //
+  // Hardening: every value below originates from customer input (directly,
+  // like plate_name/house_number/logo_file_name — the last being a raw
+  // browser filename with no format constraint — or indirectly via
+  // configurator presets) and is escaped before being placed in this HTML,
+  // which is later rendered/printed in an admin/production-staff context.
   const rows = items.map((item, i) => `
     <tr>
       <td>${i + 1}</td>
-      <td><strong>${item.plate_id}</strong></td>
-      <td>${item.plate_name || '—'}</td>
-      <td>${item.house_number || '—'}</td>
-      <td>${item.product_type}</td>
-      <td>${item.font_style || 'modern'}</td>
-      <td>${item.orders?.customer_name || '—'}</td>
-      <td>${item.orders?.customer_phone || '—'}</td>
-      <td>${item.production_status}</td>
+      <td><strong>${escapeHtml(item.plate_id)}</strong></td>
+      <td>${escapeHtml(item.plate_name) || '—'}</td>
+      <td>${escapeHtml(item.house_number) || '—'}</td>
+      <td>${escapeHtml(item.product_type)}</td>
+      <td>${escapeHtml(item.font_style) || 'modern'}</td>
+      <td>${escapeHtml(item.plate_size) || '—'}</td>
+      <td>${escapeHtml(item.finish) || '—'}</td>
+      <td>${escapeHtml(item.symbol) || '—'}</td>
+      <td>${escapeHtml(item.qr_style) || '—'}</td>
+      <td>${escapeHtml(item.logo_file_name) || '—'}</td>
+      <td>${escapeHtml(item.orders?.customer_name) || '—'}</td>
+      <td>${escapeHtml(item.orders?.customer_phone) || '—'}</td>
+      <td>${escapeHtml(item.production_status)}</td>
       <td>
         <div style="width:60px;height:60px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6b7280">
-          QR: ${item.plate_id}
+          QR: ${escapeHtml(item.plate_id)}
         </div>
       </td>
     </tr>
@@ -239,7 +256,8 @@ export function generateProductionSheetHTML(items) {
         <thead>
           <tr>
             <th>#</th><th>Plate ID</th><th>Name</th><th>House No.</th>
-            <th>Type</th><th>Font</th><th>Customer</th><th>Phone</th>
+            <th>Type</th><th>Font</th><th>Size</th><th>Finish</th><th>Symbol</th>
+            <th>QR Style</th><th>Logo File</th><th>Customer</th><th>Phone</th>
             <th>Status</th><th>QR Preview</th>
           </tr>
         </thead>

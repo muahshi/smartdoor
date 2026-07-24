@@ -1,3 +1,4 @@
+// Phase 2A Production Persistence Fix
 /**
  * Smart Door — Edge Function: create-razorpay-order
  * supabase/functions/create-razorpay-order/index.ts
@@ -56,6 +57,7 @@ serve(async (req) => {
       houseName,
       houseNumber,
       fontStyle       = "modern",
+      customization   = {},    // Phase 2A — { size, finish, symbol, qrStyle, logoFileName, subtitle, houseNumber }
       ownerId,
       quantity        = 1,     // Phase 8A — bulk pricing. Existing callers omit this and get qty=1, unchanged behavior.
       couponCode      = null,  // Phase 8A — promo code entered at checkout.
@@ -172,6 +174,14 @@ serve(async (req) => {
         customer_phone:      customerPhone,
         shipping_address:    shippingAddress,
         created_by_admin_id: partnerRoleName ? partnerAdminId : null,
+        // Phase 2A — these were already being sent by the configurator/checkout
+        // but had no column to land in, so they were silently dropped and
+        // verify-razorpay-payment / razorpay-webhook built the manufacturing
+        // record from the wrong (empty) source. Persist them as-received.
+        house_name:          houseName || null,
+        house_number:        houseNumber || customization.houseNumber || null,
+        font_style:          fontStyle || "modern",
+        customization:       customization || {},
       })
       .select("id")
       .single();
