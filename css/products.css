@@ -1,0 +1,305 @@
+/* ============================================
+   SMART DOOR — Products Listing & Detail Pages
+   Phase 2B — additive stylesheet. Extends the
+   design tokens in css/styles.css; never
+   overrides existing selectors from that file.
+   ============================================ */
+
+/* ---------- Shared: breadcrumb ---------- */
+.sd-breadcrumb {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 24px 0;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sd-breadcrumb a { color: rgba(255,255,255,0.55); text-decoration: none; }
+.sd-breadcrumb a:hover, .sd-breadcrumb a:focus-visible { color: var(--accent); }
+.sd-breadcrumb span[aria-current] { color: rgba(255,255,255,0.85); }
+.sd-breadcrumb .sep { opacity: 0.35; }
+
+/* ---------- Products Listing Page ---------- */
+.pl-header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 24px 8px;
+  text-align: center;
+}
+.pl-header h1 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  color: #fff;
+  margin: 10px 0 12px;
+  line-height: 1.15;
+}
+.pl-header p {
+  color: rgba(255,255,255,0.55);
+  max-width: 620px;
+  margin: 0 auto;
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.pl-toolbar {
+  max-width: 1200px;
+  margin: 28px auto 0;
+  padding: 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.pl-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.pl-filter-btn {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.pl-filter-btn:hover { background: var(--glass-bg-hover); color: #fff; }
+.pl-filter-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pl-filter-btn[aria-pressed="true"] {
+  background: rgba(0,162,232,0.14);
+  border-color: var(--glass-border-strong);
+  color: var(--accent);
+}
+
+.pl-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pl-sort label { font-size: 0.78rem; color: rgba(255,255,255,0.45); }
+.pl-sort select {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.82rem;
+  color: #fff;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.pl-sort select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pl-count {
+  max-width: 1200px;
+  margin: 16px auto 0;
+  padding: 0 24px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.4);
+}
+
+.pl-grid {
+  max-width: 1200px;
+  margin: 20px auto 60px;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+@media (max-width: 900px) { .pl-grid { grid-template-columns: 1fr 1fr; gap: 16px; } }
+@media (max-width: 620px) { .pl-grid { grid-template-columns: 1fr; } }
+
+.pl-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-lg, 20px);
+}
+.pl-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+.pl-empty {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 40px 24px;
+  text-align: center;
+  color: rgba(255,255,255,0.45);
+  font-size: 0.95rem;
+}
+
+/* ---------- Product Detail Page ---------- */
+.pd-wrap {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: start;
+}
+@media (max-width: 880px) {
+  .pd-wrap { grid-template-columns: 1fr; gap: 28px; padding: 16px 16px 48px; }
+}
+
+.pd-gallery-main {
+  border-radius: var(--radius-lg, 20px);
+  overflow: hidden;
+  background: var(--card-gradient);
+  border: 1px solid var(--glass-border);
+  aspect-ratio: 4 / 5;
+  position: sticky;
+  top: 90px;
+}
+@media (max-width: 880px) { .pd-gallery-main { position: static; aspect-ratio: 4/4; } }
+.pd-gallery-main img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.pd-gallery-main.img-contain img { object-fit: contain; padding: 24px; }
+.pd-gallery-thumbs {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.pd-gallery-thumb {
+  width: 68px; height: 68px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1.5px solid var(--glass-border);
+  background: var(--card-gradient);
+  cursor: pointer;
+  padding: 0;
+}
+.pd-gallery-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pd-gallery-thumb[aria-current="true"] { border-color: var(--accent); }
+.pd-gallery-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pd-info-col { min-width: 0; }
+.pd-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+.pd-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+  color: #fff;
+  margin: 0 0 10px;
+  line-height: 1.15;
+}
+.pd-price-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+.pd-price { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.7rem; color: var(--accent); }
+.pd-ship-note { font-size: 0.78rem; color: #22C55E; }
+.pd-desc { color: rgba(255,255,255,0.6); font-size: 0.98rem; line-height: 1.7; margin-bottom: 22px; }
+
+.pd-feats { list-style: none; padding: 0; margin: 0 0 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pd-feats li { font-size: 0.86rem; color: rgba(255,255,255,0.75); display: flex; gap: 8px; align-items: center; }
+.pd-feats li::before { content: "✓"; color: #22C55E; font-weight: 700; }
+@media (max-width: 420px) { .pd-feats { grid-template-columns: 1fr; } }
+
+.pd-cfg-section-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 12px;
+}
+.pd-cfg-block {
+  padding: 18px;
+  background: rgba(0,162,232,0.04);
+  border: 1px solid rgba(0,162,232,0.12);
+  border-radius: 16px;
+  margin-bottom: 22px;
+}
+
+.pd-sticky-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+}
+.pd-cta-btn {
+  flex: 1;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+  background: var(--chrome-blue, var(--primary-blue));
+  border: none;
+  border-radius: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(0,162,232,0.28);
+}
+.pd-cta-btn:hover { filter: brightness(1.08); }
+.pd-cta-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.pd-trust-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 16px;
+  background: rgba(34,197,94,0.05);
+  border: 1px solid rgba(34,197,94,0.12);
+  border-radius: 12px;
+  margin-top: 18px;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.5);
+}
+
+/* Related products */
+.pd-related-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: #fff;
+  text-align: center;
+  margin: 0 0 22px;
+}
+
+/* Skip link (accessibility) */
+.sd-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: #04121e;
+  font-weight: 700;
+  padding: 10px 18px;
+  z-index: 10000;
+  border-radius: 0 0 8px 0;
+  text-decoration: none;
+}
+.sd-skip-link:focus { left: 0; }
+
+/* Loading skeletons (perf/UX — avoid layout shift while catalog script parses) */
+.pl-skel-card, .pd-skel {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 37%, rgba(255,255,255,0.03) 63%);
+  background-size: 400% 100%;
+  animation: sd-shimmer 1.4s ease infinite;
+  border-radius: var(--radius-lg, 20px);
+}
+.pl-skel-card { aspect-ratio: 3/4; }
+@keyframes sd-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
