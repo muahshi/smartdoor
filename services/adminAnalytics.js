@@ -95,3 +95,13 @@ export async function getFulfillmentPipeline() {
 export async function getAIConsultantFunnel(days = 30) {
   return callAdminFunction(FUNCTION_NAME, { type: 'ai_consultant_funnel', days });
 }
+
+/**
+ * getAIConsultantInsights(days = 30)
+ * Phase 3.2 — Owner/Admin AI Insights Dashboard: product recommendation
+ * performance, visitor intent categories, and a daily trend, extending
+ * getAIConsultantFunnel() above without modifying it.
+ */
+export async function getAIConsultantInsights(days = 30) {
+  return callAdminFunction(FUNCTION_NAME, { type: 'ai_consultant_insights', days });
+}
