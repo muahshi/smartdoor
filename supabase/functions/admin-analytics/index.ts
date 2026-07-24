@@ -218,6 +218,20 @@ serve(async (req) => {
       return Response.json({ success: true, pipeline }, { headers });
     }
 
+    // ── AI Consultant Funnel (Phase 3.1B) ──
+    // Anonymous, platform-wide — no owner_id exists on this data, same as
+    // fulfillment_pipeline above. See sql/68_ai_consultant_analytics.sql
+    // for get_ai_consultant_funnel().
+    if (type === 'ai_consultant_funnel') {
+      const days = Math.min(Math.max(Number(body.days || 30), 1), 90);
+      const { data, error } = await supabaseAdmin.rpc('get_ai_consultant_funnel', { p_days: days });
+      if (error) {
+        console.error('[admin-analytics] get_ai_consultant_funnel error:', error.message);
+        return Response.json({ success: false, message: 'Failed to load AI consultant analytics.' }, { status: 500, headers });
+      }
+      return Response.json({ success: true, funnel: data }, { headers });
+    }
+
     return Response.json({ success: false, message: `Unknown metric type: ${type}` }, { status: 400, headers });
 
   } catch (err) {
