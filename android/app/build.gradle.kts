@@ -124,6 +124,8 @@ dependencies {
 
     // Phase A1.3 — App shell & navigation foundation.
     implementation(libs.androidx.navigation.compose)
+    // Phase A1.5 — LoginScreen gets its first ViewModel.
+    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -135,6 +137,8 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.auth)
     implementation(libs.supabase.realtime)
+    // Phase A1.5 — invokes the existing verify-pin Edge Function.
+    implementation(libs.supabase.functions)
     implementation(libs.ktor.client.android)
 
     implementation(libs.kotlinx.serialization.json)

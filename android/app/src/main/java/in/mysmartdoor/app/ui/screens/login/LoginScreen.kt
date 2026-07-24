@@ -15,17 +15,19 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -37,116 +39,130 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import `in`.mysmartdoor.app.R
-import `in`.mysmartdoor.app.ui.components.CountryCode
-import `in`.mysmartdoor.app.ui.components.CountryCodeSelector
+import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.SmartDoorScaffold
-import `in`.mysmartdoor.app.ui.components.defaultCountryCodes
 import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
 
 /**
- * Client-side-only phone validation for the Login screen. Deliberately
- * dumb: length/shape checks so the user gets instant feedback before an
- * OTP is ever requested. Real verification (does this number exist / can
- * it receive SMS) happens server-side once the OTP phase is implemented —
- * this function is never the source of truth for whether a number is
- * valid, only a UX guard against obviously-wrong input.
+ * Client-side-only Plate ID validation — a UX guard against obviously-wrong
+ * input, exactly like the equivalent check in login.html
+ * (`plateId.length < 8`). The Edge Function's stricter `^SD-[A-Z0-9]{6}$`
+ * regex remains the real source of truth server-side; this is not
+ * duplicated here so the two never drift out of sync silently.
  */
-private fun validatePhoneNumber(digitsOnly: String, country: CountryCode): String? {
-    return when {
-        digitsOnly.isEmpty() -> null // no error shown until the user types something
-        country.isoCode == "IN" && digitsOnly.length < 10 ->
-            "Enter a 10-digit mobile number"
-        country.isoCode == "IN" && digitsOnly.length == 10 && digitsOnly[0] !in '6'..'9' ->
-            "Enter a valid Indian mobile number"
-        country.isoCode != "IN" && digitsOnly.length < 6 ->
-            "Enter a valid mobile number"
-        digitsOnly.length > 12 ->
-            "Mobile number is too long"
-        else -> null
-    }
+private fun validatePlateId(plateId: String): String? = when {
+    plateId.isEmpty() -> null // no error until the user types something
+    plateId.length < 8 -> "Enter a valid Plate ID (e.g. SD-ABX9K7)"
+    else -> null
 }
 
-private fun isPhoneValid(digitsOnly: String, country: CountryCode): Boolean {
-    if (digitsOnly.isEmpty()) return false
-    return validatePhoneNumber(digitsOnly, country) == null
+private fun validatePin(pin: String): String? = when {
+    pin.isEmpty() -> null
+    pin.length < 4 -> "Enter your complete 4-digit PIN"
+    else -> null
 }
+
+private fun isFormValid(plateId: String, pin: String): Boolean =
+    plateId.trim().length >= 8 && pin.length == 4
 
 /**
  * Stateful entry point wired into [in.mysmartdoor.app.navigation.SmartDoorNavHost].
- * Owns only UI-local state (typed digits, selected country, loading/error
- * flags) via `rememberSaveable`/`remember` — there is no ViewModel here on
- * purpose. [onContinueClick] is currently a no-op default; the phase that
- * adds the OTP flow will pass a real callback (and drive [isLoading] /
- * error text from an actual repository result) without needing to touch
- * this screen's layout.
+ * Phase A1.5 replaces the phone/OTP placeholder with the real Owner Login
+ * fields — Plate ID + 4-digit PIN — driven by [LoginViewModel], which calls
+ * the existing production `verify-pin` flow via `AuthRepository`. On
+ * success, navigates to [Routes.DASHBOARD] (a placeholder screen — real
+ * Dashboard implementation is a later phase, out of scope here).
  */
 @Composable
 fun LoginScreen(
     navController: NavHostController? = null,
-    onContinueClick: (fullPhoneNumber: String) -> Unit = {},
+    viewModel: LoginViewModel = hiltViewModel(),
 ) {
-    var selectedCountry by rememberSaveable(stateSaver = countryCodeSaver) {
-        mutableStateOf(defaultCountryCodes.first())
-    }
-    var phoneDigits by rememberSaveable { mutableStateOf("") }
-    var isLoading by rememberSaveable { mutableStateOf(false) }
-    var touched by rememberSaveable { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsState()
 
-    val validationError = if (touched) validatePhoneNumber(phoneDigits, selectedCountry) else null
+    var plateId by rememberSaveable { mutableStateOf("") }
+    var pin by rememberSaveable { mutableStateOf("") }
+    var rememberDevice by rememberSaveable { mutableStateOf(false) }
+    var plateTouched by rememberSaveable { mutableStateOf(false) }
+    var pinTouched by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.loginSucceeded) {
+        if (uiState.loginSucceeded) {
+            viewModel.consumeLoginSuccess()
+            navController?.navigate(Routes.DASHBOARD) {
+                popUpTo(Routes.LOGIN) { inclusive = true }
+            }
+        }
+    }
+
+    val plateError = if (plateTouched) validatePlateId(plateId) else null
+    val pinError = if (pinTouched) validatePin(pin) else null
 
     LoginContent(
-        selectedCountry = selectedCountry,
-        onCountryChange = { selectedCountry = it },
-        phoneDigits = phoneDigits,
-        onPhoneDigitsChange = { newDigits ->
-            phoneDigits = newDigits
-            touched = true
+        plateId = plateId,
+        onPlateIdChange = { input ->
+            plateId = input.uppercase().filter { it.isLetterOrDigit() || it == '-' }.take(10)
+            plateTouched = true
         },
-        errorMessage = validationError,
-        isLoading = isLoading,
-        isContinueEnabled = isPhoneValid(phoneDigits, selectedCountry) && !isLoading,
+        pin = pin,
+        onPinChange = { input ->
+            pin = input.filter { it.isDigit() }.take(4)
+            pinTouched = true
+        },
+        rememberDevice = rememberDevice,
+        onRememberDeviceChange = { rememberDevice = it },
+        plateError = plateError,
+        pinError = pinError,
+        serverError = uiState.errorMessage,
+        isLoading = uiState.isLoading,
+        isContinueEnabled = isFormValid(plateId, pin) && !uiState.isLoading,
         onContinueClick = {
-            touched = true
-            if (isPhoneValid(phoneDigits, selectedCountry)) {
-                // Visual-only: a real async call (added with the OTP phase)
-                // is what will eventually flip isLoading back to false.
-                isLoading = true
-                onContinueClick("${selectedCountry.dialCode}$phoneDigits")
+            plateTouched = true
+            pinTouched = true
+            if (isFormValid(plateId, pin)) {
+                viewModel.clearError()
+                viewModel.login(plateId, pin)
             }
         },
     )
 }
 
-private val countryCodeSaver: Saver<CountryCode, List<String>> = listSaver(
-    save = { listOf(it.isoCode, it.dialCode, it.displayName) },
-    restore = { CountryCode(it[0], it[1], it[2]) },
-)
-
 /**
  * Stateless content — everything the screen renders, driven entirely by
- * parameters. Kept separate from [LoginScreen] so it can be previewed in
- * every state (empty, error, loading) without needing the stateful
- * wrapper, and so a future ViewModel can drive it directly.
+ * parameters, so it can be previewed in every state without a ViewModel.
+ *
+ * [rememberDevice] is collected here (matching login.html's "Remember this
+ * device for 30 days" checkbox) but is currently a UI-only value —
+ * trusted-device persistence is out of scope for A1.5; see AuthRepository's
+ * class doc.
  */
 @Composable
 private fun LoginContent(
-    selectedCountry: CountryCode,
-    onCountryChange: (CountryCode) -> Unit,
-    phoneDigits: String,
-    onPhoneDigitsChange: (String) -> Unit,
-    errorMessage: String?,
+    plateId: String,
+    onPlateIdChange: (String) -> Unit,
+    pin: String,
+    onPinChange: (String) -> Unit,
+    rememberDevice: Boolean,
+    onRememberDeviceChange: (Boolean) -> Unit,
+    plateError: String?,
+    pinError: String?,
+    serverError: String?,
     isLoading: Boolean,
     isContinueEnabled: Boolean,
     onContinueClick: () -> Unit,
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    val phoneInputDescription = stringResource(R.string.login_phone_input_description)
+    val plateInputDescription = stringResource(R.string.login_plate_id_input_description)
+    val pinInputDescription = stringResource(R.string.login_pin_input_description)
     val continueButtonLabel = stringResource(R.string.login_continue_button)
     val continueLoadingLabel = stringResource(R.string.login_continue_loading_description)
+    val errorMessage = plateError ?: pinError ?: serverError
 
     SmartDoorScaffold { innerPadding ->
         Column(
@@ -174,43 +190,65 @@ private fun LoginContent(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            OutlinedTextField(
+                value = plateId,
+                onValueChange = onPlateIdChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("login_plate_id_input")
+                    .semantics { contentDescription = plateInputDescription },
+                enabled = !isLoading,
+                singleLine = true,
+                label = { Text(stringResource(R.string.login_plate_id_label)) },
+                placeholder = { Text(stringResource(R.string.login_plate_id_placeholder)) },
+                supportingText = { Text(stringResource(R.string.login_plate_id_hint)) },
+                isError = plateError != null,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next,
+                ),
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = pin,
+                onValueChange = onPinChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("login_pin_input")
+                    .semantics { contentDescription = pinInputDescription },
+                enabled = !isLoading,
+                singleLine = true,
+                label = { Text(stringResource(R.string.login_pin_label)) },
+                visualTransformation = PasswordVisualTransformation(),
+                isError = pinError != null,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.NumberPassword,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        keyboardController?.hide()
+                        if (isContinueEnabled) onContinueClick()
+                    },
+                ),
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                CountryCodeSelector(
-                    selected = selectedCountry,
-                    onSelectedChange = onCountryChange,
+                Checkbox(
+                    checked = rememberDevice,
+                    onCheckedChange = onRememberDeviceChange,
                     enabled = !isLoading,
                 )
-
-                OutlinedTextField(
-                    value = phoneDigits,
-                    onValueChange = { input ->
-                        val digitsOnly = input.filter { it.isDigit() }.take(12)
-                        onPhoneDigitsChange(digitsOnly)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("login_phone_input")
-                        .semantics {
-                            contentDescription = phoneInputDescription
-                        },
-                    enabled = !isLoading,
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.login_phone_label)) },
-                    placeholder = { Text(stringResource(R.string.login_phone_placeholder)) },
-                    isError = errorMessage != null,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Phone,
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            keyboardController?.hide()
-                            if (isContinueEnabled) onContinueClick()
-                        },
-                    ),
+                Text(
+                    text = stringResource(R.string.login_remember_device),
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
 
@@ -271,11 +309,15 @@ private fun LoginContent(
 private fun LoginScreenPreview() {
     SmartDoorTheme {
         LoginContent(
-            selectedCountry = defaultCountryCodes.first(),
-            onCountryChange = {},
-            phoneDigits = "",
-            onPhoneDigitsChange = {},
-            errorMessage = null,
+            plateId = "",
+            onPlateIdChange = {},
+            pin = "",
+            onPinChange = {},
+            rememberDevice = false,
+            onRememberDeviceChange = {},
+            plateError = null,
+            pinError = null,
+            serverError = null,
             isLoading = false,
             isContinueEnabled = false,
             onContinueClick = {},
@@ -288,13 +330,17 @@ private fun LoginScreenPreview() {
 private fun LoginScreenErrorPreview() {
     SmartDoorTheme {
         LoginContent(
-            selectedCountry = defaultCountryCodes.first(),
-            onCountryChange = {},
-            phoneDigits = "123",
-            onPhoneDigitsChange = {},
-            errorMessage = "Enter a 10-digit mobile number",
+            plateId = "SD-ABX9K7",
+            onPlateIdChange = {},
+            pin = "1234",
+            onPinChange = {},
+            rememberDevice = false,
+            onRememberDeviceChange = {},
+            plateError = null,
+            pinError = null,
+            serverError = "Invalid Plate ID or PIN. 4 attempt(s) remaining.",
             isLoading = false,
-            isContinueEnabled = false,
+            isContinueEnabled = true,
             onContinueClick = {},
         )
     }
@@ -305,11 +351,15 @@ private fun LoginScreenErrorPreview() {
 private fun LoginScreenLoadingPreview() {
     SmartDoorTheme {
         LoginContent(
-            selectedCountry = defaultCountryCodes.first(),
-            onCountryChange = {},
-            phoneDigits = "9876543210",
-            onPhoneDigitsChange = {},
-            errorMessage = null,
+            plateId = "SD-ABX9K7",
+            onPlateIdChange = {},
+            pin = "1234",
+            onPinChange = {},
+            rememberDevice = true,
+            onRememberDeviceChange = {},
+            plateError = null,
+            pinError = null,
+            serverError = null,
             isLoading = true,
             isContinueEnabled = false,
             onContinueClick = {},
@@ -322,11 +372,15 @@ private fun LoginScreenLoadingPreview() {
 private fun LoginScreenDarkPreview() {
     SmartDoorTheme(darkTheme = true) {
         LoginContent(
-            selectedCountry = defaultCountryCodes.first(),
-            onCountryChange = {},
-            phoneDigits = "98765",
-            onPhoneDigitsChange = {},
-            errorMessage = null,
+            plateId = "SD-ABX9",
+            onPlateIdChange = {},
+            pin = "12",
+            onPinChange = {},
+            rememberDevice = false,
+            onRememberDeviceChange = {},
+            plateError = null,
+            pinError = null,
+            serverError = null,
             isLoading = false,
             isContinueEnabled = false,
             onContinueClick = {},

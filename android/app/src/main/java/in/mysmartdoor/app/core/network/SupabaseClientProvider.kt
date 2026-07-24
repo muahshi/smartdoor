@@ -4,6 +4,7 @@ import `in`.mysmartdoor.app.core.common.Logger
 import `in`.mysmartdoor.app.core.config.EnvironmentConfig
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.SupabaseClient
@@ -45,6 +46,9 @@ class SupabaseClientProvider @Inject constructor(
             }
             install(Postgrest)
             install(Realtime)
+            // Phase A1.5 — lets AuthRepository call client.functions.invoke("verify-pin", ...),
+            // reusing the same production Edge Function services/auth.js calls on the website.
+            install(Functions)
         }
     }
 }

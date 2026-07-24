@@ -19,6 +19,9 @@ datastorePreferences = "1.1.1"
 securityCrypto = "1.1.0-alpha06"
 kotlinSerializationPlugin = "2.0.21"
 
+# Phase A1.5 — verify-pin integration additions.
+hiltNavigationCompose = "1.2.0"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -37,6 +40,10 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 # is intentionally not added until a later phase needs hiltViewModel().
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
+# Phase A1.5 — LoginScreen now has a ViewModel, so hiltViewModel() is needed
+# inside the nav graph's composable() blocks.
+androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 
@@ -47,6 +54,9 @@ supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version
 supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
 supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
 supabase-realtime = { group = "io.github.jan-tennert.supabase", name = "realtime-kt" }
+# Phase A1.5 — needed to invoke the existing verify-pin Edge Function
+# (io.github.jan.supabase.functions.Functions plugin / client.functions.invoke).
+supabase-functions = { group = "io.github.jan-tennert.supabase", name = "functions-kt" }
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktorClientAndroid" }
 
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
