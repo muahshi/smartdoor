@@ -1,0 +1,183 @@
+/**
+ * AI Product Consultant (Phase 3) — additive stylesheet, new file.
+ * Reuses existing custom properties from css/styles.css (--dark-bg,
+ * --dark-card, --primary-blue, --font-display, --font-body, --radius-*,
+ * --shadow-card) instead of introducing a parallel color system.
+ * Loaded only on products.html / product.html.
+ */
+
+#ai-consultant-root {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+  font-family: var(--font-body, 'Inter', sans-serif);
+}
+
+.ai-consult-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--primary-blue, #00A2E8);
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  padding: 12px 18px;
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-blue-sm, 0 0 15px rgba(0,162,232,0.25));
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ai-consult-bubble:hover { transform: translateY(-1px); box-shadow: var(--shadow-blue, 0 0 30px rgba(0,162,232,0.3)); }
+.ai-consult-bubble-icon { font-size: 1.05rem; }
+
+.ai-consult-panel {
+  position: absolute;
+  right: 0;
+  bottom: 62px;
+  width: min(360px, calc(100vw - 40px));
+  max-height: min(520px, calc(100vh - 120px));
+  background: var(--dark-card, #0E1B2A);
+  border: 1px solid var(--dark-border, rgba(0,162,232,0.15));
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-card, 0 8px 32px rgba(0,0,0,0.4));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ai-consult-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dark-border, rgba(0,162,232,0.15));
+}
+.ai-consult-title {
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #fff;
+}
+.ai-consult-subtitle {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+  margin-top: 2px;
+}
+.ai-consult-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 4px;
+}
+.ai-consult-close:hover { color: #fff; }
+
+.ai-consult-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 140px;
+}
+
+.ai-consult-msg {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  padding: 9px 12px;
+  border-radius: 10px;
+  max-width: 88%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-consult-msg-assistant {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.85);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.ai-consult-msg-user {
+  align-self: flex-end;
+  background: var(--primary-blue, #00A2E8);
+  color: #fff;
+}
+.ai-consult-typing { opacity: 0.6; font-style: italic; }
+
+.ai-consult-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 12px;
+}
+.ai-consult-chip {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.75);
+  font-size: 0.72rem;
+  padding: 6px 10px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.ai-consult-chip:hover { border-color: var(--primary-blue, #00A2E8); color: #fff; }
+
+.ai-consult-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--dark-border, rgba(0,162,232,0.15));
+}
+.ai-consult-input-row input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #fff;
+  padding: 9px 11px;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.ai-consult-input-row input:focus { outline: none; border-color: var(--primary-blue, #00A2E8); }
+.ai-consult-input-row button {
+  background: var(--primary-blue, #00A2E8);
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  width: 38px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.ai-consult-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px 14px;
+  border-top: 1px solid var(--dark-border, rgba(0,162,232,0.15));
+}
+.ai-consult-cta {
+  flex: 1 1 auto;
+  background: rgba(212,175,55,0.1);
+  border: 1px solid rgba(212,175,55,0.3);
+  color: #D4AF37;
+  font-family: var(--font-display, 'Space Grotesk', sans-serif);
+  font-weight: 600;
+  font-size: 0.72rem;
+  padding: 8px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-consult-cta:hover { background: rgba(212,175,55,0.18); }
+
+@media (max-width: 420px) {
+  #ai-consultant-root { right: 12px; bottom: 12px; }
+  .ai-consult-panel { width: calc(100vw - 24px); }
+}

@@ -94,7 +94,12 @@
           { key: 'high-gloss', label: 'High Gloss', priceDelta: 0 },
           { key: 'matte', label: 'Matte', priceDelta: 150 }
         ]
-      }
+      },
+      // AI Product Consultant (Phase 3) — informational only, no pricing.
+      // Not a purchasable line item: checkout charges the base productType
+      // price only (see supabase/functions/_shared/pricing.ts), so this must
+      // never be presented as something with its own cost.
+      mounting: { type: 'wall-mount', weightClass: 'light', note: 'Light material — suits screw-mount or heavy-duty adhesive on most gate/door surfaces.' }
     },
     {
       key: 'wood',
@@ -127,7 +132,8 @@
           { key: 'polished', label: 'Polished Teak', priceDelta: 0 },
           { key: 'natural', label: 'Natural Grain', priceDelta: 0 }
         ]
-      }
+      },
+      mounting: { type: 'wall-mount', weightClass: 'medium', note: 'Solid wood — screw-mount recommended over adhesive for a secure, lasting hold.' }
     },
     {
       key: 'steel',
@@ -160,7 +166,8 @@
           { key: 'matte', label: 'Matte Steel', priceDelta: 0 },
           { key: 'brushed', label: 'Brushed Steel', priceDelta: 200 }
         ]
-      }
+      },
+      mounting: { type: 'wall-mount', weightClass: 'heavy', note: 'Heaviest of the three — screw-mount only; not suitable for adhesive-only installation.' }
     }
   ];
 
@@ -290,6 +297,12 @@
     return SD_PRODUCTS.find((p) => p.key === key) || null;
   }
 
+  /** AI Product Consultant (Phase 3) — informational mounting guidance only, never a priced item. */
+  function getMountingInfo(key) {
+    const p = getByKey(key);
+    return (p && p.mounting) || null;
+  }
+
   global.SD_PRODUCTS = SD_PRODUCTS;
   global.SD_Catalog = {
     products: SD_PRODUCTS,
@@ -299,6 +312,7 @@
     buildGalleryImages,
     buildPriceMap,
     getByKey,
+    getMountingInfo,
     // Phase 2/3 — Product Configurator + Live Preview data source
     fonts: SD_FONTS,
     symbols: SD_SYMBOLS,

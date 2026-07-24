@@ -44,6 +44,7 @@
   <link rel="stylesheet" href="css/styles.css" />
   <link rel="stylesheet" href="css/landing-shared.css" />
   <link rel="stylesheet" href="css/products.css" />
+  <link rel="stylesheet" href="css/ai-consultant.css" />
 </head>
 <body>
 <a href="#pd-main" class="sd-skip-link">Skip to product details</a>
@@ -179,5 +180,12 @@
 <script src="js/productCatalog.js"></script>
 <script src="js/productConfigurator.js"></script>
 <script src="js/productDetailPage.js"></script>
+<!-- AI Product Consultant (Phase 3) — additive; config/env.generated.js
+     was not previously loaded on this page (only index.html had it). The
+     widget calls groq-proxy directly (see js/aiProductConsultant.js) rather
+     than depending on js/groq.js, so that file is intentionally not added here. -->
+<script src="config/env.generated.js"></script>
+<script src="js/aiConsultantKnowledge.js"></script>
+<script src="js/aiProductConsultant.js"></script>
 </body>
 </html>
