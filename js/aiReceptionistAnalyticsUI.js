@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Receptionist Analytics UI
+ * My Smart Door — AI Receptionist Analytics UI
  * js/aiReceptionistAnalyticsUI.js
  *
  * PHASE 4 — ADDITIVE ONLY. Renders visitor-category analytics, weekly

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Dashboard Module (Phase 4)
+ * My Smart Door — Dashboard Module (Phase 4)
  * dashboard.js v3.0 — Supabase Connected
  *
  * CHANGES from v2.0:
@@ -608,9 +608,9 @@ const DashboardModule = (() => {
       });
       // Update page title if there are unread messages
       if (total > 0) {
-        document.title = `(${total}) Smart Door — Dashboard`;
+        document.title = `(${total}) My Smart Door — Dashboard`;
       } else {
-        document.title = 'Smart Door — Dashboard';
+        document.title = 'My Smart Door — Dashboard';
       }
     } catch (err) {
       console.warn('[Dashboard] _refreshUnreadBadge error:', err);
@@ -1459,7 +1459,7 @@ const DashboardModule = (() => {
         border:1px solid rgba(0,162,232,0.2);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
           <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.88rem;color:#fff;">
-            🚀 Setup Your Smart Door
+            🚀 Setup Your My Smart Door
           </div>
           <div style="font-size:0.72rem;color:#00A2E8;font-weight:700;font-family:'Space Grotesk',sans-serif;">
             ${completedCount}/${totalCount} done
@@ -1496,7 +1496,7 @@ const DashboardModule = (() => {
       }, 200);
     } else if (stepKey === 'first_visitor_scan') {
       // Show QR test instruction toast
-      showToast('📱 Open your Smart Door QR link in another browser tab to test!', 'info');
+      showToast('📱 Open your My Smart Door QR link in another browser tab to test!', 'info');
     }
   };
 

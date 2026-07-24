@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Panel Error Capture (Phase 10)
+ * My Smart Door — Admin Panel Error Capture (Phase 10)
  * js/adminErrorCapture.js
  *
  * WHY THIS FILE EXISTS INSTEAD OF js/monitoring-bootstrap.js:

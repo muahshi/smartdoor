@@ -1,5 +1,5 @@
 /**
- * Smart Door — Web Analytics Loader
+ * My Smart Door — Web Analytics Loader
  * js/analytics-web.js
  *
  * Phase 10 — Production Launch

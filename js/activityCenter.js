@@ -1,5 +1,5 @@
 /**
- * Smart Door — Owner Activity Center
+ * My Smart Door — Owner Activity Center
  * js/activityCenter.js
  *
  * ADDITIVE ONLY. Phase 2 of the Visitor History feature (Phase 1 backend:
@@ -378,7 +378,7 @@ const ActivityCenter = (() => {
         <div style="text-align:center;padding:44px 16px;color:rgba(255,255,255,0.3);">
           <div style="font-size:1.8rem;margin-bottom:8px;">${hasFilters ? '🔍' : '📭'}</div>
           <div style="font-size:0.85rem;color:rgba(255,255,255,0.4);">${hasFilters ? `No visits match these filters${search ? ` for "${_esc(search)}"` : ''}.` : 'No visitor activity yet.'}</div>
-          ${hasFilters ? `<div style="font-size:0.72rem;margin-top:6px;color:rgba(255,255,255,0.25);">Try clearing a filter above.</div>` : `<div style="font-size:0.72rem;margin-top:6px;color:rgba(255,255,255,0.25);">Visits will appear here as soon as someone taps your Smart Door.</div>`}
+          ${hasFilters ? `<div style="font-size:0.72rem;margin-top:6px;color:rgba(255,255,255,0.25);">Try clearing a filter above.</div>` : `<div style="font-size:0.72rem;margin-top:6px;color:rgba(255,255,255,0.25);">Visits will appear here as soon as someone taps your My Smart Door.</div>`}
         </div>`;
       if (moreWrap) moreWrap.innerHTML = '';
       return;

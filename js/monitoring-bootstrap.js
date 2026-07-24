@@ -1,5 +1,5 @@
 /**
- * Smart Door — Monitoring Bootstrap
+ * My Smart Door — Monitoring Bootstrap
  * js/monitoring-bootstrap.js
  *
  * Phase 10 — Production Launch

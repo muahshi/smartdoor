@@ -1,5 +1,5 @@
 /**
- * Smart Door — Forgot PIN / Owner Recovery Flow
+ * My Smart Door — Forgot PIN / Owner Recovery Flow
  * js/forgotPin.js
  *
  * Standalone module that renders the Forgot PIN UI.

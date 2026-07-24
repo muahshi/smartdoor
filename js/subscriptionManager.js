@@ -1,5 +1,5 @@
 /**
- * Smart Door — Subscription Manager (SaaS Launch)
+ * My Smart Door — Subscription Manager (SaaS Launch)
  * js/subscriptionManager.js
  *
  * Subscription Dashboard: Current Plan, Renewal Date, Usage, Upgrade,

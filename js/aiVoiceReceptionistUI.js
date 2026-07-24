@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Voice Receptionist, Pre-Call Voice UI
+ * My Smart Door — AI Voice Receptionist, Pre-Call Voice UI
  * js/aiVoiceReceptionistUI.js
  *
  * Production voice layer on top of the existing chip-based AI Call

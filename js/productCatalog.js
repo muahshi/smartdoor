@@ -251,7 +251,7 @@
     return `
       <div class="${cardClass}" data-product="${p.key}" data-price="${p.price}" onclick="selectProduct(this)">
         ${bestBadge}
-        <div class="${imgWrapClass}"><img src="${p.mainImg}" alt="${escapeHtml(p.name)} Smart Door" id="${p.mainImgId}" /><button class="pcard-gallery-btn" onclick="event.stopPropagation();openGallery('${p.galleryKey}','${escapeHtml(p.name)}')">📸 View Gallery</button></div>
+        <div class="${imgWrapClass}"><img src="${p.mainImg}" alt="${escapeHtml(p.name)} My Smart Door" id="${p.mainImgId}" /><button class="pcard-gallery-btn" onclick="event.stopPropagation();openGallery('${p.galleryKey}','${escapeHtml(p.name)}')">📸 View Gallery</button></div>
         <div class="pcard-body">
           <div class="pcard-tag" style="background:${p.tag.bg};border:1px solid ${p.tag.border};color:${p.tag.color};">${escapeHtml(p.tag.label)}</div>
           <div class="pcard-name">${escapeHtml(p.name)}</div>

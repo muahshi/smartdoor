@@ -1,5 +1,5 @@
 /**
- * Smart Door — Activation Wizard
+ * My Smart Door — Activation Wizard
  * js/activationWizard.js
  *
  * Phase 9 — Beta Launch Operations
@@ -24,7 +24,7 @@ import { markOnboardingStep } from '../services/customerSuccess.js';
 const WIZARD_STEPS = [
   {
     id: 'welcome',
-    title: 'Welcome to Smart Door! 🎉',
+    title: 'Welcome to My Smart Door! 🎉',
     subtitle: 'Your plate is activated. Let\'s set up your home in 4 quick steps.',
     icon: '🏠',
     cta: 'Let\'s Begin',
@@ -65,7 +65,7 @@ const WIZARD_STEPS = [
   },
   {
     id: 'test',
-    title: 'Test Your Smart Door!',
+    title: 'Test Your My Smart Door!',
     subtitle: 'Scan your QR code with any phone to see the visitor experience.',
     icon: '📱',
     cta: 'Show My QR Code',
@@ -244,7 +244,7 @@ async function _completeWizard() {
     border-radius: 0.75rem; font-size: 0.95rem; font-weight: 600;
     z-index: 9998; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   `;
-  toast.textContent = '🎉 Smart Door setup complete!';
+  toast.textContent = '🎉 My Smart Door setup complete!';
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 4000);
 }

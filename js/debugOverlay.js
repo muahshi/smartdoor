@@ -1,5 +1,5 @@
 /**
- * Smart Door — Visitor-Side Forensic Debug Overlay
+ * My Smart Door — Visitor-Side Forensic Debug Overlay
  * js/debugOverlay.js
  *
  * TEMPORARY diagnostic tool for the third-party-visitor-phone WebRTC

@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Voice Receptionist, Owner Rules UI
+ * My Smart Door — AI Voice Receptionist, Owner Rules UI
  * js/aiReceptionistRulesUI.js
  *
  * Self-contained owner-dashboard overlay for managing

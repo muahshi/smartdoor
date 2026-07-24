@@ -1,5 +1,5 @@
 /**
- * Smart Door — WebRTC Tap to Talk, Visitor Call UI (Phase 2 UX)
+ * My Smart Door — WebRTC Tap to Talk, Visitor Call UI (Phase 2 UX)
  * js/visitorCallUI.js
  *
  * Self-contained UI layer for the visitor-side call screen (visitor.html).

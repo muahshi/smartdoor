@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Receptionist Pre-Call Screening UI
+ * My Smart Door — AI Receptionist Pre-Call Screening UI
  * js/aiCallScreeningUI.js
  *
  * Self-contained UI layer for the visitor-side "AI answers first" screen,

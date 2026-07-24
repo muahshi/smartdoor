@@ -1,5 +1,5 @@
 /**
- * Smart Door — WebRTC Tap to Talk, Owner UI (Phase 2 UX upgrade)
+ * My Smart Door — WebRTC Tap to Talk, Owner UI (Phase 2 UX upgrade)
  * js/webrtcCallUI.js
  *
  * Self-contained UI glue for the owner dashboard (app.html). Injects its

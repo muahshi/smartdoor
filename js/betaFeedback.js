@@ -1,5 +1,5 @@
 /**
- * Smart Door — Beta Feedback Widget
+ * My Smart Door — Beta Feedback Widget
  * js/betaFeedback.js
  *
  * Phase 9 — Beta Launch Operations
@@ -96,7 +96,7 @@ function _openModal() {
 
       <!-- Rate Panel -->
       <div id="sd-fb-rate" class="sd-fb-panel" style="display:none;">
-        <p style="margin:0 0 1rem;font-size:0.9rem;color:rgba(255,255,255,0.6);">How would you rate Smart Door?</p>
+        <p style="margin:0 0 1rem;font-size:0.9rem;color:rgba(255,255,255,0.6);">How would you rate My Smart Door?</p>
         <div id="sd-stars" style="display:flex;gap:0.5rem;justify-content:center;margin-bottom:1rem;">
           ${[1,2,3,4,5].map(n=>`<span data-star="${n}" style="font-size:2rem;cursor:pointer;opacity:0.4;transition:opacity 0.15s;">⭐</span>`).join('')}
         </div>

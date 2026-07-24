@@ -1,5 +1,5 @@
 /**
- * Smart Door — Groq AI Service
+ * My Smart Door — Groq AI Service
  * Production-ready wrapper for Groq's LLaMA-3 API
  * groq.js v1.0
  */
@@ -248,7 +248,7 @@ const GroqService = (() => {
   function _generalResponse(text) {
     return {
       success: true,
-      content: `AI Assistant processed your request: "${text}". The owner has been notified through the Smart Door secure channel.`,
+      content: `AI Assistant processed your request: "${text}". The owner has been notified through the My Smart Door secure channel.`,
       model: 'llama3-70b-8192 (mock)',
     };
   }
@@ -264,7 +264,7 @@ const GroqService = (() => {
     const messages = [
       {
         role: 'system',
-        content: `You are an AI security assistant for Smart Door, a smart nameplate system. You understand Hindi, Hinglish (Hindi in Latin script), English, and natural code-mixing — classify correctly regardless of the visitor's language.
+        content: `You are an AI security assistant for My Smart Door, a smart nameplate system. You understand Hindi, Hinglish (Hindi in Latin script), English, and natural code-mixing — classify correctly regardless of the visitor's language.
 Analyze the visitor's message and classify their intent into ONE of: Delivery, Courier, Family, Relative, Friend, Guest, Neighbour, House Help, Driver, Technician, Maintenance, Society Staff, Government, Utility, Business Visitor, Medical, "Emergency / SOS", "Spam / Promotional", "General Visitor".
 Examples: "I'm from Amazon" → Delivery. "I'm your neighbour" → Neighbour. "I'm his college friend" → Friend. "I've come for AC servicing" → Maintenance. "I'm from the electricity department" → Utility. "I'm his uncle" → Relative. "I need urgent help" → "Emergency / SOS".
 Respond ONLY with a JSON object containing:
@@ -304,7 +304,7 @@ An unsolicited sales/survey/promotional message, or a vague/evasive answer to wh
     const messages = [
       {
         role: 'system',
-        content: `You are an AI assistant for Smart Door. The owner has given you a brief note about their current situation.
+        content: `You are an AI assistant for My Smart Door. The owner has given you a brief note about their current situation.
 Convert it into a polished, professional, and warm greeting message that will be shown to visitors scanning the QR code.
 Keep it under 60 words. Be friendly, informative, and include helpful instructions (e.g., where to leave parcels, when to ring bell).
 Do NOT say "The owner" — write from the first person perspective of the household.`,

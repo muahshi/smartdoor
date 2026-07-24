@@ -1,5 +1,5 @@
 /**
- * Smart Door — Production Notification Center
+ * My Smart Door — Production Notification Center
  * js/notificationCenter.js
  *
  * ADDITIVE ONLY. Does not modify WebRTC, dashboard.js, or any existing

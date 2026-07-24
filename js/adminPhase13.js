@@ -1,5 +1,5 @@
 /**
- * Smart Door — Admin Phase 13 Panel Extension
+ * My Smart Door — Admin Phase 13 Panel Extension
  * js/adminPhase13.js
  *
  * Adds to existing admin.html:

@@ -1,5 +1,5 @@
 /**
- * Smart Door — Premium Owner Experience
+ * My Smart Door — Premium Owner Experience
  * js/ownerPremium.js
  *
  * ADDITIVE ONLY.
@@ -269,7 +269,7 @@ const OwnerPremium = (() => {
   function _shareLink(member) {
     const nameEl = document.getElementById('owner-greeting-name') || document.getElementById('owner-panel-name');
     const ownerName = (nameEl && nameEl.textContent.trim() !== '…') ? nameEl.textContent.trim() : 'the owner';
-    const msg = `Hi ${member.name}, you've been added as a family contact on ${ownerName}'s Smart Door. You'll receive calls and alerts when visitors arrive.`;
+    const msg = `Hi ${member.name}, you've been added as a family contact on ${ownerName}'s My Smart Door. You'll receive calls and alerts when visitors arrive.`;
     const phone = (member.phone || '').replace(/[^0-9]/g, '');
     const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, '_blank', 'noopener');
@@ -307,7 +307,7 @@ const OwnerPremium = (() => {
         <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:0.95rem;color:#fff;">Share Access</div>
       </div>
       <div style="padding:16px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
-        <div style="font-size:0.76rem;color:rgba(255,255,255,0.4);margin-bottom:6px;">Send a family member a WhatsApp message so they know they're on your Smart Door alert &amp; call-routing list.</div>
+        <div style="font-size:0.76rem;color:rgba(255,255,255,0.4);margin-bottom:6px;">Send a family member a WhatsApp message so they know they're on your My Smart Door alert &amp; call-routing list.</div>
         ${rows}
       </div>
     `;

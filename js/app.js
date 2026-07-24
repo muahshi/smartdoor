@@ -1,5 +1,5 @@
 /**
- * Smart Door — Main App Module
+ * My Smart Door — Main App Module
  * Owner Dashboard Interactions (app.js v2.1)
  *
  * NOTE: the visitor-facing experience lives ONLY in visitor.html now.
@@ -509,7 +509,7 @@ function setupAIAssistant() {
         appendIntentBadge(d);
 
         // Show AI response
-        appendAIMessage('Smart Door AI', d.response, 'ai', d.color);
+        appendAIMessage('My Smart Door AI', d.response, 'ai', d.color);
 
         // Handle intent actions
         if (d.action === 'Blocked') {
@@ -542,7 +542,7 @@ function setupAIAssistant() {
       }
     } catch (err) {
       document.getElementById(thinkingId)?.remove();
-      appendAIMessage('Smart Door AI', 'I\'m having trouble processing your request. Please use the buttons below.', 'ai');
+      appendAIMessage('My Smart Door AI', 'I\'m having trouble processing your request. Please use the buttons below.', 'ai');
     }
   }
 

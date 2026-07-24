@@ -1,5 +1,5 @@
 /**
- * Smart Door — AI Owner Assistant UI
+ * My Smart Door — AI Owner Assistant UI
  * js/aiOwnerAssistantUI.js
  *
  * PHASE 5 — ADDITIVE ONLY. Mounts into the two existing
