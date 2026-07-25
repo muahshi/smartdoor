@@ -8,7 +8,7 @@
  *   • Pure black background (#000000)
  *   • Gold QR modules (#D4AF37) — rounded squares
  *   • 3 premium finder patterns (gold outer, black gap, gold inner)
- *   • Official SmartDoor shield logo — /public/images/branding/smartdoor-shield.png
+ *   • Official MySmartDoor QR Center Badge — /images/branding/qr-center-badge.png
  *   • Logo: 15–18% of QR width, centered, no backing square
  *   • Quiet zone: 4 modules
  *   • Error correction: H
@@ -30,8 +30,10 @@ const OUTPUT_PX      = 1500; // minimum print-ready resolution
 const GOLD  = '#D4AF37';
 const BLACK = '#000000';
 
-// Official logo asset — single source of truth, never recreated
-const SHIELD_LOGO_PATH = '/public/images/branding/smartdoor-shield.png';
+// Official QR center badge asset — single source of truth, never recreated.
+// Master vector lives at images/branding/qr-center-badge.svg; this PNG is
+// generated from that SVG (see Brand Asset Guide) — never hand-edit the PNG.
+const SHIELD_LOGO_PATH = '/images/branding/qr-center-badge.png';
 
 // ── QR library (vendored locally — see vendor/qrcode/README.md) ─────────────
 // PRODUCTION FIX: was a dynamic import from https://esm.sh/qrcode@1.5.4.
