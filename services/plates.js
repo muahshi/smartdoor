@@ -33,10 +33,14 @@ export async function isPlateActive(slugOrPlateId) {
 
     // Search by qr_slug OR plate_id to support both old and new plates.
     // We do NOT filter on status here — we read status and decide below.
+    // SECURITY (Phase 4A): routed through get_plate_public_lookup() RPC
+    // instead of a direct table SELECT. plates no longer has a blanket
+    // anon/authenticated SELECT policy (sql/70_plates_public_lookup_hardening.sql),
+    // since that policy allowed a full anonymous table dump via
+    // `GET /rest/v1/plates?select=*`. The RPC performs the identical
+    // single-row lookup server-side and returns the same 7 columns.
     const { data: plate, error } = await supabase
-      .from('plates')
-      .select('id, plate_id, qr_slug, product_type, status, owner_id, activation_date')
-      .or(`qr_slug.eq.${normalized},plate_id.eq.${normalized}`)
+      .rpc('get_plate_public_lookup', { p_identifier: normalized })
       .maybeSingle();
 
     if (error) {
@@ -86,10 +90,10 @@ export async function getPlateBySlug(slugOrPlateId) {
     // FIX: Search both qr_slug AND plate_id so old plates (where plate_id
     // was used directly as the QR slug before the qr_slug column existed)
     // still resolve correctly.
+    // SECURITY (Phase 4A): routed through get_plate_public_lookup() RPC —
+    // see isPlateActive() above for why.
     const { data: plate, error } = await supabase
-      .from('plates')
-      .select('id, plate_id, qr_slug, product_type, status, owner_id, activation_date')
-      .or(`qr_slug.eq.${normalized},plate_id.eq.${normalized}`)
+      .rpc('get_plate_public_lookup', { p_identifier: normalized })
       .maybeSingle();
 
     if (error || !plate) {
