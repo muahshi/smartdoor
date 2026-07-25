@@ -16,11 +16,25 @@
  *   • Gold modules (#D4AF37) on black (#000000)
  *   • Rounded QR modules (25% corner radius)
  *   • 3 premium finder patterns (gold outer, black gap, gold inner)
- *   • Official MySmartDoor QR Center Badge embedded, centered, ~17% of QR width
+ *   • Official MySmartDoor QR Center Badge embedded, centered, ~30% of QR width
  *   • Quiet zone: 4 modules
  *   • Error correction: H (required so the center logo doesn't break scans)
  *   • Output: 1500×1500 (or caller-specified width for smaller variants)
  *   • No text, no frame, no plaque, no border, no shadow — QR only.
+ *
+ * BADGE SIZE — 30% (raised from a previous 17%): the approved brand
+ * reference sample was measured directly (finder-pattern pixel span vs.
+ * badge bounding box) at ~31% grid-width / ~39% grid-height. That size was
+ * verified empirically before shipping: a same-length target URL at this
+ * renderer's module count/ECC-H budget decodes reliably up to ~36% and
+ * fails between 37–39%, so 30% keeps a real safety margin below the
+ * measured cliff edge rather than sitting right on it. The reserved
+ * exclusion zone stays square (so the module-skipping math is simple and
+ * symmetric); the badge artwork itself is fit inside that square preserving
+ * its native (taller-than-wide) aspect ratio via preserveAspectRatio=
+ * "xMidYMid meet" — it is never stretched to fill the square. Re-run that
+ * decode check (see repo's `scripts/` or ask for it again) before raising
+ * this ratio any further; occlusion failure is a cliff, not a slope.
  *
  * PNG generation: buildPremiumQrPngDataUrl renders a PNG by rasterizing the
  * exact same SVG markup produced by buildPremiumQrSvg (via @resvg/resvg-wasm,
@@ -54,7 +68,7 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
   const QUIET      = 4;     // quiet zone modules
   const ECL        = 'H';
   const FINDER     = 7;
-  const LOGO_RATIO = 0.17;  // 17% of QR grid width
+  const LOGO_RATIO = 0.30;  // 30% of QR grid width — matches approved reference; see header
 
   // QR data matrix via qrcode lib
   // @ts-ignore
