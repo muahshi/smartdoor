@@ -9,10 +9,12 @@
  * `invoices` row + `gst_settings` data already fetched via
  * services/invoices.js).
  *
- * Library loaded dynamically via CDN (ESM), same pattern as
- * services/payments.js's loadRazorpaySDK() and services/qr.js's QRCode
- * import — no bundler/build step in this repo, so runtime CDN imports are
- * the established convention here.
+ * jsPDF is still loaded dynamically via CDN (ESM), same pattern as
+ * services/payments.js's loadRazorpaySDK() — no bundler/build step in this
+ * repo, so runtime CDN imports are the established convention for it.
+ * The QRCode lib below is the exception: it's vendored locally (see
+ * vendor/qrcode/README.md) after a production incident where esm.sh was
+ * unreachable/CSP-blocked and broke every QR-generating surface at once.
  *
  * Usage:
  *   import { downloadInvoicePdf } from './gstInvoicePdf.js';
@@ -36,13 +38,12 @@ async function _loadJsPDF() {
   return _jsPDF;
 }
 
-// ── QRCode lib (same CDN module already used by services/qr.js) ────────────
-let _QRCode = null;
+// ── QRCode lib (vendored locally — see vendor/qrcode/README.md) ────────────
+// PRODUCTION FIX: was a dynamic import from https://esm.sh/qrcode@1.5.4,
+// same as services/qr.js — now imports the same vendored, same-origin copy.
+import QRCodeLib from '../vendor/qrcode/qrcode.v1.5.4.min.js';
 async function _loadQRLib() {
-  if (_QRCode) return _QRCode;
-  const mod = await import('https://esm.sh/qrcode@1.5.4');
-  _QRCode = mod.default;
-  return _QRCode;
+  return QRCodeLib;
 }
 
 function money(n) {

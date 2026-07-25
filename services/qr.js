@@ -33,12 +33,16 @@ const BLACK = '#000000';
 // Official logo asset — single source of truth, never recreated
 const SHIELD_LOGO_PATH = '/public/images/branding/smartdoor-shield.png';
 
-// ── QR library (ESM CDN) ──────────────────────────────────────────────────────
-let _QRCode = null;
+// ── QR library (vendored locally — see vendor/qrcode/README.md) ─────────────
+// PRODUCTION FIX: was a dynamic import from https://esm.sh/qrcode@1.5.4.
+// Any CSP connect-src/script-src block on esm.sh, a CDN outage, or a flaky
+// mobile network made this reject with "Failed to fetch dynamically
+// imported module" — which broke every QR download/preview in Admin. Same
+// class of failure vendor/supabase-js/ was already created to fix; this
+// applies the identical fix to the QR library.
+import QRCode from '../vendor/qrcode/qrcode.v1.5.4.min.js';
+let _QRCode = QRCode;
 async function _loadQRLib() {
-  if (_QRCode) return _QRCode;
-  const mod = await import('https://esm.sh/qrcode@1.5.4');
-  _QRCode = mod.default;
   return _QRCode;
 }
 
