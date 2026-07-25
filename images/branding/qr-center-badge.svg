@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MySmartDoor Official QR Center Badge
+  Master vector asset. Traced from the official Brand Asset Guide.
+  This is the ONLY badge that belongs in the center of a generated QR code.
+  Do not hand-edit; regenerate from the guide if the brand mark changes.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>MySmartDoor QR Center Badge</title>
+  <desc>Official gold shield badge with the MySmartDoor "N" mark, on transparent background, for embedding in the center of QR codes</desc>
+  <path fill="#D4AF37" d="M 127.80 24.09 L 113.10 36.75 L 99.22 44.50 L 57.37 54.51 L 54.92 68.59 L 43.89 77.37 L 43.89 151.89 L 50.22 173.32 L 64.92 192.31 L 80.64 204.35 L 128.20 231.71 L 181.89 200.06 L 196.19 187.20 L 205.37 174.14 L 212.11 151.27 L 212.11 77.37 L 202.11 69.41 L 197.82 53.28 L 174.95 50.02 L 157.19 44.50 L 144.33 37.56 Z"/>
+  <path fill="#000000" d="M 127.80 32.05 L 154.54 49.81 L 191.90 59.20 L 195.98 73.08 L 205.37 81.45 L 205.37 150.25 L 200.06 169.44 L 191.08 182.51 L 179.04 193.74 L 128.20 223.54 L 86.76 200.27 L 70.63 188.22 L 56.96 171.28 L 50.63 150.25 L 50.63 81.45 L 60.22 73.29 L 63.29 60.22 L 101.26 50.02 L 115.96 41.85 Z"/>
+  <path fill="#D4AF37" d="M 163.52 70.43 L 136.78 91.66 L 135.76 94.11 L 144.13 101.26 L 144.33 164.13 L 164.54 178.63 L 165.56 177.61 L 165.56 71.66 Z"/>
+  <path fill="#D4AF37" d="M 92.27 70.43 L 91.25 71.45 L 91.25 177.81 L 93.50 178.63 L 112.69 164.13 L 113.30 101.46 L 134.53 117.38 L 134.53 160.46 L 138.00 162.50 L 138.00 105.75 L 127.80 96.77 L 93.91 70.63 Z"/>
+</svg>

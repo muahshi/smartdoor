@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MySmartDoor Official Brand Mark — "N" icon
+  Master vector asset. Traced from the official Brand Asset Guide.
+  Do not hand-edit; regenerate from the guide if the brand mark changes.
+  Also serves as MASTER LOGO (PRIMARY) per the Brand Asset Guide (same mark).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <title>MySmartDoor Icon</title>
+  <desc>Official MySmartDoor gold "N" brand mark on transparent background</desc>
+  <path fill="#D4AF37" d="M 168.42 65.74 L 137.39 90.85 L 136.17 93.09 L 136.98 94.32 L 144.74 100.24 L 146.17 102.28 L 146.37 167.40 L 167.60 182.30 L 169.65 182.71 L 171.07 181.08 L 171.07 67.37 L 170.05 65.94 Z"/>
+  <path fill="#D4AF37" d="M 86.97 65.74 L 85.13 67.57 L 85.13 181.28 L 87.78 182.71 L 110.65 166.79 L 111.06 100.24 L 134.74 118.81 L 134.94 163.93 L 138.41 165.97 L 138.62 106.16 L 137.59 104.32 L 91.66 67.78 Z"/>
+</svg>
