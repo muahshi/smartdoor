@@ -111,8 +111,14 @@ export async function generateBrandedQrCanvas(plateId) {
     );
   }
 
-  // ── Logo exclusion zone — 17% of QR grid width, centered ──
-  const LOGO_RATIO  = 0.17;
+  // ── Logo exclusion zone — 30% of QR grid width, centered ──
+  // Enlarged from the previous 17% to match the approved premium reference's
+  // badge proportions. Verified empirically against this renderer's own
+  // module count / error-correction budget before shipping — see
+  // premiumQr.ts header for the measurement + safety margin notes. Do not
+  // raise this further without re-running that check: scan reliability
+  // degrades sharply, not gradually, past a certain occlusion size.
+  const LOGO_RATIO  = 0.30;
   const centerMod   = Math.floor(count / 2);
   const halfExclude = Math.ceil((count * LOGO_RATIO) / 2);
   function isInLogoZone(row, col) {
@@ -170,17 +176,29 @@ export async function generateBrandedQrCanvas(plateId) {
   drawFinder(0,            count - FINDER); // top-right
   drawFinder(count - FINDER, 0           ); // bottom-left
 
-  // ── Official SmartDoor shield logo ──
+  // ── Official MySmartDoor QR Center Badge ──
   // Loaded from SHIELD_LOGO_PATH. Never redrawn. Never generated inline.
   // Sits inside QR with transparent background — looks embedded, not pasted.
   const QR_GRID_PX  = count * MOD_PX;
-  const LOGO_PX     = Math.round(QR_GRID_PX * LOGO_RATIO);
-  const logoX       = OFFSET + (QR_GRID_PX - LOGO_PX) / 2;
-  const logoY       = OFFSET + (QR_GRID_PX - LOGO_PX) / 2;
+  const ZONE_PX     = QR_GRID_PX * LOGO_RATIO; // reserved square (no-module) zone
 
   const shield = await _loadShield();
+  // FIX: previously drew the badge into a ZONE_PX × ZONE_PX square, which
+  // stretched the (taller-than-wide) shield artwork out of proportion.
+  // The reserved zone stays square (so module-exclusion math is unchanged),
+  // but the badge itself is fit inside it preserving its native aspect
+  // ratio — same "contain" behavior as the SVG renderer's
+  // preserveAspectRatio="xMidYMid meet", so client and server output match.
+  const naturalW = shield.naturalWidth  || shield.width  || 1;
+  const naturalH = shield.naturalHeight || shield.height || 1;
+  const badgeScale = Math.min(ZONE_PX / naturalW, ZONE_PX / naturalH);
+  const LOGO_W = naturalW * badgeScale;
+  const LOGO_H = naturalH * badgeScale;
+  const logoX  = OFFSET + (QR_GRID_PX - LOGO_W) / 2;
+  const logoY  = OFFSET + (QR_GRID_PX - LOGO_H) / 2;
+
   // No backing square. No circle. No border. Just the logo on black.
-  ctx.drawImage(shield, logoX, logoY, LOGO_PX, LOGO_PX);
+  ctx.drawImage(shield, logoX, logoY, LOGO_W, LOGO_H);
 
   return canvas;
 }
