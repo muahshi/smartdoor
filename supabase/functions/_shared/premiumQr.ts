@@ -16,7 +16,7 @@
  *   • Gold modules (#D4AF37) on black (#000000)
  *   • Rounded QR modules (25% corner radius)
  *   • 3 premium finder patterns (gold outer, black gap, gold inner)
- *   • SmartDoor shield logo embedded, centered, ~17% of QR width
+ *   • Official MySmartDoor QR Center Badge embedded, centered, ~17% of QR width
  *   • Quiet zone: 4 modules
  *   • Error correction: H (required so the center logo doesn't break scans)
  *   • Output: 1500×1500 (or caller-specified width for smaller variants)
@@ -128,12 +128,16 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
     finderSvg(count - FINDER, 0            ),
   ].join('\n  ');
 
-  // Fetch shield logo from Storage, embed as base64
+  // Fetch the official QR Center Badge from Storage, embed as base64.
+  // This object must be uploaded once to the qr-codes bucket at
+  // branding/qr-center-badge.png — see the deployment notes in this
+  // module's header / the branding-standardization PR for the manual
+  // upload step (Edge Functions cannot read the repo filesystem).
   let logoElement = '';
   try {
     const { data: logoUrlData } = supabase.storage
       .from(QR_BUCKET)
-      .getPublicUrl('branding/smartdoor-shield.png');
+      .getPublicUrl('branding/qr-center-badge.png');
     const logoUrl = logoUrlData?.publicUrl;
 
     if (logoUrl) {
