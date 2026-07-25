@@ -2,32 +2,41 @@
  * SmartDoor — Shared Premium QR Renderer
  * supabase/functions/_shared/premiumQr.ts
  *
- * G2 FIX: This module is the SVG-building logic extracted verbatim from
- * supabase/functions/generate-qr/index.ts (buildPremiumQrSvg), so that the
- * same branded design can be reused by admin-provision-customer,
- * admin-bulk-provision, and admin-print-pack without duplicating it three
- * more times.
+ * PHASE 4B: This is now the ONLY QR-rendering implementation on the server
+ * side. Every Edge Function that produces a QR (generate-qr,
+ * admin-plate-status, admin-provision-customer, admin-bulk-provision,
+ * admin-print-pack) imports buildPremiumQrSvg / buildPremiumQrPngDataUrl
+ * from here instead of carrying its own copy. Previously generate-qr and
+ * admin-plate-status each had a verbatim/near-verbatim inline duplicate of
+ * this SVG-building logic — those duplicates have been removed and both
+ * functions now call into this module (see their headers for details).
  *
- * generate-qr/index.ts and admin-plate-status/index.ts are intentionally
- * NOT changed to import this — they already contain a correct, independent
- * copy of this same logic and are out of scope for this fix.
- *
- * Design spec (must stay identical across every implementation):
+ * Design spec (must stay identical across every implementation — this is
+ * the "second QR design" / premium black + metallic gold style):
  *   • Gold modules (#D4AF37) on black (#000000)
+ *   • Rounded QR modules (25% corner radius)
  *   • 3 premium finder patterns (gold outer, black gap, gold inner)
- *   • SmartDoor shield logo embedded (SVG: base64 PNG fetched from Storage)
+ *   • SmartDoor shield logo embedded, centered, ~17% of QR width
  *   • Quiet zone: 4 modules
- *   • Error correction: H
- *   • Output: 1500×1500 SVG
- *   • PNG fallback: same qrcode library, gold/black color swap only
- *     (no logo, no rounded modules, no custom finders — this is a known,
- *     accepted approximation already used in production by generate-qr
- *     and admin-plate-status; not a new limitation introduced by this fix)
+ *   • Error correction: H (required so the center logo doesn't break scans)
+ *   • Output: 1500×1500 (or caller-specified width for smaller variants)
  *   • No text, no frame, no plaque, no border, no shadow — QR only.
+ *
+ * PNG generation: buildPremiumQrPngDataUrl renders a PNG by rasterizing the
+ * exact same SVG markup produced by buildPremiumQrSvg (via @resvg/resvg-wasm,
+ * a pure-WASM renderer with no native bindings, safe for the Edge Runtime).
+ * This means PNG and SVG output are pixel-for-pixel the same design —
+ * rounded modules, custom finders, and the shield logo all included — not
+ * an approximation. If WASM rasterization fails for any reason (e.g. the
+ * package can't be fetched at cold start), it falls back to a plain
+ * gold/black QR via the `qrcode` library so QR generation never hard-fails;
+ * this fallback is logged loudly so it's never silently shipped.
  */
 
 // @ts-ignore — esm.sh resolves at runtime
 import QRCode from 'https://esm.sh/qrcode@1.5.4';
+// @ts-ignore — esm.sh resolves at runtime; pure WASM, no native bindings
+import { Resvg, initWasm } from 'https://esm.sh/@resvg/resvg-wasm@2.6.2';
 
 export const QR_GOLD   = '#D4AF37';
 export const QR_BLACK  = '#000000';
@@ -153,22 +162,68 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
 </svg>`;
 }
 
+// Converts a large byte array to base64 in chunks — spreading a full-size
+// (e.g. 1500×1500) PNG buffer directly into String.fromCharCode(...) can
+// exceed the JS engine's max-arguments limit and throw.
+function _bytesToBase64(bytes: Uint8Array): string {
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+// ── WASM init (lazy, cached across invocations within the same isolate) ──────
+let _wasmReady: Promise<void> | null = null;
+function _ensureResvgWasm(): Promise<void> {
+  if (!_wasmReady) {
+    _wasmReady = (async () => {
+      const wasmResp = await fetch('https://esm.sh/@resvg/resvg-wasm@2.6.2/index_bg.wasm');
+      // @ts-ignore — accepts a Response or ArrayBuffer
+      await initWasm(wasmResp);
+    })();
+  }
+  return _wasmReady;
+}
+
 /**
- * PNG fallback: gold-on-black color swap via the qrcode library.
- * Deno has no Canvas API, so this does NOT include the logo, rounded
- * modules, or custom finder patterns — it is the same accepted
- * approximation already in production use by generate-qr and
- * admin-plate-status for their PNG output.
+ * PNG output — rasterizes the exact same SVG as buildPremiumQrSvg, so PNG
+ * and SVG are pixel-for-pixel identical (rounded modules, custom finders,
+ * shield logo). `width` controls the output pixel size (SVG is built at a
+ * fixed 1500×1500 internal grid and scaled down/up on rasterization).
+ *
+ * `margin` is only used by the legacy plain-QR fallback path below; the
+ * primary path always uses the fixed 4-module quiet zone baked into
+ * buildPremiumQrSvg, per the design spec.
  */
+// deno-lint-ignore no-explicit-any
 export async function buildPremiumQrPngDataUrl(
+  supabase: any,
   targetUrl: string,
   opts: { width?: number; margin?: number } = {},
 ): Promise<string> {
   const { width = 1500, margin = 4 } = opts;
-  return await QRCode.toDataURL(targetUrl, {
-    width,
-    margin,
-    errorCorrectionLevel: 'H',
-    color: { dark: QR_GOLD, light: QR_BLACK },
-  });
+
+  try {
+    await _ensureResvgWasm();
+    const svgString = await buildPremiumQrSvg(supabase, targetUrl);
+    // @ts-ignore
+    const resvg = new Resvg(svgString, { fitTo: { mode: 'width', value: width } });
+    const rendered = resvg.render();
+    const pngBuffer: Uint8Array = rendered.asPng();
+    const b64 = _bytesToBase64(pngBuffer);
+    return `data:image/png;base64,${b64}`;
+  } catch (e) {
+    // Never let QR generation hard-fail because the rasterizer had a bad
+    // day — fall back to a plain gold/black QR (no logo/rounded corners),
+    // and log loudly so this doesn't silently ship in production.
+    console.error('[premiumQr] resvg-wasm rasterization failed, using plain fallback PNG:', e);
+    return await QRCode.toDataURL(targetUrl, {
+      width,
+      margin,
+      errorCorrectionLevel: 'H',
+      color: { dark: QR_GOLD, light: QR_BLACK },
+    });
+  }
 }

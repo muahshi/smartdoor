@@ -174,7 +174,7 @@ serve(async (req) => {
     let qrSvgUrl: string | null = null;
 
     try {
-      const pngDataUrl: string = await buildPremiumQrPngDataUrl(qrTargetUrl, { width: 800, margin: 2 });
+      const pngDataUrl: string = await buildPremiumQrPngDataUrl(supabaseAdmin, qrTargetUrl, { width: 800, margin: 2 });
       const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
       const pngBlob = new Blob([pngBytes], { type: 'image/png' });
       const { error: pngErr } = await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.png`, pngBlob, { contentType: 'image/png', upsert: true });

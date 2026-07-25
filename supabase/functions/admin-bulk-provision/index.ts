@@ -56,7 +56,7 @@ async function generateUniquePlateId(supabaseAdmin: ReturnType<typeof getService
 // match the premium gold-on-black shield-logo design.
 async function uploadQr(supabaseAdmin: ReturnType<typeof getServiceClient>, plateId: string) {
   const url = `${APP_URL}/p/${plateId}`;
-  const pngDataUrl: string = await buildPremiumQrPngDataUrl(url, { width: 400, margin: 4 });
+  const pngDataUrl: string = await buildPremiumQrPngDataUrl(supabaseAdmin, url, { width: 400, margin: 4 });
   const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
   await supabaseAdmin.storage.from(QR_BUCKET).upload(`${plateId}.png`, new Blob([pngBytes], { type: 'image/png' }), { upsert: true });
   const qrImageUrl = supabaseAdmin.storage.from(QR_BUCKET).getPublicUrl(`${plateId}.png`).data?.publicUrl || null;

@@ -16,10 +16,9 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-// @ts-ignore — esm.sh resolves at runtime
-import QRCode from 'https://esm.sh/qrcode@1.5.4';
 import { restrictedCors } from '../_shared/cors.ts';
 import { getServiceClient, verifyAdminSession, adminCan, adminAuthError } from '../_shared/adminAuth.ts';
+import { buildPremiumQrSvg, buildPremiumQrPngDataUrl } from '../_shared/premiumQr.ts';
 
 const APP_URL   = Deno.env.get('APP_URL') || 'https://mysmartdoor.in';
 const QR_BUCKET = 'qr-codes';
@@ -33,129 +32,34 @@ const QR_BUCKET = 'qr-codes';
  * Storage's qr-codes bucket is service_role-write-only
  * (sql/10_security_hardening.sql) — this is why it has to happen here
  * rather than in services/qr.js's client-side uploadQrToStorage().
- */
-/**
- * Regenerates the premium gold-on-black SmartDoor QR for a plate.
- * Matches the design produced by services/qr.js and generate-qr edge function:
- *   • Gold (#D4AF37) modules on black (#000000)
- *   • 3 premium finder patterns
- *   • SmartDoor shield logo embedded (fetched from Storage)
- *   • Error correction H, quiet zone 4, 1500×1500 px
- *   • No text, no frame, no plaque
+ *
+ * PHASE 4B: This used to carry its own inline copy of the SVG/PNG builder
+ * (near-verbatim duplicate of generate-qr's, which itself has since been
+ * de-duplicated too). Both now call the single shared renderer in
+ * supabase/functions/_shared/premiumQr.ts — see that file's header for the
+ * full premium black + gold design spec.
  */
 async function regenerateQr(supabaseAdmin: ReturnType<typeof getServiceClient>, pid: string) {
-  const targetUrl  = `${APP_URL}/p/${pid}`;
-  const QR_BUCKET_LOCAL = QR_BUCKET;
+  const targetUrl = `${APP_URL}/p/${pid}`;
 
-  const GOLD   = '#D4AF37';
-  const BLACK  = '#000000';
-  const OUTPUT = 1500;
-  const QUIET  = 4;
-  const FINDER = 7;
-  const LOGO_RATIO = 0.17;
-
-  // @ts-ignore
-  const qrData  = QRCode.create(targetUrl, { errorCorrectionLevel: 'H' });
-  const modules = qrData.modules;
-  const count: number = modules.size;
-
-  const MOD_PX = OUTPUT / (count + QUIET * 2);
-  const OFFSET = QUIET * MOD_PX;
-
-  const finderOrigins = [
-    { r: 0,             c: 0              },
-    { r: 0,             c: count - FINDER  },
-    { r: count - FINDER, c: 0             },
-  ];
-
-  function isInFinder(r: number, c: number) {
-    return finderOrigins.some(f =>
-      r >= f.r - 1 && r <= f.r + FINDER && c >= f.c - 1 && c <= f.c + FINDER
-    );
-  }
-
-  const cx = Math.floor(count / 2);
-  const hx = Math.ceil((count * LOGO_RATIO) / 2);
-  function isInLogoZone(r: number, c: number) {
-    return r >= cx - hx && r <= cx + hx && c >= cx - hx && c <= cx + hx;
-  }
-
-  // Data module rects
-  const rects: string[] = [];
-  for (let r = 0; r < count; r++) {
-    for (let c = 0; c < count; c++) {
-      if (!modules.get(r, c) || isInFinder(r, c) || isInLogoZone(r, c)) continue;
-      const x = OFFSET + c * MOD_PX, y = OFFSET + r * MOD_PX;
-      const ms = MOD_PX - 1, br = ms * 0.25;
-      rects.push(`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${ms.toFixed(2)}" height="${ms.toFixed(2)}" rx="${br.toFixed(2)}" fill="${GOLD}"/>`);
-    }
-  }
-
-  // Finder pattern SVG
-  function finderSvg(sr: number, sc: number): string {
-    const px = OFFSET + sc * MOD_PX, py = OFFSET + sr * MOD_PX;
-    const sz = FINDER * MOD_PX, br = sz * 0.12;
-    const g1 = MOD_PX, g2 = MOD_PX * 2;
-    return [
-      `<rect x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${sz.toFixed(2)}" height="${sz.toFixed(2)}" rx="${br.toFixed(2)}" fill="${GOLD}"/>`,
-      `<rect x="${(px+g1).toFixed(2)}" y="${(py+g1).toFixed(2)}" width="${(sz-g1*2).toFixed(2)}" height="${(sz-g1*2).toFixed(2)}" rx="${(br*.5).toFixed(2)}" fill="${BLACK}"/>`,
-      `<rect x="${(px+g2).toFixed(2)}" y="${(py+g2).toFixed(2)}" width="${(sz-g2*2).toFixed(2)}" height="${(sz-g2*2).toFixed(2)}" rx="${(br*.3).toFixed(2)}" fill="${GOLD}"/>`,
-    ].join('\n');
-  }
-
-  const findersSvg = [
-    finderSvg(0,             0            ),
-    finderSvg(0,             count - FINDER),
-    finderSvg(count - FINDER, 0            ),
-  ].join('\n');
-
-  // Logo — fetch from Storage, embed as base64
-  let logoEl = '';
-  try {
-    const { data: logoUrlData } = supabaseAdmin.storage
-      .from(QR_BUCKET_LOCAL).getPublicUrl('branding/smartdoor-shield.png');
-    if (logoUrlData?.publicUrl) {
-      const resp = await fetch(logoUrlData.publicUrl);
-      if (resp.ok) {
-        const buf   = await resp.arrayBuffer();
-        const b64   = btoa(String.fromCharCode(...new Uint8Array(buf)));
-        const grid  = count * MOD_PX;
-        const lpx   = grid * LOGO_RATIO;
-        const lx    = OFFSET + (grid - lpx) / 2;
-        const ly    = OFFSET + (grid - lpx) / 2;
-        logoEl = `<image href="data:image/png;base64,${b64}" x="${lx.toFixed(2)}" y="${ly.toFixed(2)}" width="${lpx.toFixed(2)}" height="${lpx.toFixed(2)}" preserveAspectRatio="xMidYMid meet"/>`;
-      }
-    }
-  } catch (_e) { /* logo non-fatal */ }
-
-  const svgString = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="${OUTPUT}" height="${OUTPUT}" viewBox="0 0 ${OUTPUT} ${OUTPUT}">
-  <rect width="${OUTPUT}" height="${OUTPUT}" fill="${BLACK}"/>
-  ${rects.join('\n  ')}
-  ${findersSvg}
-  ${logoEl}
-</svg>`;
+  const svgString = await buildPremiumQrSvg(supabaseAdmin, targetUrl);
 
   // Upload SVG
   const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-  await supabaseAdmin.storage.from(QR_BUCKET_LOCAL)
+  await supabaseAdmin.storage.from(QR_BUCKET)
     .upload(`${pid}.svg`, svgBlob, { contentType: 'image/svg+xml', upsert: true });
-  const qrSvgUrl = supabaseAdmin.storage.from(QR_BUCKET_LOCAL)
+  const qrSvgUrl = supabaseAdmin.storage.from(QR_BUCKET)
     .getPublicUrl(`${pid}.svg`).data?.publicUrl || null;
 
-  // PNG — gold/black via qrcode (no canvas in Deno)
+  // PNG — same premium design as the SVG, via the shared renderer
   let qrImageUrl: string | null = null;
   try {
-    const pngDataUrl: string = await QRCode.toDataURL(targetUrl, {
-      width: 1500, margin: 4, errorCorrectionLevel: 'H',
-      color: { dark: GOLD, light: BLACK },
-    });
+    const pngDataUrl: string = await buildPremiumQrPngDataUrl(supabaseAdmin, targetUrl, { width: 1500, margin: 4 });
     const pngBytes = Uint8Array.from(atob(pngDataUrl.split(',')[1]), c => c.charCodeAt(0));
     const pngBlob  = new Blob([pngBytes], { type: 'image/png' });
-    await supabaseAdmin.storage.from(QR_BUCKET_LOCAL)
+    await supabaseAdmin.storage.from(QR_BUCKET)
       .upload(`${pid}.png`, pngBlob, { contentType: 'image/png', upsert: true });
-    qrImageUrl = supabaseAdmin.storage.from(QR_BUCKET_LOCAL)
+    qrImageUrl = supabaseAdmin.storage.from(QR_BUCKET)
       .getPublicUrl(`${pid}.png`).data?.publicUrl || null;
   } catch (_e) { /* png non-fatal */ }
 

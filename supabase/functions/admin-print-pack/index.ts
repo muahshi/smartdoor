@@ -325,7 +325,7 @@ serve(async (req) => {
       // QR surface. PNG byte format/dimensions are unchanged, so the
       // embedding logic below (PDF XObject + PNG header parsing) is untouched.
       const qrUrl = `${APP_URL}/p/${pid}`;
-      const pngDataUrl: string = await buildPremiumQrPngDataUrl(qrUrl, { width: 200, margin: 2 });
+      const pngDataUrl: string = await buildPremiumQrPngDataUrl(supabaseAdmin, qrUrl, { width: 200, margin: 2 });
       const base64 = pngDataUrl.split(',')[1];
 
       // Get dimensions (PNG header at bytes 16-24)
