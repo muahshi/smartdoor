@@ -47,6 +47,9 @@
   flex-direction: column;
   overflow: hidden;
 }
+.ai-consult-panel[hidden] {
+  display: none;
+}
 
 .ai-consult-header {
   display: flex;
