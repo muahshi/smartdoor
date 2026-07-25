@@ -22,19 +22,47 @@
  *   • Output: 1500×1500 (or caller-specified width for smaller variants)
  *   • No text, no frame, no plaque, no border, no shadow — QR only.
  *
- * BADGE SIZE — 30% (raised from a previous 17%): the approved brand
- * reference sample was measured directly (finder-pattern pixel span vs.
- * badge bounding box) at ~31% grid-width / ~39% grid-height. That size was
- * verified empirically before shipping: a same-length target URL at this
- * renderer's module count/ECC-H budget decodes reliably up to ~36% and
- * fails between 37–39%, so 30% keeps a real safety margin below the
- * measured cliff edge rather than sitting right on it. The reserved
- * exclusion zone stays square (so the module-skipping math is simple and
- * symmetric); the badge artwork itself is fit inside that square preserving
- * its native (taller-than-wide) aspect ratio via preserveAspectRatio=
- * "xMidYMid meet" — it is never stretched to fill the square. Re-run that
- * decode check (see repo's `scripts/` or ask for it again) before raising
- * this ratio any further; occlusion failure is a cliff, not a slope.
+ * BADGE SIZE — 2026-07-26 rewrite (rectangular excavation, replaces the old
+ * square-LOGO_RATIO approach):
+ *
+ * Root cause found via direct OpenCV measurement of the approved reference
+ * image (finder-pattern pixel span → module pixel size → badge bounding
+ * box, connected-component analysis): the badge was never actually 30% of
+ * the grid on screen. The old code excavated a SQUARE zone sized by
+ * LOGO_RATIO and then fit the (taller-than-wide, ~1.23 h:w) badge asset
+ * inside it via preserveAspectRatio="xMidYMid meet" — but the asset's own
+ * 256×256 canvas had ~34% horizontal / ~19% vertical transparent padding
+ * baked in, so "meet" scaled to the *padded* canvas, not the visible
+ * shield. Net effect: the visible badge rendered at roughly half the
+ * intended size, while the excavation zone wasted the difference as empty
+ * black space. The badge asset (SVG viewBox + PNG) has since been cropped
+ * to its content bounding box (see qr-center-badge.svg/.png), so this is
+ * fixed at the asset level too — but the renderer no longer assumes a
+ * square excavation regardless.
+ *
+ * Measured targets (approved reference, OpenCV connected-component
+ * analysis of the shield outline vs. the finder-pattern-derived module
+ * grid): badge height ≈ 40.8% of grid height, badge width ≈ 31.3% of grid
+ * width (these aren't independent — width follows from height via the
+ * asset's native aspect ratio once the asset is un-padded).
+ *
+ * LOGO_HEIGHT_RATIO below is the single tunable (badge height / grid
+ * height); LOGO_WIDTH_RATIO is derived from it via BADGE_ASPECT_HW so the
+ * excavation rectangle always matches the badge's true shape — no wasted
+ * excavated space on the narrow axis the way the square version had.
+ *
+ * SCAN-SAFETY NOTE (read before raising LOGO_HEIGHT_RATIO): the previous
+ * empirical decode test (reliable to ~36%, fails 37–39%) was run against
+ * the OLD square algorithm, where excavated module AREA = ratio². This
+ * rectangular version excavates ratio_h × ratio_w = ratio_h² / 1.225 of
+ * the grid — i.e. for the same height ratio it removes ~18% FEWER modules
+ * than the square version did, because the width axis is now excavated
+ * only as far as the badge actually extends. At LOGO_HEIGHT_RATIO=0.408
+ * the excavated area is equivalent to a square ratio of ~0.367 — just
+ * inside the previously-verified safe zone, but close enough to the
+ * documented cliff (37–39%) that this has NOT been re-verified with an
+ * actual decode test in this pass. Re-run the decode check before shipping
+ * this to production; occlusion failure is a cliff, not a slope.
  *
  * PNG generation: buildPremiumQrPngDataUrl renders a PNG by rasterizing the
  * exact same SVG markup produced by buildPremiumQrSvg (via @resvg/resvg-wasm,
@@ -68,7 +96,12 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
   const QUIET      = 4;     // quiet zone modules
   const ECL        = 'H';
   const FINDER     = 7;
-  const LOGO_RATIO = 0.30;  // 30% of QR grid width — matches approved reference; see header
+  // Badge asset (post-crop) native aspect ratio, height:width — measured
+  // directly from qr-center-badge.png's content bounding box (854×697).
+  // See header for how this and the two ratios below were derived.
+  const BADGE_ASPECT_HW   = 854 / 697;       // ≈ 1.225
+  const LOGO_HEIGHT_RATIO = 0.408;           // badge height / grid height
+  const LOGO_WIDTH_RATIO  = LOGO_HEIGHT_RATIO / BADGE_ASPECT_HW; // ≈ 0.333
 
   // QR data matrix via qrcode lib
   // @ts-ignore
@@ -94,11 +127,12 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
     );
   }
 
-  const centerMod   = Math.floor(count / 2);
-  const halfExclude = Math.ceil((count * LOGO_RATIO) / 2);
+  const centerMod    = Math.floor(count / 2);
+  const halfExcludeH = Math.ceil((count * LOGO_HEIGHT_RATIO) / 2); // rows
+  const halfExcludeW = Math.ceil((count * LOGO_WIDTH_RATIO) / 2);  // cols
   function isInLogoZone(row: number, col: number): boolean {
-    return row >= centerMod - halfExclude && row <= centerMod + halfExclude &&
-           col >= centerMod - halfExclude && col <= centerMod + halfExclude;
+    return row >= centerMod - halfExcludeH && row <= centerMod + halfExcludeH &&
+           col >= centerMod - halfExcludeW && col <= centerMod + halfExcludeW;
   }
 
   // Collect SVG rects for data modules
@@ -160,10 +194,17 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
         const logoBuf  = await logoResp.arrayBuffer();
         const logoB64  = btoa(String.fromCharCode(...new Uint8Array(logoBuf)));
         const QR_GRID  = count * MOD_PX;
-        const LOGO_PX  = QR_GRID * LOGO_RATIO;
-        const logoX    = OFFSET + (QR_GRID - LOGO_PX) / 2;
-        const logoY    = OFFSET + (QR_GRID - LOGO_PX) / 2;
-        logoElement = `<image href="data:image/png;base64,${logoB64}" x="${logoX.toFixed(2)}" y="${logoY.toFixed(2)}" width="${LOGO_PX.toFixed(2)}" height="${LOGO_PX.toFixed(2)}" preserveAspectRatio="xMidYMid meet"/>`;
+        const LOGO_W   = QR_GRID * LOGO_WIDTH_RATIO;
+        const LOGO_H   = QR_GRID * LOGO_HEIGHT_RATIO;
+        const logoX    = OFFSET + (QR_GRID - LOGO_W) / 2;
+        const logoY    = OFFSET + (QR_GRID - LOGO_H) / 2;
+        // preserveAspectRatio is now effectively a no-op (box aspect ==
+        // asset aspect, both ≈1.225 h:w post-crop) — kept as "meet" rather
+        // than "none" as a safety net in case the asset is ever swapped
+        // for one with a slightly different aspect ratio; "none" would
+        // silently stretch/distort the badge instead of just under-filling
+        // the box.
+        logoElement = `<image href="data:image/png;base64,${logoB64}" x="${logoX.toFixed(2)}" y="${logoY.toFixed(2)}" width="${LOGO_W.toFixed(2)}" height="${LOGO_H.toFixed(2)}" preserveAspectRatio="xMidYMid meet"/>`;
       }
     }
   } catch (e) {
