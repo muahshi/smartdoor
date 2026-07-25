@@ -4,8 +4,19 @@
   Master vector asset. Traced from the official Brand Asset Guide.
   This is the ONLY badge that belongs in the center of a generated QR code.
   Do not hand-edit; regenerate from the guide if the brand mark changes.
+
+  2026-07-26: viewBox cropped from "0 0 256 256" to the shield's actual
+  content bounding box (+1.5% safety padding). The old 256x256 canvas had
+  ~34% horizontal / ~19% vertical transparent padding baked in, which
+  silently shrank the badge whenever a renderer fit this asset into a
+  square box via preserveAspectRatio="xMidYMid meet" (box was scaled to
+  the *padded* canvas, not the visible shield). Cropping makes the
+  asset's intrinsic aspect ratio (~1.225 h:w) equal to the shield's own
+  visible aspect ratio, so renderer math now controls the visible badge
+  size directly instead of indirectly through unknown padding. See
+  premiumQr.ts and services/qr.js for the renderer-side fix.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40.78 20.98 174.44 213.84">
   <title>MySmartDoor QR Center Badge</title>
   <desc>Official gold shield badge with the MySmartDoor "N" mark, on transparent background, for embedding in the center of QR codes</desc>
   <path fill="#D4AF37" d="M 127.80 24.09 L 113.10 36.75 L 99.22 44.50 L 57.37 54.51 L 54.92 68.59 L 43.89 77.37 L 43.89 151.89 L 50.22 173.32 L 64.92 192.31 L 80.64 204.35 L 128.20 231.71 L 181.89 200.06 L 196.19 187.20 L 205.37 174.14 L 212.11 151.27 L 212.11 77.37 L 202.11 69.41 L 197.82 53.28 L 174.95 50.02 L 157.19 44.50 L 144.33 37.56 Z"/>
