@@ -322,8 +322,13 @@
     if (error) { console.error('[Onboarding] OTP verify failed:', error); showStep('step-error'); return; }
 
     // Fetch order + owner details
+    // SECURITY (Phase 4A): routed through get_plate_public_lookup() RPC.
+    // This query runs immediately after verifyOtp(), before the users row's
+    // auth_user_id is necessarily linked, so it cannot rely on
+    // plates_select_own — it depended on the (now removed) blanket anon
+    // SELECT policy. See sql/70_plates_public_lookup_hardening.sql.
     const { data: plate } = await supabase
-      .from('plates').select('owner_id, plate_id').eq('plate_id', plateId).single();
+      .rpc('get_plate_public_lookup', { p_identifier: plateId }).maybeSingle();
 
     if (!plate) { showStep('step-error'); return; }
 

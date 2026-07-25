@@ -665,27 +665,14 @@
       // Fetch owner_id + status. Status is now checked (see renderSuspended
       // below) — previously this deliberately skipped the check, which meant
       // a suspended plate's QR still showed the full visitor experience.
-      // Try qr_slug first, fallback to plate_id
-      let plate = null;
-      let plateErr = null;
-
-      const res1 = await supabase
-        .from('plates')
-        .select('id, plate_id, qr_slug, product_type, owner_id, status')
-        .eq('qr_slug', plateSlug)
+      // SECURITY (Phase 4A): routed through get_plate_public_lookup() RPC,
+      // which matches qr_slug OR plate_id server-side in one call. plates
+      // no longer has a blanket anon SELECT policy (a direct
+      // `.from('plates').select(...)` here would now return nothing under
+      // RLS) — see sql/70_plates_public_lookup_hardening.sql.
+      const { data: plate, error: plateErr } = await supabase
+        .rpc('get_plate_public_lookup', { p_identifier: plateSlug })
         .maybeSingle();
-
-      if (res1.data) {
-        plate = res1.data;
-      } else {
-        const res2 = await supabase
-          .from('plates')
-          .select('id, plate_id, qr_slug, product_type, owner_id, status')
-          .eq('plate_id', plateSlug)
-          .maybeSingle();
-        plate = res2.data;
-        plateErr = res2.error;
-      }
 
       if (plateErr || !plate || !plate.owner_id) {
         renderNotFound();
