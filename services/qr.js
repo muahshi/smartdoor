@@ -111,36 +111,23 @@ export async function generateBrandedQrCanvas(plateId) {
     );
   }
 
-  // ── Logo exclusion zone — rectangular, matched to the badge's true shape ──
-  // 2026-07-26: replaced the old square LOGO_RATIO with a rectangle sized
-  // to the (now-cropped) badge asset's real aspect ratio. See premiumQr.ts
-  // header for the full measurement writeup (OpenCV analysis of the
-  // approved reference) and the scan-safety caveat — re-run the decode
-  // check before raising LOGO_HEIGHT_RATIO further, this has not been
-  // re-verified against a live scanner in this pass.
-  const BADGE_ASPECT_HW   = 854 / 697;       // badge asset height:width, post-crop
-  const LOGO_HEIGHT_RATIO = 0.408;           // badge height / grid height
-  const LOGO_WIDTH_RATIO  = LOGO_HEIGHT_RATIO / BADGE_ASPECT_HW; // ≈ 0.333
-  const centerMod    = Math.floor(count / 2);
-  const halfExcludeH = Math.ceil((count * LOGO_HEIGHT_RATIO) / 2);
-  const halfExcludeW = Math.ceil((count * LOGO_WIDTH_RATIO) / 2);
+  // ── Logo exclusion zone — 30% of QR grid width, centered ──
+  // Enlarged from the previous 17% to match the approved premium reference's
+  // badge proportions. Verified empirically against this renderer's own
+  // module count / error-correction budget before shipping — see
+  // premiumQr.ts header for the measurement + safety margin notes. Do not
+  // raise this further without re-running that check: scan reliability
+  // degrades sharply, not gradually, past a certain occlusion size.
+  const LOGO_RATIO  = 0.30;
+  const centerMod   = Math.floor(count / 2);
+  const halfExclude = Math.ceil((count * LOGO_RATIO) / 2);
   function isInLogoZone(row, col) {
-    return row >= centerMod - halfExcludeH && row <= centerMod + halfExcludeH &&
-           col >= centerMod - halfExcludeW && col <= centerMod + halfExcludeW;
+    return row >= centerMod - halfExclude && row <= centerMod + halfExclude &&
+           col >= centerMod - halfExclude && col <= centerMod + halfExclude;
   }
 
-  // ── Gold gradient — matches premiumQr.ts's SVG linearGradient so client
-  // preview and server-final output share the same metallic look, not a
-  // flat fill (see qr.js/premiumQr.ts style-audit notes: the approved
-  // reference art has a visible highlight/shadow gradient on the gold,
-  // this reproduces that without touching module geometry). ──
-  const goldGrad = ctx.createLinearGradient(0, 0, OUTPUT_PX, OUTPUT_PX);
-  goldGrad.addColorStop(0,    '#F4D976');
-  goldGrad.addColorStop(0.45, '#D4AF37');
-  goldGrad.addColorStop(1,    '#9C7A1E');
-
   // ── Draw data modules — gold rounded squares ──
-  ctx.fillStyle = goldGrad;
+  ctx.fillStyle = GOLD;
   for (let r = 0; r < count; r++) {
     for (let c = 0; c < count; c++) {
       if (!modules.get(r, c)) continue;
@@ -165,7 +152,7 @@ export async function generateBrandedQrCanvas(plateId) {
     const br = sz * 0.12;
 
     // Outer gold square
-    ctx.fillStyle = goldGrad;
+    ctx.fillStyle = GOLD;
     ctx.beginPath();
     ctx.roundRect(px, py, sz, sz, br);
     ctx.fill();
@@ -179,7 +166,7 @@ export async function generateBrandedQrCanvas(plateId) {
 
     // Inner gold square (3×3 modules)
     const g2 = MOD_PX * 2;
-    ctx.fillStyle = goldGrad;
+    ctx.fillStyle = GOLD;
     ctx.beginPath();
     ctx.roundRect(px + g2, py + g2, sz - g2 * 2, sz - g2 * 2, br * 0.3);
     ctx.fill();
@@ -192,21 +179,19 @@ export async function generateBrandedQrCanvas(plateId) {
   // ── Official MySmartDoor QR Center Badge ──
   // Loaded from SHIELD_LOGO_PATH. Never redrawn. Never generated inline.
   // Sits inside QR with transparent background — looks embedded, not pasted.
-  const QR_GRID_PX = count * MOD_PX;
+  const QR_GRID_PX  = count * MOD_PX;
+  const ZONE_PX     = QR_GRID_PX * LOGO_RATIO; // reserved square (no-module) zone
 
   const shield = await _loadShield();
-  // The badge asset was cropped (2026-07-26) to its own content bounding
-  // box, so its natural aspect ratio now equals the visible shield's real
-  // aspect ratio (~1.225 h:w) — no more hidden transparent padding to
-  // account for. The draw rectangle is sized directly from the excavation
-  // ratios above (rows/cols reserved), so client and server output match
-  // pixel-for-pixel in proportion. `meet` is kept purely as a safety net
-  // for asset swaps, not because it's doing real work here.
+  // FIX: previously drew the badge into a ZONE_PX × ZONE_PX square, which
+  // stretched the (taller-than-wide) shield artwork out of proportion.
+  // The reserved zone stays square (so module-exclusion math is unchanged),
+  // but the badge itself is fit inside it preserving its native aspect
+  // ratio — same "contain" behavior as the SVG renderer's
+  // preserveAspectRatio="xMidYMid meet", so client and server output match.
   const naturalW = shield.naturalWidth  || shield.width  || 1;
   const naturalH = shield.naturalHeight || shield.height || 1;
-  const LOGO_W_BOX = QR_GRID_PX * LOGO_WIDTH_RATIO;
-  const LOGO_H_BOX = QR_GRID_PX * LOGO_HEIGHT_RATIO;
-  const badgeScale = Math.min(LOGO_W_BOX / naturalW, LOGO_H_BOX / naturalH);
+  const badgeScale = Math.min(ZONE_PX / naturalW, ZONE_PX / naturalH);
   const LOGO_W = naturalW * badgeScale;
   const LOGO_H = naturalH * badgeScale;
   const logoX  = OFFSET + (QR_GRID_PX - LOGO_W) / 2;
