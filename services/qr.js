@@ -129,8 +129,18 @@ export async function generateBrandedQrCanvas(plateId) {
            col >= centerMod - halfExcludeW && col <= centerMod + halfExcludeW;
   }
 
+  // ── Gold gradient — matches premiumQr.ts's SVG linearGradient so client
+  // preview and server-final output share the same metallic look, not a
+  // flat fill (see qr.js/premiumQr.ts style-audit notes: the approved
+  // reference art has a visible highlight/shadow gradient on the gold,
+  // this reproduces that without touching module geometry). ──
+  const goldGrad = ctx.createLinearGradient(0, 0, OUTPUT_PX, OUTPUT_PX);
+  goldGrad.addColorStop(0,    '#F4D976');
+  goldGrad.addColorStop(0.45, '#D4AF37');
+  goldGrad.addColorStop(1,    '#9C7A1E');
+
   // ── Draw data modules — gold rounded squares ──
-  ctx.fillStyle = GOLD;
+  ctx.fillStyle = goldGrad;
   for (let r = 0; r < count; r++) {
     for (let c = 0; c < count; c++) {
       if (!modules.get(r, c)) continue;
@@ -155,7 +165,7 @@ export async function generateBrandedQrCanvas(plateId) {
     const br = sz * 0.12;
 
     // Outer gold square
-    ctx.fillStyle = GOLD;
+    ctx.fillStyle = goldGrad;
     ctx.beginPath();
     ctx.roundRect(px, py, sz, sz, br);
     ctx.fill();
@@ -169,7 +179,7 @@ export async function generateBrandedQrCanvas(plateId) {
 
     // Inner gold square (3×3 modules)
     const g2 = MOD_PX * 2;
-    ctx.fillStyle = GOLD;
+    ctx.fillStyle = goldGrad;
     ctx.beginPath();
     ctx.roundRect(px + g2, py + g2, sz - g2 * 2, sz - g2 * 2, br * 0.3);
     ctx.fill();
