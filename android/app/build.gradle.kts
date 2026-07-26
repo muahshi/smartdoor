@@ -1,3 +1,25 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+// ROOT CAUSE FIX (runtime "No internet connection" on login):
+// SUPABASE_URL / SUPABASE_ANON_KEY were sourced ONLY from System.getenv(...),
+// defaulting to "" when unset. Local/Android Studio builds don't inherit
+// shell env vars by default, so every local build silently produced an
+// empty Supabase URL. Fall back to local.properties (gitignored, standard
+// Android pattern) when the env var isn't set. CI/Play builds are
+// unaffected — env vars still take priority.
+val localProperties = Properties().apply {
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        load(FileInputStream(localPropsFile))
+    }
+}
+
+fun supabaseConfigValue(envKey: String, localKey: String): String =
+    System.getenv(envKey)?.takeIf { it.isNotBlank() }
+        ?: localProperties.getProperty(localKey)?.takeIf { it.isNotBlank() }
+        ?: ""
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -38,11 +60,11 @@ android {
             buildConfigField("String", "ENVIRONMENT_NAME", "\"dev\"")
             buildConfigField(
                 "String", "SUPABASE_URL",
-                "\"${System.getenv("SMARTDOOR_DEV_SUPABASE_URL") ?: ""}\""
+                "\"${supabaseConfigValue("SMARTDOOR_DEV_SUPABASE_URL", "smartdoor.dev.supabaseUrl")}\""
             )
             buildConfigField(
                 "String", "SUPABASE_ANON_KEY",
-                "\"${System.getenv("SMARTDOOR_DEV_SUPABASE_ANON_KEY") ?: ""}\""
+                "\"${supabaseConfigValue("SMARTDOOR_DEV_SUPABASE_ANON_KEY", "smartdoor.dev.supabaseAnonKey")}\""
             )
         }
         create("staging") {
@@ -52,11 +74,11 @@ android {
             buildConfigField("String", "ENVIRONMENT_NAME", "\"staging\"")
             buildConfigField(
                 "String", "SUPABASE_URL",
-                "\"${System.getenv("SMARTDOOR_STAGING_SUPABASE_URL") ?: ""}\""
+                "\"${supabaseConfigValue("SMARTDOOR_STAGING_SUPABASE_URL", "smartdoor.staging.supabaseUrl")}\""
             )
             buildConfigField(
                 "String", "SUPABASE_ANON_KEY",
-                "\"${System.getenv("SMARTDOOR_STAGING_SUPABASE_ANON_KEY") ?: ""}\""
+                "\"${supabaseConfigValue("SMARTDOOR_STAGING_SUPABASE_ANON_KEY", "smartdoor.staging.supabaseAnonKey")}\""
             )
         }
         create("prod") {
@@ -65,11 +87,11 @@ android {
             buildConfigField("String", "ENVIRONMENT_NAME", "\"prod\"")
             buildConfigField(
                 "String", "SUPABASE_URL",
-                "\"${System.getenv("SMARTDOOR_PROD_SUPABASE_URL") ?: ""}\""
+                "\"${supabaseConfigValue("SMARTDOOR_PROD_SUPABASE_URL", "smartdoor.prod.supabaseUrl")}\""
             )
             buildConfigField(
                 "String", "SUPABASE_ANON_KEY",
-                "\"${System.getenv("SMARTDOOR_PROD_SUPABASE_ANON_KEY") ?: ""}\""
+                "\"${supabaseConfigValue("SMARTDOOR_PROD_SUPABASE_ANON_KEY", "smartdoor.prod.supabaseAnonKey")}\""
             )
         }
     }

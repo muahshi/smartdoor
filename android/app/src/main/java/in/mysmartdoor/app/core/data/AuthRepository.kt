@@ -1,6 +1,8 @@
 package `in`.mysmartdoor.app.core.data
 
+import `in`.mysmartdoor.app.core.common.AppError
 import `in`.mysmartdoor.app.core.common.Result
+import `in`.mysmartdoor.app.core.config.EnvironmentConfig
 import `in`.mysmartdoor.app.core.network.dto.VerifyPinRequest
 import `in`.mysmartdoor.app.core.network.dto.VerifyPinResponse
 import `in`.mysmartdoor.app.core.session.SecureSessionManager
@@ -34,6 +36,7 @@ class AuthRepository @Inject constructor(
     private val client: SupabaseClient,
     private val json: Json,
     private val sessionManager: SecureSessionManager,
+    private val environmentConfig: EnvironmentConfig,
 ) : BaseRepository() {
 
     /**
@@ -42,7 +45,29 @@ class AuthRepository @Inject constructor(
      *   Edge Function's own normalization.
      * @param pin raw 4-digit PIN input, unmodified other than trimming.
      */
-    suspend fun loginOwner(plateId: String, pin: String): Result<Unit> = safeApiCall {
+    suspend fun loginOwner(plateId: String, pin: String): Result<Unit> {
+        // Root-cause guard: an empty/unset SUPABASE_URL or SUPABASE_ANON_KEY
+        // used to reach the Ktor client and fail as a raw connection error,
+        // which BaseRepository.safeApiCall generically maps to
+        // AppError.Network ("No internet connection") — misleading on a
+        // device with working internet. Catch it here instead, before any
+        // network call is attempted, with a message that names the real
+        // problem.
+        if (!environmentConfig.isConfigured) {
+            return Result.Error(
+                AppError.Server(
+                    message = "App is not configured for the '${environmentConfig.environmentName}' " +
+                        "environment (missing Supabase URL/key). Contact support.",
+                )
+            )
+        }
+
+        return safeApiCall {
+            loginOwnerInternal(plateId, pin)
+        }
+    }
+
+    private suspend fun loginOwnerInternal(plateId: String, pin: String) {
         val normalizedPlateId = plateId.trim().uppercase()
         val normalizedPin = pin.trim()
 
