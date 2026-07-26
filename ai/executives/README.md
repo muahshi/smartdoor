@@ -12,9 +12,13 @@ execution logic. As of SDOS Phase 3, `coo/` fully defines the COO
 executive's role, authority, and operational playbooks (order
 fulfilment, manufacturing, inventory, customer support, installation,
 logistics, incident response) — documentation only, no agent runtime or
-execution logic. See `ai/executives/coo/README.md`. `ceo/` and `cfo/`
-remain empty; no agents, personas, or decision logic execute for any
-role yet.
+execution logic. See `ai/executives/coo/README.md`. As of SDOS Phase 4, `cfo/` fully
+defines the CFO executive's role, authority, and financial playbooks
+(revenue, subscription metrics, cash flow, pricing, GST compliance,
+unit economics, investor reporting, fundraising) — documentation only,
+no agent runtime or execution logic. See `ai/executives/cfo/README.md`.
+`ceo/` remains empty; no agents, personas, or decision logic execute for
+any role yet.
 
 ## What will eventually go here
 - One subfolder per executive (e.g. `ceo/`, `cto/`, `coo/`, `cfo/`)
