@@ -8,6 +8,10 @@ with structured documentation of the SmartDoor business — the "Company
 Brain." Nothing in this phase implements AI, dashboards, or workflows;
 it is documentation only.
 
+> Phase 2 (`ai/executives/cto/README.md`) builds directly on this Company
+> Brain to fully define the AI CTO executive, in documentation only. See
+> that folder for how an executive consumes the knowledge described here.
+
 ## Purpose
 
 Every future AI executive needs to understand the business before it
