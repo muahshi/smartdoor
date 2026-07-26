@@ -147,7 +147,7 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
       const y  = OFFSET + r * MOD_PX;
       const ms = MOD_PX - 1;
       const br = ms * 0.25;
-      rects.push(`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${ms.toFixed(2)}" height="${ms.toFixed(2)}" rx="${br.toFixed(2)}" fill="${QR_GOLD}"/>`);
+      rects.push(`<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${ms.toFixed(2)}" height="${ms.toFixed(2)}" rx="${br.toFixed(2)}" fill="url(#qrGoldGrad)"/>`);
     }
   }
 
@@ -164,9 +164,9 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
     const inner2 = sz - g2 * 2;
 
     return [
-      `<rect x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${sz.toFixed(2)}" height="${sz.toFixed(2)}" rx="${br.toFixed(2)}" fill="${QR_GOLD}"/>`,
+      `<rect x="${px.toFixed(2)}" y="${py.toFixed(2)}" width="${sz.toFixed(2)}" height="${sz.toFixed(2)}" rx="${br.toFixed(2)}" fill="url(#qrGoldGrad)"/>`,
       `<rect x="${(px+g1).toFixed(2)}" y="${(py+g1).toFixed(2)}" width="${inner1.toFixed(2)}" height="${inner1.toFixed(2)}" rx="${(br*0.5).toFixed(2)}" fill="${QR_BLACK}"/>`,
-      `<rect x="${(px+g2).toFixed(2)}" y="${(py+g2).toFixed(2)}" width="${inner2.toFixed(2)}" height="${inner2.toFixed(2)}" rx="${(br*0.3).toFixed(2)}" fill="${QR_GOLD}"/>`,
+      `<rect x="${(px+g2).toFixed(2)}" y="${(py+g2).toFixed(2)}" width="${inner2.toFixed(2)}" height="${inner2.toFixed(2)}" rx="${(br*0.3).toFixed(2)}" fill="url(#qrGoldGrad)"/>`,
     ].join('\n    ');
   }
 
@@ -214,6 +214,13 @@ export async function buildPremiumQrSvg(supabase: any, targetUrl: string): Promi
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
      width="${OUTPUT}" height="${OUTPUT}" viewBox="0 0 ${OUTPUT} ${OUTPUT}">
+  <defs>
+    <linearGradient id="qrGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"  stop-color="#F4D976"/>
+      <stop offset="45%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#9C7A1E"/>
+    </linearGradient>
+  </defs>
   <rect width="${OUTPUT}" height="${OUTPUT}" fill="${QR_BLACK}"/>
   ${rects.join('\n  ')}
   ${findersSvg}
