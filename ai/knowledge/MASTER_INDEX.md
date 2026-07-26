@@ -36,6 +36,15 @@ AI) must follow when touching it.
 7. `documents/documents.md` — where to go for anything not covered
    above, plus known discrepancies to watch for
 
+## AI Executives Built On This Knowledge
+
+- **CTO** — fully defined as of SDOS Phase 2. See
+  `ai/executives/cto/README.md` for the CTO's mission, responsibilities,
+  authority matrix, and standards library. The CTO reads this Company
+  Brain (primarily `database.md`, `services.md`, `features.md`,
+  `pages.md`, `documents.md`) as its background context.
+- CEO, COO, CFO — not yet defined (future phases).
+
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
 - SmartDoor's actual codebase and Supabase database are always the
