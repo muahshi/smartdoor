@@ -43,7 +43,16 @@ AI) must follow when touching it.
   authority matrix, and standards library. The CTO reads this Company
   Brain (primarily `database.md`, `services.md`, `features.md`,
   `pages.md`, `documents.md`) as its background context.
-- CEO, COO, CFO — not yet defined (future phases).
+- **COO** — fully defined as of SDOS Phase 3. See
+  `ai/executives/coo/README.md` for the COO's mission, responsibilities,
+  authority matrix, and operational playbooks (order fulfilment,
+  manufacturing, inventory, customer support, installation, logistics,
+  incident response). The COO reads this Company Brain (primarily
+  `workflows.md`, `business_rules.md`, `services.md`, `database.md`) as
+  its background context, alongside the existing production runbooks
+  (`OPERATIONS_RUNBOOK.md`, `SUPPORT_RUNBOOK.md`,
+  `docs/SUPPORT_ESCALATION_GUIDE.md`).
+- CEO, CFO — not yet defined (future phases).
 
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
