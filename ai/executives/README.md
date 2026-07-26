@@ -8,8 +8,13 @@ business.
 ## Status
 As of SDOS Phase 2, `cto/` fully defines the CTO executive's role,
 authority, and standards — documentation only, no agent runtime or
-execution logic. `ceo/`, `coo/`, and `cfo/` remain empty; no agents,
-personas, or decision logic execute for any role yet.
+execution logic. As of SDOS Phase 3, `coo/` fully defines the COO
+executive's role, authority, and operational playbooks (order
+fulfilment, manufacturing, inventory, customer support, installation,
+logistics, incident response) — documentation only, no agent runtime or
+execution logic. See `ai/executives/coo/README.md`. `ceo/` and `cfo/`
+remain empty; no agents, personas, or decision logic execute for any
+role yet.
 
 ## What will eventually go here
 - One subfolder per executive (e.g. `ceo/`, `cto/`, `coo/`, `cfo/`)
