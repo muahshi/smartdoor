@@ -78,25 +78,32 @@ class AuthRepository @Inject constructor(
         )
         val payload: VerifyPinResponse = json.decodeFromString(rawResponse.bodyAsText())
 
-        if (!payload.success || payload.token.isNullOrBlank()) {
+        val tokenHash = payload.token
+        if (!payload.success || tokenHash.isNullOrBlank()) {
             throw IllegalStateException(
                 payload.message ?: "Invalid Plate ID or PIN. Please try again."
             )
         }
 
         // ── Step 2: exchange the hashed magic-link token for a real session ──
-        // NOTE (verify before shipping): this mirrors the web's
-        // `supabase.auth.verifyOtp({ token_hash: data.token, type: 'magiclink' })`,
-        // but supabase-kt 3.1.4's documented `verifyEmailOtp` signature only
-        // shows a `token` parameter (not a separately-named `tokenHash`). This
-        // is the one call in this file that needs a real compile + device test
-        // against the actual verify-pin response — if it rejects the hashed
-        // token, the fix is almost certainly a differently-named parameter on
-        // this same function, not a different auth design.
+        // CONFIRMED against supabase-kt 3.1.4 source (Auth.kt / AuthImpl.kt):
+        // verifyEmailOtp has two distinct overloads —
+        //   verifyEmailOtp(type, email, token, captchaToken)   → body { type, token, email }
+        //   verifyEmailOtp(type, tokenHash, captchaToken)      → body { type, token_hash }
+        // `payload.token` from verify-pin is a hashed magic-link token
+        // (`hashed_token` from the Edge Function's `generateLink()` call), the
+        // same value the web sends as `token_hash` via
+        // `supabase.auth.verifyOtp({ token_hash: data.token, type: 'magiclink' })`.
+        // The previous code used the first (`token=`) overload, which puts the
+        // hash in the `token` field — Supabase Auth then tries to validate it
+        // as a live short-lived OTP code, fails, and returns `otp_expired` even
+        // though the token itself is fine. Using the `tokenHash=` overload sends
+        // it as `token_hash`, matching both the web flow and what verify-pin
+        // actually issues. Same Edge Function, same two-step exchange, same
+        // Supabase project — no auth design change.
         client.auth.verifyEmailOtp(
             type = OtpType.Email.MAGIC_LINK,
-            email = payload.email.orEmpty(),
-            token = payload.token,
+            tokenHash = tokenHash,
         )
 
         val session = client.auth.currentSessionOrNull()

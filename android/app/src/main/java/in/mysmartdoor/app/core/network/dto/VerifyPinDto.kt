@@ -22,9 +22,10 @@ data class VerifyPinRequest(
  * PIN, lockout, rate limit) — see supabase/functions/verify-pin/index.ts.
  *
  * [token] is the magic-link `hashed_token` from `generateLink()`, exchanged
- * via `auth.verifyEmailOtp(type = OtpType.Email.MAGIC_LINK, ...)` — the
- * same two-step handoff `services/auth.js` performs with
- * `supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })`.
+ * via `auth.verifyEmailOtp(type = OtpType.Email.MAGIC_LINK, tokenHash = ...)`
+ * — the `tokenHash` overload, which sends `token_hash` (not `token`) in the
+ * request body. This is the same two-step handoff `services/auth.js`
+ * performs with `supabase.auth.verifyOtp({ token_hash, type: 'magiclink' })`.
  */
 @Serializable
 data class VerifyPinResponse(
