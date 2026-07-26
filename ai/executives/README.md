@@ -6,8 +6,10 @@ roles — that will eventually run on top of SDOS to help manage the SmartDoor
 business.
 
 ## Status
-Empty. Phase 0 does not implement any executive. No CEO/CTO/COO/CFO agents,
-personas, or decision logic exist yet.
+As of SDOS Phase 2, `cto/` fully defines the CTO executive's role,
+authority, and standards — documentation only, no agent runtime or
+execution logic. `ceo/`, `coo/`, and `cfo/` remain empty; no agents,
+personas, or decision logic execute for any role yet.
 
 ## What will eventually go here
 - One subfolder per executive (e.g. `ceo/`, `cto/`, `coo/`, `cfo/`)
