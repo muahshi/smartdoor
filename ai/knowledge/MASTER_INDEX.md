@@ -52,7 +52,18 @@ AI) must follow when touching it.
   its background context, alongside the existing production runbooks
   (`OPERATIONS_RUNBOOK.md`, `SUPPORT_RUNBOOK.md`,
   `docs/SUPPORT_ESCALATION_GUIDE.md`).
-- CEO, CFO — not yet defined (future phases).
+- **CFO** — fully defined as of SDOS Phase 4. See
+  `ai/executives/cfo/README.md` for the CFO's mission, responsibilities,
+  authority matrix, financial model, and finance playbooks (revenue,
+  subscription metrics, cash flow, pricing, GST compliance, unit
+  economics, investor reporting). The CFO reads this Company Brain
+  (primarily `business_rules.md`, `products.md`, `database.md`,
+  `services.md`) as its background context, alongside SmartDoor's real
+  billing/GST schema (`sql/46_saas_billing_schema.sql`,
+  `sql/57_commerce_engine_phase8a.sql`,
+  `sql/58_gst_billing_phase8b.sql`) and existing legal documents
+  (`docs/legal/refund-policy.md`).
+- CEO — not yet defined (future phase).
 
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
