@@ -101,9 +101,11 @@ import java.time.OffsetDateTime
  * [in.mysmartdoor.app.navigation.SmartDoorNavHost] yet. Phase 4 —
  * VISITORS V2 was the first exception ("Visitor History" →
  * [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]); Phase 6 —
- * MESSAGES V2 adds a second: "Messages" now navigates to the real
- * [in.mysmartdoor.app.ui.screens.messages.MessagesScreen] instead of
- * showing the snackbar.
+ * MESSAGES V2 added a second ("Messages" →
+ * [in.mysmartdoor.app.ui.screens.messages.MessagesScreen]); Phase 7 — AI
+ * RECEPTIONIST V2 adds a third: "AI Receptionist" now navigates to the
+ * real [in.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen]
+ * instead of showing the snackbar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,6 +159,7 @@ fun DashboardScreen(
                         when (feature) {
                             "Visitor History" -> navController.navigate(Routes.VISITOR_FEED)
                             "Messages" -> navController.navigate(Routes.MESSAGES)
+                            "AI Receptionist" -> navController.navigate(Routes.AI_RECEPTIONIST)
                             else -> showComingSoon(feature)
                         }
                     },
