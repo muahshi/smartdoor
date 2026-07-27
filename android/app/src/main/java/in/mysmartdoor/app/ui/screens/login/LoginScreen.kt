@@ -1,6 +1,20 @@
 package `in`.mysmartdoor.app.ui.screens.login
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,26 +23,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -37,17 +52,29 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import `in`.mysmartdoor.app.BuildConfig
 import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.navigation.Routes
+import `in`.mysmartdoor.app.ui.components.GlassCard
+import `in`.mysmartdoor.app.ui.components.SDBadge
+import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
+import `in`.mysmartdoor.app.ui.components.SmartDoorButton
+import `in`.mysmartdoor.app.ui.components.SmartDoorButtonVariant
 import `in`.mysmartdoor.app.ui.components.SmartDoorScaffold
+import `in`.mysmartdoor.app.ui.components.SmartDoorTextField
+import `in`.mysmartdoor.app.ui.theme.SmartDoorBackgroundDark
+import `in`.mysmartdoor.app.ui.theme.SmartDoorMotion
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSurfaceVariantDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
+import kotlinx.coroutines.launch
 
 /**
  * Client-side-only Plate ID validation — a UX guard against obviously-wrong
@@ -73,11 +100,16 @@ private fun isFormValid(plateId: String, pin: String): Boolean =
 
 /**
  * Stateful entry point wired into [in.mysmartdoor.app.navigation.SmartDoorNavHost].
- * Phase A1.5 replaces the phone/OTP placeholder with the real Owner Login
+ * Phase A1.5 replaced the phone/OTP placeholder with the real Owner Login
  * fields — Plate ID + 4-digit PIN — driven by [LoginViewModel], which calls
  * the existing production `verify-pin` flow via `AuthRepository`. On
  * success, navigates to [Routes.DASHBOARD] (a placeholder screen — real
  * Dashboard implementation is a later phase, out of scope here).
+ *
+ * Premium Login Experience phase: visuals only. Every field above this
+ * doc comment — validation rules, form-valid gate, the ViewModel contract,
+ * the navigation side effect below — is unchanged from A1.5. Only
+ * [LoginContent]'s presentation changed.
  */
 @Composable
 fun LoginScreen(
@@ -141,6 +173,17 @@ fun LoginScreen(
  * device for 30 days" checkbox) but is currently a UI-only value —
  * trusted-device persistence is out of scope for A1.5; see AuthRepository's
  * class doc.
+ *
+ * Premium Login Experience phase: rebuilt as a flagship hero screen —
+ * dark navy backdrop, "My Smart Door" wordmark + tagline, the form inside
+ * a [GlassCard], and a bottom trust block (Secure Login badge, privacy/
+ * terms text, version). Built entirely from existing design-system
+ * pieces (GlassCard, SmartDoorTextField, SmartDoorButton, SDBadge,
+ * SmartDoorSpacing/Motion/Typography/Theme) — no new components, no new
+ * colors, and no changes to the design-system files themselves. Entrance
+ * motion is a one-shot fade/slide/scale driven by [remember]ed state so it
+ * plays once per composition, not on every recomposition (e.g. while the
+ * user types).
  */
 @Composable
 private fun LoginContent(
@@ -157,151 +200,323 @@ private fun LoginContent(
     isContinueEnabled: Boolean,
     onContinueClick: () -> Unit,
 ) {
-    val keyboardController = LocalSoftwareKeyboardController.current
     val plateInputDescription = stringResource(R.string.login_plate_id_input_description)
     val pinInputDescription = stringResource(R.string.login_pin_input_description)
     val continueButtonLabel = stringResource(R.string.login_continue_button)
     val continueLoadingLabel = stringResource(R.string.login_continue_loading_description)
+    val secureBadgeLabel = stringResource(R.string.login_secure_badge)
     val errorMessage = plateError ?: pinError ?: serverError
 
-    SmartDoorScaffold { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = stringResource(R.string.login_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+    // One-shot entrance choreography: hero block first, then the card,
+    // then the trust footer — staggered fade+slide, played once.
+    var heroVisible by remember { mutableStateOf(false) }
+    var cardVisible by remember { mutableStateOf(false) }
+    var footerVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        heroVisible = true
+        kotlinx.coroutines.delay(120)
+        cardVisible = true
+        kotlinx.coroutines.delay(160)
+        footerVisible = true
+    }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = stringResource(R.string.login_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            OutlinedTextField(
-                value = plateId,
-                onValueChange = onPlateIdChange,
+    // The Premium Black + Gold treatment (GlassCard, gold CTA) is designed
+    // to sit over the dark navy surface — force dark theme on this hero
+    // screen specifically, matching the production web login's dark
+    // background, regardless of system light/dark setting.
+    SmartDoorTheme(darkTheme = true) {
+        SmartDoorScaffold { innerPadding ->
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("login_plate_id_input")
-                    .semantics { contentDescription = plateInputDescription },
-                enabled = !isLoading,
-                singleLine = true,
-                label = { Text(stringResource(R.string.login_plate_id_label)) },
-                placeholder = { Text(stringResource(R.string.login_plate_id_placeholder)) },
-                supportingText = { Text(stringResource(R.string.login_plate_id_hint)) },
-                isError = plateError != null,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Next,
-                ),
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = pin,
-                onValueChange = onPinChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("login_pin_input")
-                    .semantics { contentDescription = pinInputDescription },
-                enabled = !isLoading,
-                singleLine = true,
-                label = { Text(stringResource(R.string.login_pin_label)) },
-                visualTransformation = PasswordVisualTransformation(),
-                isError = pinError != null,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.NumberPassword,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        keyboardController?.hide()
-                        if (isContinueEnabled) onContinueClick()
-                    },
-                ),
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = rememberDevice,
-                    onCheckedChange = onRememberDeviceChange,
-                    enabled = !isLoading,
-                )
-                Text(
-                    text = stringResource(R.string.login_remember_device),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-
-            if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics {
-                            liveRegion = LiveRegionMode.Polite
-                            contentDescription = "Error: $errorMessage"
-                        },
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Button(
-                onClick = onContinueClick,
-                enabled = isContinueEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("login_continue_button")
-                    .semantics {
-                        contentDescription = if (isLoading) continueLoadingLabel else continueButtonLabel
-                    },
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .height(20.dp)
-                            .wrapContentHeight(),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp,
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(SmartDoorBackgroundDark, SmartDoorSurfaceVariantDark),
+                        ),
                     )
-                } else {
-                    Text(text = stringResource(R.string.login_continue_button))
+                    .padding(innerPadding),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .imePadding()
+                        .padding(horizontal = SmartDoorSpacing.lg, vertical = SmartDoorSpacing.xl),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    AnimatedVisibility(
+                        visible = heroVisible,
+                        enter = fadeIn(tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.decelerate)) +
+                            slideInVertically(
+                                animationSpec = tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.decelerate),
+                                initialOffsetY = { -it / 3 },
+                            ),
+                    ) {
+                        LoginHero()
+                    }
+
+                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xl))
+
+                    AnimatedVisibility(
+                        visible = cardVisible,
+                        enter = fadeIn(tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.emphasized)) +
+                            slideInVertically(
+                                animationSpec = tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.emphasized),
+                                initialOffsetY = { it / 6 },
+                            ) +
+                            scaleIn(
+                                animationSpec = tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.emphasized),
+                                initialScale = 0.94f,
+                            ),
+                    ) {
+                        GlassCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .widthIn(max = 480.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(SmartDoorSpacing.lg),
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = stringResource(R.string.login_title),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+
+                                Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+
+                                Text(
+                                    text = stringResource(R.string.login_subtitle),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+
+                                Spacer(modifier = Modifier.height(SmartDoorSpacing.lg))
+
+                                FocusAnimatedField {
+                                    SmartDoorTextField(
+                                        value = plateId,
+                                        onValueChange = onPlateIdChange,
+                                        label = stringResource(R.string.login_plate_id_label),
+                                        modifier = Modifier.testTag("login_plate_id_input"),
+                                        placeholder = stringResource(R.string.login_plate_id_placeholder),
+                                        supportingText = stringResource(R.string.login_plate_id_hint),
+                                        errorMessage = plateError,
+                                        enabled = !isLoading,
+                                        keyboardType = KeyboardType.Text,
+                                        contentDescriptionOverride = plateInputDescription,
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
+
+                                FocusAnimatedField {
+                                    SmartDoorTextField(
+                                        value = pin,
+                                        onValueChange = onPinChange,
+                                        label = stringResource(R.string.login_pin_label),
+                                        modifier = Modifier.testTag("login_pin_input"),
+                                        errorMessage = pinError,
+                                        enabled = !isLoading,
+                                        keyboardType = KeyboardType.NumberPassword,
+                                        visualTransformation = PasswordVisualTransformation(),
+                                        contentDescriptionOverride = pinInputDescription,
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Checkbox(
+                                        checked = rememberDevice,
+                                        onCheckedChange = onRememberDeviceChange,
+                                        enabled = !isLoading,
+                                        colors = CheckboxDefaults.colors(
+                                            checkedColor = SmartDoorSecondaryDark,
+                                        ),
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.login_remember_device),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                    visible = errorMessage != null,
+                                    enter = fadeIn(tween(SmartDoorMotion.durationShort)) + expandVertically(),
+                                    exit = fadeOut(tween(SmartDoorMotion.durationShort)) + shrinkVertically(),
+                                ) {
+                                    Column {
+                                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+                                        Text(
+                                            text = errorMessage.orEmpty(),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .semantics {
+                                                    liveRegion = LiveRegionMode.Polite
+                                                    contentDescription = "Error: ${errorMessage.orEmpty()}"
+                                                },
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(SmartDoorSpacing.lg))
+
+                                PressScaleButton(
+                                    label = if (isLoading) continueLoadingLabel else continueButtonLabel,
+                                    onClick = onContinueClick,
+                                    enabled = isContinueEnabled,
+                                    isLoading = isLoading,
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xl))
+
+                    AnimatedVisibility(
+                        visible = footerVisible,
+                        enter = fadeIn(tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.standard)) +
+                            slideInVertically(
+                                animationSpec = tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.standard),
+                                initialOffsetY = { it / 4 },
+                            ),
+                    ) {
+                        LoginFooter(secureBadgeLabel = secureBadgeLabel)
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(R.string.login_terms_notice),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
         }
     }
+}
+
+/**
+ * Top hero block — "My Smart Door" wordmark + tagline. Pure branding, no
+ * state, no logic; a static asset/vector logo can slot in above the
+ * wordmark later without touching anything else in this file.
+ */
+@Composable
+private fun LoginHero() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = stringResource(R.string.login_brand_wordmark),
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+        Text(
+            text = stringResource(R.string.login_brand_tagline),
+            style = MaterialTheme.typography.bodyMedium,
+            color = SmartDoorSecondaryDark,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+/**
+ * Bottom trust block — Secure Login badge, privacy/terms notice, and the
+ * real app version pulled from [BuildConfig] (not hardcoded, so it can't
+ * silently drift from the actual release build).
+ */
+@Composable
+private fun LoginFooter(secureBadgeLabel: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        SDBadge(text = secureBadgeLabel, status = SDBadgeStatus.Success)
+
+        Spacer(modifier = Modifier.height(SmartDoorSpacing.sm))
+
+        Text(
+            text = stringResource(R.string.login_terms_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.widthIn(max = 320.dp),
+        )
+
+        Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+
+        Text(
+            text = stringResource(R.string.login_version_label, BuildConfig.VERSION_NAME),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Wraps a design-system field with a subtle focus-driven scale, without
+ * modifying [SmartDoorTextField] itself. [Modifier.onFocusChanged] on this
+ * wrapper observes `hasFocus` (true while the field or any descendant
+ * holds focus) and animates a barely-there 1.0 → 1.02 scale — the "focus
+ * animation" the brief calls for, implemented entirely at the call site.
+ */
+@Composable
+private fun FocusAnimatedField(content: @Composable () -> Unit) {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.02f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "field-focus-scale",
+    )
+
+    Box(
+        modifier = Modifier
+            .scale(scale)
+            .onFocusChanged { isFocused = it.hasFocus },
+    ) {
+        content()
+    }
+}
+
+/**
+ * The primary CTA, wrapped with a local press/click bounce.
+ * [SmartDoorButton]'s public API is completely untouched — no new
+ * parameters, no modification to that file. The animation here is driven
+ * entirely by our own [onClick] wrapper (a quick scale-down/scale-back-up
+ * [Animatable] sequence fired the instant the real tap is registered), not
+ * by intercepting or duplicating any pointer/touch handling underneath
+ * [SmartDoorButton]. The real [onClick] still runs exactly as before —
+ * this only adds a coroutine that animates a `Modifier.scale` alongside it.
+ * Also hides the keyboard on submit here (rather than via a text-field
+ * keyboard-action callback), since that's a call-site concern.
+ */
+@Composable
+private fun PressScaleButton(
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    isLoading: Boolean,
+) {
+    val scale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    SmartDoorButton(
+        label = label,
+        onClick = {
+            keyboardController?.hide()
+            scope.launch {
+                scale.animateTo(0.96f, tween(SmartDoorMotion.durationShort, easing = SmartDoorMotion.standard))
+                scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
+            }
+            onClick()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale.value)
+            .testTag("login_continue_button")
+            .semantics { contentDescription = label },
+        variant = SmartDoorButtonVariant.Primary,
+        enabled = enabled,
+        isLoading = isLoading,
+    )
 }
 
 @Preview(showBackground = true, name = "Login — default")
