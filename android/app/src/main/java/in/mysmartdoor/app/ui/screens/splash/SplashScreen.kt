@@ -14,8 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.SmartDoorScaffold
@@ -31,18 +35,41 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
  *
  * [navController] is nullable so the Preview below can keep rendering the
  * screen with no navigation graph attached.
+ *
+ * Phase 8 architecture decision: Splash's only job is to decide Dashboard
+ * vs. Login *before* the very first navigation — Public Home is never
+ * reached from here (only from Login's "New to My Smart Door?" section).
+ * [SplashViewModel.hasSession] reads the existing encrypted session store
+ * ([in.mysmartdoor.app.core.session.SecureSessionManager]); this waits for
+ * its first non-null value alongside the display-duration delay (whichever
+ * finishes last) so a slow DataStore read can't cut the splash short.
  */
 @Composable
-fun SplashScreen(navController: NavHostController? = null) {
+fun SplashScreen(
+    navController: NavHostController? = null,
+    viewModel: SplashViewModel = hiltViewModel(),
+) {
     LaunchedEffect(navController) {
         if (navController != null) {
+            val hasSessionDeferred = async { viewModel.hasSession.filterNotNull().first() }
             delay(SPLASH_DISPLAY_DURATION_MS)
-            navController.navigate(Routes.LOGIN) {
+            val destination = if (hasSessionDeferred.await()) Routes.DASHBOARD else Routes.LOGIN
+            navController.navigate(destination) {
                 popUpTo(Routes.SPLASH) { inclusive = true }
             }
         }
     }
 
+    SplashContent()
+}
+
+/**
+ * Stateless visual content, with no ViewModel dependency — kept separate
+ * so [SplashScreenPreview] can render it without a Hilt graph, same
+ * pattern as [in.mysmartdoor.app.ui.screens.login.LoginScreen]/`LoginContent`.
+ */
+@Composable
+private fun SplashContent() {
     SmartDoorScaffold { innerPadding ->
         Box(
             modifier = Modifier
@@ -66,13 +93,13 @@ fun SplashScreen(navController: NavHostController? = null) {
     }
 }
 
-/** How long Splash stays visible before handing off to Login. */
+/** How long Splash stays visible before handing off to Dashboard/Login. */
 private const val SPLASH_DISPLAY_DURATION_MS = 1200L
 
 @Preview(showBackground = true)
 @Composable
 private fun SplashScreenPreview() {
     SmartDoorTheme {
-        SplashScreen()
+        SplashContent()
     }
 }
