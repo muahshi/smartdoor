@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
+import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
 import `in`.mysmartdoor.app.ui.screens.splash.SplashScreen
 import `in`.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen
 
@@ -51,6 +52,13 @@ fun SmartDoorNavHost(
         // VisitorRepository (reads the existing get_owner_activity_feed RPC).
         composable(Routes.VISITOR_FEED) {
             VisitorFeedScreen(navController)
+        }
+
+        // Phase 6 — MESSAGES V2: real screen, backed by MessagesViewModel /
+        // MessagesRepository (reads the existing conversations/messages
+        // tables — the same backend the website's Inbox tab already uses).
+        composable(Routes.MESSAGES) {
+            MessagesScreen(navController)
         }
     }
 }
