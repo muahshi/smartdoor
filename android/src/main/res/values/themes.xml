@@ -1,0 +1,8 @@
+<resources>
+    <!-- Minimal manifest-level theme; actual Material 3 theming lives in
+         Compose (ui/theme/Theme.kt). This just sets the window background
+         before Compose content is set. -->
+    <style name="Theme.SmartDoor" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>
