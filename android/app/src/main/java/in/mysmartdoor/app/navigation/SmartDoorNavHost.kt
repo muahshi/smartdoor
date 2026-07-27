@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.splash.SplashScreen
+import `in`.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen
 
 /**
  * Root navigation graph for the app.
@@ -46,7 +47,10 @@ fun SmartDoorNavHost(
             DashboardScreen(navController)
         }
 
-        // Added in a later phase, once the corresponding screen exists:
-        //   composable(Routes.VISITOR_FEED) { VisitorFeedScreen(navController) }
+        // Phase 4 — VISITORS V2: real screen, backed by VisitorFeedViewModel /
+        // VisitorRepository (reads the existing get_owner_activity_feed RPC).
+        composable(Routes.VISITOR_FEED) {
+            VisitorFeedScreen(navController)
+        }
     }
 }
