@@ -99,9 +99,11 @@ import java.time.OffsetDateTime
  * Quick Actions still show a "coming soon" snackbar (unchanged from Phase
  * 1) since most of their destination screens don't exist in
  * [in.mysmartdoor.app.navigation.SmartDoorNavHost] yet. Phase 4 —
- * VISITORS V2 is the first exception: "Visitor History" now navigates to
- * the real [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]
- * instead of showing the snackbar.
+ * VISITORS V2 was the first exception ("Visitor History" →
+ * [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]); Phase 6 —
+ * MESSAGES V2 adds a second: "Messages" now navigates to the real
+ * [in.mysmartdoor.app.ui.screens.messages.MessagesScreen] instead of
+ * showing the snackbar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -152,10 +154,10 @@ fun DashboardScreen(
                 currentData != null -> DashboardContent(
                     data = currentData,
                     onQuickAction = { feature ->
-                        if (feature == "Visitor History") {
-                            navController.navigate(Routes.VISITOR_FEED)
-                        } else {
-                            showComingSoon(feature)
+                        when (feature) {
+                            "Visitor History" -> navController.navigate(Routes.VISITOR_FEED)
+                            "Messages" -> navController.navigate(Routes.MESSAGES)
+                            else -> showComingSoon(feature)
                         }
                     },
                 )
