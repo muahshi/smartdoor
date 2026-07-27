@@ -12,6 +12,7 @@ import `in`.mysmartdoor.app.core.network.dto.PlateDto
 import `in`.mysmartdoor.app.core.network.dto.SecurityRulesDto
 import `in`.mysmartdoor.app.core.network.dto.SubscriptionDto
 import `in`.mysmartdoor.app.core.network.dto.VisitorLogDto
+import `in`.mysmartdoor.app.core.network.dto.VisitorVisitDto
 import `in`.mysmartdoor.app.core.session.SecureSessionManager
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
@@ -27,11 +28,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Owner Dashboard V1 — reads-only aggregation over the exact same
+ * Owner Dashboard — reads-only aggregation over the exact same
  * production tables the website's `js/dashboard.js` + `services/` *.js
  * already use (`users`, `plates`, `subscriptions`, `security_rules`,
- * `visitor_logs`, `call_logs`, `message_logs`, `notifications`). No new
- * tables, no new Edge Function — RLS (`owner_id = get_my_owner_id()`,
+ * `visitor_logs`, `call_logs`, `message_logs`, `notifications`). Phase 2
+ * additionally reads `visitor_visits` (`sql/41_visitor_memory.sql`) for the
+ * AI Handled / Missed Visitor stats and the AI Receptionist's last-interaction
+ * summary — same table the web's visitor-memory feature already reads. No
+ * new tables, no new Edge Function — RLS (`owner_id = get_my_owner_id()`,
  * see `sql/65_fix_owner_id_rls_mismatch.sql`) already scopes every one of
  * these queries to the signed-in owner server-side; the `.eq("owner_id", …)`
  * filters here match what the web client sends for defence in depth /
@@ -92,6 +96,10 @@ class DashboardRepository @Inject constructor(
         val unreadMessageCountDeferred = async { safeSection(0) { fetchUnreadMessageCount(ownerId) } }
         val recentNotificationsDeferred = async { safeSection(emptyList()) { fetchRecentNotifications(ownerId) } }
         val unreadNotificationCountDeferred = async { safeSection(0) { fetchUnreadNotificationCount(ownerId) } }
+        val recentVisitorVisitsDeferred = async { safeSection(emptyList()) { fetchRecentVisitorVisits(ownerId) } }
+        val missedAndAiHandledDeferred = async { safeSection(0 to 0) { fetchMissedAndAiHandledCounts(ownerId) } }
+
+        val missedAndAiHandled = missedAndAiHandledDeferred.await()
 
         DashboardData(
             owner = owner,
@@ -105,6 +113,9 @@ class DashboardRepository @Inject constructor(
             unreadMessageCount = unreadMessageCountDeferred.await(),
             recentNotifications = recentNotificationsDeferred.await(),
             unreadNotificationCount = unreadNotificationCountDeferred.await(),
+            recentVisitorVisits = recentVisitorVisitsDeferred.await(),
+            missedVisitorCount = missedAndAiHandled.first,
+            aiHandledCount = missedAndAiHandled.second,
         )
     }
 
@@ -222,4 +233,47 @@ class DashboardRepository @Inject constructor(
             }
             .countOrNull()
             ?.toInt() ?: 0
+
+    private suspend fun fetchRecentVisitorVisits(ownerId: String): List<VisitorVisitDto> =
+        client.postgrest.from("visitor_visits")
+            .select(
+                columns = Columns.list("id", "purpose", "call_type", "accepted", "duration", "created_at"),
+            ) {
+                filter { eq("owner_id", ownerId) }
+                order("created_at", Order.DESCENDING)
+                limit(RECENT_LIMIT)
+            }
+            .decodeList()
+
+    /**
+     * Returns (missedVisitorCount, aiHandledCount) per the CTO-approved
+     * production definitions on [VisitorVisitDto]:
+     *   Missed Visitor = accepted == false
+     *   AI Handled      = accepted == false AND purpose != null
+     *
+     * Deliberately fetches every `accepted = false` row for this owner and
+     * counts client-side, rather than a server-side compound
+     * `accepted=false AND purpose IS NOT NULL` filter: this file's only
+     * proven-working Postgrest filter primitives are `eq`/`gte` (every
+     * query above uses just these), and a null-check filter operator isn't
+     * exercised anywhere in this codebase to verify against a real build in
+     * this environment — same caution `DashboardScreen.RefreshGlyph`
+     * already documents for not adding an unverified dependency mid-phase.
+     * `eq("accepted", false)` is exact and already proven, so this fetch
+     * gives real, exact production counts without gambling on unverified
+     * DSL surface. Per-owner row volume here is small (visitor traffic for
+     * one residence), so fetching the full matching set is not a scale risk.
+     */
+    private suspend fun fetchMissedAndAiHandledCounts(ownerId: String): Pair<Int, Int> {
+        val missedVisits = client.postgrest.from("visitor_visits")
+            .select(columns = Columns.list("id", "purpose", "created_at")) {
+                filter {
+                    eq("owner_id", ownerId)
+                    eq("accepted", false)
+                }
+            }
+            .decodeList<VisitorVisitDto>()
+        val aiHandledCount = missedVisits.count { it.purpose != null }
+        return missedVisits.size to aiHandledCount
+    }
 }
