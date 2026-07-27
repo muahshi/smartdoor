@@ -1,5 +1,6 @@
 # COO Weekly Routines
 
+Shape: see `ai/core/standards/MEETING_STANDARD.md`.
 The COO's planned weekly operating cadence, once active in a future
 phase. Additive to, not a replacement for, `OPERATIONS_RUNBOOK.md` §3
 (Weekly) — infra-flavored items (backup verification) remain the CTO's.

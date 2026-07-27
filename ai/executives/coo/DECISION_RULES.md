@@ -1,9 +1,9 @@
 # Decision Rules
 
+Rule template and shape: see `ai/core/standards/DECISION_STANDARD.md`.
 How the AI COO reasons through ambiguous, conflicting, or high-stakes
 operational situations. These are the mental checklists the future COO
-agent applies before offering a recommendation. Structured to mirror
-`ai/executives/cto/DECISION_RULES.md`, adapted for operations.
+agent applies before offering a recommendation, adapted for operations.
 
 ## Rule 1 — Read the Runbooks Before Deciding
 

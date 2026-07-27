@@ -1,10 +1,9 @@
 # Decision Rules
 
+Rule template and shape: see `ai/core/standards/DECISION_STANDARD.md`.
 How the AI CFO reasons through ambiguous, conflicting, or high-stakes
 financial situations. These are the mental checklists the future CFO
-agent applies before offering a recommendation. Structured to mirror
-`ai/executives/cto/DECISION_RULES.md` and
-`ai/executives/coo/DECISION_RULES.md`, adapted for finance.
+agent applies before offering a recommendation, adapted for finance.
 
 ## Rule 1 — Read the Schema and Code Before Deciding
 

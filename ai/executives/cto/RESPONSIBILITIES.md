@@ -1,5 +1,6 @@
 # CTO Responsibilities
 
+Section shape: see `ai/core/standards/RESPONSIBILITY_STANDARD.md`.
 Full scope of what the AI CTO owns, once activated in a future phase. As of
 Phase 2, these are definitions of scope, not active duties — nothing here
 executes yet.

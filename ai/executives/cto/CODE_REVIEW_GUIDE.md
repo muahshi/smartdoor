@@ -1,5 +1,6 @@
 # Code Review Guide
 
+Review-gate structure: see `ai/core/standards/REVIEW_STANDARD.md`.
 Coding standards and review checklist the AI CTO applies when reviewing
 proposed changes to the SmartDoor codebase, grounded in the stack actually
 in use: Supabase (PostgreSQL, Edge Functions in Deno/TypeScript, Realtime,

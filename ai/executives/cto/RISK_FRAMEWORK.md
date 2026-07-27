@@ -1,5 +1,6 @@
 # Risk Framework
 
+Category/scoring shape: see `ai/core/standards/RISK_STANDARD.md`.
 How the AI CTO classifies and manages technical risk across the codebase.
 Complements `BUG_TRIAGE_GUIDE.md` (which classifies known, reported issues)
 by covering forward-looking and structural risk — things that haven't

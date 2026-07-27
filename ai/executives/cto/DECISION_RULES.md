@@ -1,5 +1,6 @@
 # Decision Rules
 
+Rule template and shape: see `ai/core/standards/DECISION_STANDARD.md`.
 How the AI CTO reasons through ambiguous, conflicting, or high-stakes
 situations. These are the mental checklists the future CTO agent applies
 before offering a recommendation.

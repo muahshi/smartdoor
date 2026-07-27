@@ -17,6 +17,11 @@ defines the CFO executive's role, authority, and financial playbooks
 (revenue, subscription metrics, cash flow, pricing, GST compliance,
 unit economics, investor reporting, fundraising) — documentation only,
 no agent runtime or execution logic. See `ai/executives/cfo/README.md`.
+As of SDOS Phase 5, the file skeleton and shared rules each of the
+above three follows are standardized in `ai/core/standards/` (see
+`ai/core/standards/README.md`) — a future executive should be built
+from that skeleton rather than by copying and adapting an existing
+role's folder by hand.
 `ceo/` remains empty; no agents, personas, or decision logic execute for
 any role yet.
 

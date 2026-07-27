@@ -11,6 +11,10 @@ it is documentation only.
 > Phase 2 (`ai/executives/cto/README.md`) builds directly on this Company
 > Brain to fully define the AI CTO executive, in documentation only. See
 > that folder for how an executive consumes the knowledge described here.
+> Phase 5 (`ai/core/standards/README.md`) later standardized the shared
+> *shape* every executive (CTO, COO, CFO, and future roles) is built
+> from — this Company Brain remains the shared *content* layer; Phase 5
+> did not change how executives read it.
 
 ## Purpose
 

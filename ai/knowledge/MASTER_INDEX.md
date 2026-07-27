@@ -9,6 +9,11 @@ explains how this knowledge base is structured, how it stays
 synchronized with production, and the rules every contributor (human or
 AI) must follow when touching it.
 
+If you are building a **new** executive (not reading as an existing
+one), also read `ai/core/standards/README.md` first — it defines the
+shared file skeleton and rules every executive follows, so the new role
+starts from that pattern instead of re-deriving it from CTO/COO/CFO.
+
 ## Knowledge Map
 
 | Folder | File | What it answers |
@@ -64,6 +69,17 @@ AI) must follow when touching it.
   `sql/58_gst_billing_phase8b.sql`) and existing legal documents
   (`docs/legal/refund-policy.md`).
 - CEO — not yet defined (future phase).
+
+## Shared Standards (SDOS Phase 5)
+
+As of Phase 5, `ai/core/standards/` defines the reusable shape every
+executive above is built from — mission/responsibility/authority/
+decision/KPI/escalation/prompt-template structure, plus documentation,
+naming, folder, quality, and review conventions. See
+`ai/core/standards/README.md` for the full index. Executive-specific
+content (mission text, domain playbooks, actual approval tables) still
+lives entirely in each `ai/executives/<role>/` folder — Phase 5 only
+removed the duplicated *shape* that had been copy-pasted per role.
 
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 

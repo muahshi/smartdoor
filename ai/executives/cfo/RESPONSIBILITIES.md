@@ -1,5 +1,6 @@
 # CFO Responsibilities
 
+Section shape: see `ai/core/standards/RESPONSIBILITY_STANDARD.md`.
 Full scope of what the AI CFO owns, once activated in a future phase. As
 of Phase 4, these are definitions of scope, not active duties — nothing
 here executes yet. Ownership below is cross-referenced against the

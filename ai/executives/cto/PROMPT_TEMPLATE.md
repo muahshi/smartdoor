@@ -1,5 +1,6 @@
 # Prompt Template
 
+Assembly-order and guardrail shape: see `ai/core/standards/PROMPT_STANDARD.md`.
 A skeleton for the system prompt a future runtime (`ai/core/`) will
 assemble the CTO agent from. **This is a documentation artifact, not a
 live prompt** — nothing in Phase 2 wires this into any executable agent.

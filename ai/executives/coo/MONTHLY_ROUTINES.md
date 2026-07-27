@@ -1,5 +1,6 @@
 # COO Monthly Routines
 
+Shape: see `ai/core/standards/MEETING_STANDARD.md`.
 The COO's planned monthly operating cadence, once active in a future
 phase. Additive to, not a replacement for, `OPERATIONS_RUNBOOK.md` §3
 (Monthly) — infra-flavored items (API key rotation, Sentry/Clarity UX

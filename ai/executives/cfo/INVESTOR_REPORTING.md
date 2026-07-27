@@ -1,5 +1,6 @@
 # Investor Reporting
 
+Report discipline: see `ai/core/standards/REPORT_STANDARD.md`.
 What an investor update could honestly draw on today, and what it
 cannot, given the actual state of SmartDoor's financial data. No cap
 table, investor record, or prior fundraising history exists anywhere in

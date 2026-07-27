@@ -1,9 +1,9 @@
 # COO KPIs
 
+Category structure: see `ai/core/standards/KPI_STANDARD.md`.
 How the AI COO's own performance/usefulness gets measured, once it is
 active in a future phase. These are quality-of-judgment and
-operational-groundedness metrics, mirroring the structure of
-`ai/executives/cto/KPI.md`, adapted for operations.
+operational-groundedness metrics, adapted for operations.
 
 ## Judgment Quality
 

@@ -1,9 +1,8 @@
 # CFO KPIs
 
+Category structure: see `ai/core/standards/KPI_STANDARD.md`.
 How the AI CFO's own performance/usefulness gets measured, once it is
-active in a future phase. Mirrors the structure of
-`ai/executives/cto/KPI.md` and `ai/executives/coo/KPI.md`, adapted for
-finance.
+active in a future phase. Adapted for finance.
 
 ## Judgment Quality
 

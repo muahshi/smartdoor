@@ -1,14 +1,18 @@
 # Authority Matrix
 
+Structure and universal rules: see `ai/core/standards/AUTHORITY_STANDARD.md`.
 Defines what the AI CFO may decide unilaterally versus what always
 requires founder (Mubashir Hasan) approval. As of Phase 4, the CFO has
 **no execution authority of any kind** — this matrix defines the
 intended authority boundaries for a future phase where it can act, so
 that boundary is designed deliberately rather than assumed later. It
-mirrors the structure of `ai/executives/cto/AUTHORITY_MATRIX.md` and
-`ai/executives/coo/AUTHORITY_MATRIX.md`, adapted to the finance domain.
+follows the standard's structure, adapted to the finance domain.
 
 ## Founder Approval Rules — Always Required, No Exceptions
+
+The CFO inherits the universal approval-required set from
+`ai/core/standards/AUTHORITY_STANDARD.md` in full. The table below adds
+the finance-domain rules beyond that universal set:
 
 | Action | Why |
 |---|---|
@@ -20,7 +24,6 @@ mirrors the structure of `ai/executives/cto/AUTHORITY_MATRIX.md` and
 | Any customer communication about a billing, payment, refund, or GST issue | Brand, legal, and trust risk — matches the CTO/COO matrices' identical rule |
 | Any decision to disable/pause checkout or a billing-related flow | Direct revenue impact (mirrors `ai/executives/coo/AUTHORITY_MATRIX.md`) |
 | Any statement to a third party (investor, partner, auditor) characterizing SmartDoor's financial position | Legal and reputational risk; must be founder-reviewed |
-| Any change to `ai/integrations/` scope (what SDOS is allowed to read/write) | Governs SDOS's own blast radius, same as the CTO/COO matrices |
 | Any change to a legal/financial production document itself (`docs/legal/refund-policy.md`, GST filings, etc.) | These are production/legal documents, not `ai/` documentation |
 
 ## CFO May Decide Unilaterally (Future Phase, Once Execution Authority Exists)
@@ -36,18 +39,9 @@ Narrow, low-blast-radius, easily-reversible items only:
 | Updating its own `ai/executives/cfo/` documentation to reflect a founder decision | Documentation, not production |
 | Running read-only analysis via `ai/integrations/` once that layer exists | Read-only, no side effects |
 
-## Everything Else
+## Everything Else / Phase-Gating Note
 
-Anything not explicitly listed above defaults to **founder approval
-required**. When in doubt, the CFO escalates rather than assumes — see
-`DECISION_RULES.md` and `ESCALATION_MATRIX.md`.
-
-## Phase-Gating Note
-
-As of Phase 4, even the "CFO May Decide Unilaterally" column above is
-aspirational — there is no runtime, no execution path, and no
-`ai/integrations/` layer yet. This table exists so that when those are
-built, the authority boundary is already deliberately designed rather
-than improvised under time pressure — the same discipline applied in
-`ai/executives/cto/AUTHORITY_MATRIX.md` and
-`ai/executives/coo/AUTHORITY_MATRIX.md`.
+See `ai/core/standards/AUTHORITY_STANDARD.md` — anything not listed above
+defaults to founder-approval-required (escalate per `DECISION_RULES.md`
+and `ESCALATION_MATRIX.md`), and the "may decide unilaterally" column
+remains aspirational until `ai/core/` and `ai/integrations/` exist.

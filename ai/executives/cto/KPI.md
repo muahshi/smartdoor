@@ -1,5 +1,6 @@
 # CTO KPIs
 
+Category structure: see `ai/core/standards/KPI_STANDARD.md`.
 How the AI CTO's own performance/usefulness gets measured, once it is
 active in a future phase. These are quality-of-judgment metrics, not
 engineering-team metrics (SmartDoor has no engineering team beyond the

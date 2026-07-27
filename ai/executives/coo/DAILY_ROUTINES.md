@@ -1,5 +1,6 @@
 # COO Daily Routines
 
+Shape: see `ai/core/standards/MEETING_STANDARD.md`.
 The COO's planned daily operating cadence, once active in a future phase.
 These are additive to, not a replacement for, the Daily checklist already
 in `OPERATIONS_RUNBOOK.md` §3 — infra-flavored daily items (Sentry

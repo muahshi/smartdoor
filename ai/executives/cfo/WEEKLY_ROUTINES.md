@@ -1,5 +1,6 @@
 # CFO Weekly Routines
 
+Shape: see `ai/core/standards/MEETING_STANDARD.md`.
 The CFO's planned weekly operating cadence, once active in a future
 phase. Additive to, and distinct from, the COO's weekly checklist
 (`ai/executives/coo/WEEKLY_ROUTINES.md`).

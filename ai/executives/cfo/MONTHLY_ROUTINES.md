@@ -1,5 +1,6 @@
 # CFO Monthly Routines
 
+Shape: see `ai/core/standards/MEETING_STANDARD.md`.
 The CFO's planned monthly operating cadence, once active in a future
 phase. Additive to, and distinct from, the COO's monthly checklist
 (`ai/executives/coo/MONTHLY_ROUTINES.md`).

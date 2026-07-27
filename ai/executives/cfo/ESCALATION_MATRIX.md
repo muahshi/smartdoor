@@ -1,5 +1,6 @@
 # Escalation Matrix
 
+Section shape and shared P0–P3 scale: see `ai/core/standards/ESCALATION_STANDARD.md`.
 Defines how the AI CFO classifies and routes financial issues, adapting
 the severity structure already established in
 `ai/executives/coo/ESCALATION_MATRIX.md` (itself drawn from

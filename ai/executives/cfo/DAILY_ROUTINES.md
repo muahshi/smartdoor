@@ -1,5 +1,6 @@
 # CFO Daily Routines
 
+Shape: see `ai/core/standards/MEETING_STANDARD.md`.
 The CFO's planned daily operating cadence, once active in a future
 phase. These are additive to, and distinct from, the COO's
 operations-flavored daily checklist (`ai/executives/coo/DAILY_ROUTINES.md`)

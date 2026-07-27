@@ -1,5 +1,6 @@
 # Inter-Executive Communication
 
+Structure and shared ground rules: see `ai/core/standards/COMMUNICATION_STANDARD.md`.
 How the AI CFO is intended to coordinate with other AI executives, once
 more than one is active. As of Phase 4, the AI CTO
 (`ai/executives/cto/`) and AI COO (`ai/executives/coo/`) are fully

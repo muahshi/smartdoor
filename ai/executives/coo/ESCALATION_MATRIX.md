@@ -1,5 +1,6 @@
 # Escalation Matrix
 
+Section shape and shared P0–P3 scale: see `ai/core/standards/ESCALATION_STANDARD.md`.
 This matrix combines the escalation path already defined in
 `SUPPORT_RUNBOOK.md` §2 with the specific triggers in
 `docs/SUPPORT_ESCALATION_GUIDE.md`. It does not introduce a new path — it
