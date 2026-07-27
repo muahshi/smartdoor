@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
@@ -59,6 +60,15 @@ fun SmartDoorNavHost(
         // tables — the same backend the website's Inbox tab already uses).
         composable(Routes.MESSAGES) {
             MessagesScreen(navController)
+        }
+
+        // Phase 7 — AI RECEPTIONIST V2: real screen, backed by
+        // AiReceptionistViewModel / AiReceptionistRepository (reads the
+        // existing security_rules status, get_ai_receptionist_insights RPC,
+        // and ai_call_screenings — the same backend the website's AI
+        // Receptionist surfaces already use).
+        composable(Routes.AI_RECEPTIONIST) {
+            AiReceptionistScreen(navController)
         }
     }
 }
