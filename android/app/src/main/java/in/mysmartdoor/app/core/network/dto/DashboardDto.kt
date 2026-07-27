@@ -97,3 +97,30 @@ data class NotificationDto(
     @SerialName("is_read") val isRead: Boolean = false,
     @SerialName("created_at") val createdAt: String,
 )
+
+/**
+ * Row DTO for `visitor_visits` (see `sql/41_visitor_memory.sql`). Owner
+ * Dashboard Phase 2 — backs the "AI Handled" / "Missed Visitor" Smart
+ * Statistics and the AI Receptionist card's last-interaction line. No new
+ * columns/tables involved; [purpose] is the AI receptionist's detected
+ * visitor intent (e.g. "Delivery" / "Guest" / "Maid" — see
+ * `services/aiReceptionist.js`); [accepted] is null for non-call
+ * interactions (bell, message) and true/false once a call is resolved.
+ *
+ * Per CTO-approved production definitions:
+ * - Missed Visitor = accepted == false
+ * - AI Handled      = accepted == false AND purpose != null
+ *
+ * Every AI-Handled visit is therefore also a Missed visit by definition —
+ * "missed" describes the owner never answering, "AI handled" describes what
+ * happened as a *result* of that non-answer. Expected, not a bug.
+ */
+@Serializable
+data class VisitorVisitDto(
+    val id: String,
+    val purpose: String? = null,
+    @SerialName("call_type") val callType: String? = null,
+    val accepted: Boolean? = null,
+    val duration: Int = 0,
+    @SerialName("created_at") val createdAt: String,
+)
