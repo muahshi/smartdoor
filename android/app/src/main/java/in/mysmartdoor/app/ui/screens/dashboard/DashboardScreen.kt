@@ -3,6 +3,7 @@ package `in`.mysmartdoor.app.ui.screens.dashboard
 import `in`.mysmartdoor.app.core.data.model.DashboardData
 import `in`.mysmartdoor.app.core.network.dto.NotificationDto
 import `in`.mysmartdoor.app.core.network.dto.VisitorVisitDto
+import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.GlassCard
 import `in`.mysmartdoor.app.ui.components.SDAvatar
 import `in`.mysmartdoor.app.ui.components.SDBadge
@@ -96,9 +97,11 @@ import java.time.OffsetDateTime
  * [SmartDoorMotion] tokens — no new design language introduced.
  *
  * Quick Actions still show a "coming soon" snackbar (unchanged from Phase
- * 1) since their destination screens don't exist in
- * [in.mysmartdoor.app.navigation.SmartDoorNavHost] yet — navigation is
- * explicitly out of scope for this phase.
+ * 1) since most of their destination screens don't exist in
+ * [in.mysmartdoor.app.navigation.SmartDoorNavHost] yet. Phase 4 —
+ * VISITORS V2 is the first exception: "Visitor History" now navigates to
+ * the real [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]
+ * instead of showing the snackbar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -148,7 +151,13 @@ fun DashboardScreen(
             when {
                 currentData != null -> DashboardContent(
                     data = currentData,
-                    onQuickAction = ::showComingSoon,
+                    onQuickAction = { feature ->
+                        if (feature == "Visitor History") {
+                            navController.navigate(Routes.VISITOR_FEED)
+                        } else {
+                            showComingSoon(feature)
+                        }
+                    },
                 )
                 uiState.isLoading -> DashboardSkeleton()
                 uiState.errorMessage != null -> ErrorScreen(
