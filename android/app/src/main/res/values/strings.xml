@@ -21,4 +21,12 @@
     <string name="login_continue_button">Login to Dashboard</string>
     <string name="login_continue_loading_description">Logging in, please wait</string>
     <string name="login_terms_notice">By continuing, you agree to SmartDoor\'s Terms of Service and Privacy Policy.</string>
+
+    <!-- Premium Login Experience phase — hero branding block + secure
+         badge. UI-only additions; no auth/validation strings above this
+         line are touched. -->
+    <string name="login_brand_wordmark">My Smart Door</string>
+    <string name="login_brand_tagline">Private. Secure. Smart.</string>
+    <string name="login_secure_badge">Secure Login</string>
+    <string name="login_version_label">Version %1$s</string>
 </resources>
