@@ -24,6 +24,14 @@ object Routes {
     const val DASHBOARD = "dashboard"
     const val VISITOR_FEED = "visitor_feed"
 
+    // Phase 8 — PUBLIC ONBOARDING & MARKETING EXPERIENCE. Entry point for
+    // prospective customers who don't own a Smart Door yet. Reached only
+    // from Login's "New to My Smart Door?" section (see LoginScreen) —
+    // explicitly NOT the app's start destination; Splash still only ever
+    // resolves to DASHBOARD or LOGIN. No other future-module routes are
+    // declared here per CTO decision — only what this phase registers.
+    const val PUBLIC_HOME = "public_home"
+
     // Owner Dashboard V1 — Quick Action destination contracts only; no
     // composable registered yet, see class doc above.
     const val CALL_HISTORY = "call_history"

@@ -9,6 +9,7 @@ import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
+import `in`.mysmartdoor.app.ui.screens.publicweb.PublicHomeScreen
 import `in`.mysmartdoor.app.ui.screens.splash.SplashScreen
 import `in`.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen
 
@@ -41,6 +42,14 @@ fun SmartDoorNavHost(
 
         composable(Routes.LOGIN) {
             LoginScreen(navController)
+        }
+
+        // Phase 8 — PUBLIC ONBOARDING & MARKETING EXPERIENCE: reached only
+        // from Login's "New to My Smart Door?" section, never navigated to
+        // from Splash. Opens the existing production website for every
+        // action (see PublicHomeScreen doc) — no native catalog/commerce.
+        composable(Routes.PUBLIC_HOME) {
+            PublicHomeScreen(navController)
         }
 
         // Owner Dashboard V1 — real screen, backed by DashboardViewModel /
