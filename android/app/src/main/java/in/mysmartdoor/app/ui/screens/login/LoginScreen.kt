@@ -60,6 +60,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import `in`.mysmartdoor.app.BuildConfig
 import `in`.mysmartdoor.app.R
+import `in`.mysmartdoor.app.core.common.rememberWebLinkLauncher
+import `in`.mysmartdoor.app.core.config.PublicWebLinks
 import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.GlassCard
 import `in`.mysmartdoor.app.ui.components.SDBadge
@@ -117,6 +119,7 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val openWebLink = rememberWebLinkLauncher()
 
     var plateId by rememberSaveable { mutableStateOf("") }
     var pin by rememberSaveable { mutableStateOf("") }
@@ -162,6 +165,10 @@ fun LoginScreen(
                 viewModel.login(plateId, pin)
             }
         },
+        onExploreClick = { navController?.navigate(Routes.PUBLIC_HOME) },
+        onAiReceptionistDemoClick = { openWebLink(PublicWebLinks.FEATURES) },
+        onBuyClick = { openWebLink(PublicWebLinks.PRODUCTS) },
+        onVisitWebsiteClick = { openWebLink(PublicWebLinks.HOME) },
     )
 }
 
@@ -199,6 +206,10 @@ private fun LoginContent(
     isLoading: Boolean,
     isContinueEnabled: Boolean,
     onContinueClick: () -> Unit,
+    onExploreClick: () -> Unit = {},
+    onAiReceptionistDemoClick: () -> Unit = {},
+    onBuyClick: () -> Unit = {},
+    onVisitWebsiteClick: () -> Unit = {},
 ) {
     val plateInputDescription = stringResource(R.string.login_plate_id_input_description)
     val pinInputDescription = stringResource(R.string.login_pin_input_description)
@@ -391,8 +402,96 @@ private fun LoginContent(
                     ) {
                         LoginFooter(secureBadgeLabel = secureBadgeLabel)
                     }
+
+                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xl))
+
+                    AnimatedVisibility(
+                        visible = footerVisible,
+                        enter = fadeIn(tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.standard)) +
+                            slideInVertically(
+                                animationSpec = tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.standard),
+                                initialOffsetY = { it / 4 },
+                            ),
+                    ) {
+                        ExploreSection(
+                            onExploreClick = onExploreClick,
+                            onAiReceptionistDemoClick = onAiReceptionistDemoClick,
+                            onBuyClick = onBuyClick,
+                            onVisitWebsiteClick = onVisitWebsiteClick,
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Phase 8 — PUBLIC ONBOARDING & MARKETING EXPERIENCE.
+ *
+ * "New to My Smart Door?" section below the owner login card — the only
+ * entry point into the Public/prospective-customer journey. Doesn't
+ * disturb the owner login flow above it (no shared state, purely
+ * additional content lower on the same screen), per CTO decision.
+ *
+ * [onExploreClick] navigates in-app to
+ * [in.mysmartdoor.app.ui.screens.publicweb.PublicHomeScreen]. The other
+ * three actions open the existing production website directly via
+ * [in.mysmartdoor.app.core.common.rememberWebLinkLauncher] — reused as-is,
+ * nothing rebuilt natively. Built entirely from existing design-system
+ * pieces (GlassCard, SmartDoorButton) — no new components, no new colors.
+ */
+@Composable
+private fun ExploreSection(
+    onExploreClick: () -> Unit,
+    onAiReceptionistDemoClick: () -> Unit,
+    onBuyClick: () -> Unit,
+    onVisitWebsiteClick: () -> Unit,
+) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 480.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(SmartDoorSpacing.lg),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
+        ) {
+            Text(
+                text = stringResource(R.string.login_explore_section_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            SmartDoorButton(
+                label = stringResource(R.string.login_explore_button),
+                onClick = onExploreClick,
+                modifier = Modifier.fillMaxWidth().testTag("login_explore_button"),
+                variant = SmartDoorButtonVariant.Secondary,
+            )
+
+            SmartDoorButton(
+                label = stringResource(R.string.login_ai_receptionist_demo_button),
+                onClick = onAiReceptionistDemoClick,
+                modifier = Modifier.fillMaxWidth(),
+                variant = SmartDoorButtonVariant.Ghost,
+            )
+
+            SmartDoorButton(
+                label = stringResource(R.string.login_buy_button),
+                onClick = onBuyClick,
+                modifier = Modifier.fillMaxWidth(),
+                variant = SmartDoorButtonVariant.Ghost,
+            )
+
+            SmartDoorButton(
+                label = stringResource(R.string.login_visit_website_button),
+                onClick = onVisitWebsiteClick,
+                modifier = Modifier.fillMaxWidth(),
+                variant = SmartDoorButtonVariant.Ghost,
+            )
         }
     }
 }
