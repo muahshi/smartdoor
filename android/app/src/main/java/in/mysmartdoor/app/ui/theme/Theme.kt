@@ -26,21 +26,33 @@ private val DarkColors = darkColorScheme(
     onPrimary = SmartDoorOnPrimaryDark,
     secondary = SmartDoorSecondaryDark,
     onSecondary = SmartDoorOnSecondaryDark,
+    tertiary = SmartDoorTertiaryDark,
+    onTertiary = SmartDoorOnTertiaryDark,
     background = SmartDoorBackgroundDark,
     onBackground = SmartDoorOnBackgroundDark,
     surface = SmartDoorSurfaceDark,
-    onSurface = SmartDoorOnSurfaceDark
+    onSurface = SmartDoorOnSurfaceDark,
+    surfaceVariant = SmartDoorSurfaceVariantDark,
+    onSurfaceVariant = SmartDoorOnSurfaceVariantDark,
+    outline = SmartDoorOutlineDark,
 )
 
 /**
  * App-wide Material 3 theme. Every future screen (Owner dashboard, Guard
  * app, Visitor flow) wraps its content in this single composable, keeping
  * one consistent design system across the whole app.
+ *
+ * Owner Dashboard V1: [dynamicColor] now defaults to `false`. Previously
+ * `true`, it let Android 12+'s wallpaper-derived colors silently override
+ * the brand palette below on real devices — harmless while [DarkColors]
+ * was still a placeholder, but wrong now that it's the actual Premium
+ * Black + Gold palette (`css/landing-shared.css`) the rest of the product
+ * ships with. [darkTheme] still follows the system setting, unchanged.
  */
 @Composable
 fun SmartDoorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
