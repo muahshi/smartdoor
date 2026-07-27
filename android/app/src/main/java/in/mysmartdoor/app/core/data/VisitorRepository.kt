@@ -7,6 +7,7 @@ import `in`.mysmartdoor.app.core.network.dto.VisitorActivityDto
 import `in`.mysmartdoor.app.core.session.SecureSessionManager
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
