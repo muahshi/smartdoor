@@ -28,7 +28,7 @@ import javax.inject.Singleton
 
 /**
  * Owner Dashboard V1 — reads-only aggregation over the exact same
- * production tables the website's `js/dashboard.js` + `services/*.js`
+ * production tables the website's `js/dashboard.js` + `services/` *.js
  * already use (`users`, `plates`, `subscriptions`, `security_rules`,
  * `visitor_logs`, `call_logs`, `message_logs`, `notifications`). No new
  * tables, no new Edge Function — RLS (`owner_id = get_my_owner_id()`,

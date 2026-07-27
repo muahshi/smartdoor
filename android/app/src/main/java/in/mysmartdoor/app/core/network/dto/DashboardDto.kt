@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * `sql/01_schema.sql` (users, plates, subscriptions, security_rules,
  * visitor_logs, notifications) and `sql/04_communication_schema.sql`
  * (call_logs, message_logs). Field names/nullability mirror exactly what
- * `services/*.js` on the website selects from these same tables
+ * `services/` *.js on the website selects from these same tables
  * (`services/auth.js#getCurrentOwner`, `services/plates.js#getMyPlate`,
  * `services/subscriptions.js#getSubscription`, `services/security.js`,
  * `services/logs.js`). No new columns, no new tables.
