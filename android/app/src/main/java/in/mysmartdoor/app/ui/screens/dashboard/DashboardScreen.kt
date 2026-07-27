@@ -1,18 +1,35 @@
 package `in`.mysmartdoor.app.ui.screens.dashboard
 
 import `in`.mysmartdoor.app.core.data.model.DashboardData
-import `in`.mysmartdoor.app.core.network.dto.CallLogDto
-import `in`.mysmartdoor.app.core.network.dto.MessageLogDto
 import `in`.mysmartdoor.app.core.network.dto.NotificationDto
-import `in`.mysmartdoor.app.core.network.dto.VisitorLogDto
+import `in`.mysmartdoor.app.core.network.dto.VisitorVisitDto
+import `in`.mysmartdoor.app.ui.components.GlassCard
+import `in`.mysmartdoor.app.ui.components.SDAvatar
+import `in`.mysmartdoor.app.ui.components.SDBadge
+import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
+import `in`.mysmartdoor.app.ui.components.SDCard
+import `in`.mysmartdoor.app.ui.components.SDSectionHeader
+import `in`.mysmartdoor.app.ui.components.SDSkeletonLoader
+import `in`.mysmartdoor.app.ui.components.SDSkeletonLoaderGroup
+import `in`.mysmartdoor.app.ui.components.SDStatCard
+import `in`.mysmartdoor.app.ui.components.SDTopBar
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
+import `in`.mysmartdoor.app.ui.theme.SmartDoorMotion
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccess
 import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +37,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,8 +47,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -40,23 +56,21 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -66,23 +80,25 @@ import java.time.Instant
 import java.time.OffsetDateTime
 
 /**
- * Owner Dashboard V1 — replaces the `Routes.DASHBOARD` placeholder that
- * previously rendered `EmptyStateScreen` in [in.mysmartdoor.app.navigation.SmartDoorNavHost]
- * (see that file's history: "You're in! Dashboard is coming in a later phase.").
+ * Owner Dashboard Phase 2 — "premium smart home control center" redesign.
  *
- * All data comes from [DashboardViewModel] → [in.mysmartdoor.app.core.data.DashboardRepository],
- * which reads the same production tables `js/dashboard.js` reads on the
- * website. No mock data anywhere in this file.
+ * All data still comes from [DashboardViewModel] → [in.mysmartdoor.app.core.data.DashboardRepository]
+ * (unchanged data flow from Phase 1; only the composition layer below is
+ * new). No mock data anywhere in this file — every value rendered traces
+ * back to a real field on [DashboardData]. Sections with no reliable
+ * production data source (live device online/offline, AI conversation
+ * transcripts, hardware telemetry) are deliberately omitted rather than
+ * faked — see the Phase 2 CTO handoff for the full data-availability audit.
  *
- * Quick Actions (Visitor History, Call History, Messages, QR Preview,
- * Smart Plate, AI Receptionist, Settings, Notifications, Account) are real
- * Material buttons, but none of their destination screens exist yet in
- * [in.mysmartdoor.app.navigation.SmartDoorNavHost] — building them is
- * explicitly out of scope for this phase (future roadmap). Tapping one
- * shows a "coming soon" snackbar instead of navigating to an unregistered
- * route and crashing, the same pattern [in.mysmartdoor.app.navigation.Routes]
- * already documents for `VISITOR_FEED`. The new route constants added there
- * exist purely as the contract for those later phases.
+ * Built entirely on the Phase 1 design system ([GlassCard], [SDCard],
+ * [SDTopBar], [SDStatCard], [SDBadge], [SDSectionHeader], [SDAvatar],
+ * [SDSkeletonLoader]) plus [SmartDoorSpacing]/[SmartDoorElevation]/
+ * [SmartDoorMotion] tokens — no new design language introduced.
+ *
+ * Quick Actions still show a "coming soon" snackbar (unchanged from Phase
+ * 1) since their destination screens don't exist in
+ * [in.mysmartdoor.app.navigation.SmartDoorNavHost] yet — navigation is
+ * explicitly out of scope for this phase.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,12 +124,16 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Dashboard", style = MaterialTheme.typography.titleMedium) },
+            SDTopBar(
+                title = "Dashboard",
                 actions = {
                     IconButton(onClick = { if (!uiState.isRefreshing) viewModel.refresh() }) {
                         if (uiState.isRefreshing) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = SmartDoorSecondaryDark,
+                            )
                         } else {
                             RefreshGlyph()
                         }
@@ -145,160 +165,236 @@ private fun DashboardContent(
     data: DashboardData,
     onQuickAction: (String) -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    // Skeleton → content swap: a single gentle fade + rise, per the design
+    // system's motion guidance (Motion.kt: "emphasized for skeleton→content
+    // swap"). Runs once per composition of real content, not per scroll.
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.emphasized)) +
+            slideInVertically(
+                animationSpec = tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.emphasized),
+                initialOffsetY = { it / 12 },
+            ),
     ) {
-        item { OwnerHeaderCard(data) }
-        item { StatusRow(data) }
-        item { StatsRow(data) }
-        item { QuickActionsGrid(onQuickAction) }
-        item { RecentVisitorsSection(data.recentVisitors) }
-        item { RecentCallsSection(data.recentCalls) }
-        item { RecentMessagesSection(data.recentMessages) }
-        item { RecentNotificationsSection(data.recentNotifications, data.unreadNotificationCount) }
-        item { LastSyncFooter(data) }
-    }
-}
-
-// ────────── HEADER ──────────
-
-@Composable
-private fun OwnerHeaderCard(data: DashboardData) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(SmartDoorSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.md),
         ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondary),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = data.owner.fullName.trim().firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSecondary,
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = data.owner.fullName,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = data.owner.plateId,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                Text(
-                    text = "Member since ${formatDate(data.owner.createdAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            item { HeroSmartDoorCard(data) }
+            item { AiReceptionistCard(data) }
+            item { SmartStatisticsSection(data) }
+            item { QuickActionsSection(onQuickAction) }
+            item { LiveActivityTimelineSection(data) }
+            item { NotificationsPreviewSection(data) }
+            item { SmartDoorStatusSection(data) }
+            item { SubscriptionSummaryCard(data) }
+            item { LastSyncFooter(data) }
         }
     }
 }
 
-// ────────── STATUS CHIPS ──────────
+// ────────── 1. HERO SMART DOOR CARD ──────────
 
 @Composable
-private fun StatusRow(data: DashboardData) {
-    Column {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip(
-                label = "Plate",
-                value = data.plate?.status?.replaceFirstChar { it.uppercase() } ?: "Not linked",
-                active = data.plate?.status == "active",
-                modifier = Modifier.weight(1f),
-            )
-            StatusChip(
-                label = "Subscription",
-                value = data.subscription?.plan?.replace('_', ' ')?.replaceFirstChar { it.uppercase() } ?: "None",
-                active = data.subscription?.status == "active",
-                modifier = Modifier.weight(1f),
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip(
-                label = "AI Receptionist",
-                value = if (data.securityRules?.autoReplyEnabled == true) "On" else "Off",
-                active = data.securityRules?.autoReplyEnabled == true,
-                modifier = Modifier.weight(1f),
-            )
-            StatusChip(
-                label = "Masked Calling",
-                value = if (data.securityRules?.callForwarding == true) "On" else "Off",
-                active = data.securityRules?.callForwarding == true,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StatusChip(label: String, value: String, active: Boolean, modifier: Modifier = Modifier) {
-    val dotColor = if (active) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
-    Card(modifier = modifier) {
-        Column(modifier = Modifier.padding(12.dp)) {
+private fun HeroSmartDoorCard(data: DashboardData) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(dotColor),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = label, style = MaterialTheme.typography.labelMedium)
+                PlatePreview(plateId = data.owner.plateId, modifier = Modifier.size(64.dp))
+                Spacer(modifier = Modifier.width(SmartDoorSpacing.md))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = data.owner.fullName,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = data.owner.plateId,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SmartDoorSecondaryDark,
+                    )
+                    Text(
+                        text = "Member since ${formatDate(data.owner.createdAt)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                SDAvatar(name = data.owner.fullName, size = 40.dp)
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
+            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                SDBadge(
+                    text = data.plate?.status?.replaceFirstChar { it.uppercase() } ?: "Not linked",
+                    status = if (data.plate?.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
+                )
+                SDBadge(
+                    text = subscriptionBadgeLabel(data),
+                    status = if (data.subscription?.status == "active") SDBadgeStatus.Info else SDBadgeStatus.Neutral,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Stylized plate mockup drawn entirely in Compose (gold ring + monogram +
+ * a hairline "engraved" plate-id chip) rather than a real product image —
+ * this app has no image-loading library (Coil/Glide) and no QR-generation
+ * dependency yet (confirmed against `build.gradle.kts`), and adding one
+ * mid-phase without being able to run a build to verify resolution is
+ * riskier than a vector-drawn placeholder. Swap for a real rendered plate
+ * photo/QR once an image pipeline is a deliberate, verified decision.
+ */
+@Composable
+private fun PlatePreview(plateId: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .border(width = 1.dp, color = SmartDoorSecondaryDark.copy(alpha = 0.4f), shape = RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = plateId.take(2).uppercase(),
+            style = MaterialTheme.typography.titleMedium,
+            color = SmartDoorSecondaryDark,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+private fun subscriptionBadgeLabel(data: DashboardData): String {
+    val plan = data.subscription?.plan?.replace('_', ' ')?.replaceFirstChar { it.uppercase() }
+    return plan ?: "No active plan"
+}
+
+// ────────── 2. AI RECEPTIONIST CARD ──────────
+
+@Composable
+private fun AiReceptionistCard(data: DashboardData) {
+    val aiEnabled = data.securityRules?.autoReplyEnabled == true
+    val lastInteraction = data.recentVisitorVisits.firstOrNull { it.purpose != null }
+
+    SDCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AiActivityDot(active = aiEnabled)
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+                    Text(text = "AI Receptionist", style = MaterialTheme.typography.titleMedium)
+                }
+                SDBadge(
+                    text = if (aiEnabled) "On" else "Off",
+                    status = if (aiEnabled) SDBadgeStatus.Success else SDBadgeStatus.Neutral,
+                )
+            }
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
             Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                text = if (lastInteraction != null) {
+                    "Last handled: ${lastInteraction.purpose} · ${formatRelativeTime(lastInteraction.createdAt)}"
+                } else {
+                    "No AI-handled visitor interactions yet."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
 
-// ────────── STATS ──────────
-
+/** Small pulsing dot — the AI activity indicator, only animates while [active]. */
 @Composable
-private fun StatsRow(data: DashboardData) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        StatTile(label = "Today's Visitors", value = data.todayVisitorCount.toString(), modifier = Modifier.weight(1f))
-        StatTile(label = "Unread Messages", value = data.unreadMessageCount.toString(), modifier = Modifier.weight(1f))
-        StatTile(label = "Notifications", value = data.unreadNotificationCount.toString(), modifier = Modifier.weight(1f))
+private fun AiActivityDot(active: Boolean) {
+    if (!active) {
+        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(MaterialTheme.colorScheme.outline))
+        return
     }
+    val transition = rememberInfiniteTransition(label = "ai_activity")
+    val alpha by transition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = SmartDoorMotion.durationLong),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "ai_activity_alpha",
+    )
+    Box(
+        modifier = Modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(SmartDoorSuccess.copy(alpha = alpha)),
+    )
 }
 
+// ────────── 3. SMART STATISTICS ──────────
+
 @Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier = modifier) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-            Text(text = label, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+private fun SmartStatisticsSection(data: DashboardData) {
+    Column {
+        SDSectionHeader(title = "Smart Statistics", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
+        Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                CountUpStatCard(
+                    label = "Today's Visitors",
+                    value = data.todayVisitorCount,
+                    modifier = Modifier.weight(1f),
+                )
+                CountUpStatCard(
+                    label = "Unread Messages",
+                    value = data.unreadMessageCount,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                CountUpStatCard(
+                    label = "AI Handled",
+                    value = data.aiHandledCount,
+                    modifier = Modifier.weight(1f),
+                )
+                CountUpStatCard(
+                    label = "Missed Visitors",
+                    value = data.missedVisitorCount,
+                    modifier = Modifier.weight(1f),
+                )
+                CountUpStatCard(
+                    label = "Notifications",
+                    value = data.unreadNotificationCount,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
 
-// ────────── QUICK ACTIONS ──────────
+/**
+ * [SDStatCard] with an animated count-up from 0 to [value] — the "number
+ * count-up" animation called for in the brief. Not a real-vs-fake risk:
+ * the animation only interpolates the display of an already-real number,
+ * it never invents one.
+ */
+@Composable
+private fun CountUpStatCard(label: String, value: Int, modifier: Modifier = Modifier) {
+    val animated by animateIntAsState(
+        targetValue = value,
+        animationSpec = tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.standard),
+        label = "count_up_$label",
+    )
+    SDStatCard(label = label, value = animated.toString(), modifier = modifier)
+}
+
+// ────────── 4. QUICK ACTIONS ──────────
 
 private data class QuickAction(val label: String, val glyph: String)
 
@@ -315,45 +411,40 @@ private val quickActions = listOf(
 )
 
 @Composable
-private fun QuickActionsGrid(onAction: (String) -> Unit) {
+private fun QuickActionsSection(onAction: (String) -> Unit) {
     Column {
-        Text(
-            text = "Quick Actions",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
+        SDSectionHeader(title = "Quick Actions", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
         quickActions.chunked(3).forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
             ) {
                 row.forEach { action ->
-                    QuickActionButton(
+                    QuickActionTile(
                         action = action,
                         onClick = { onAction(action.label) },
                         modifier = Modifier.weight(1f),
                     )
                 }
-                // Pad the last, possibly-shorter row so buttons keep equal width.
                 repeat(3 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
         }
     }
 }
 
 @Composable
-private fun QuickActionButton(action: QuickAction, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Card(
+private fun QuickActionTile(action: QuickAction, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    SDCard(
         modifier = modifier.clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        contentPadding = PaddingValues(vertical = SmartDoorSpacing.sm, horizontal = SmartDoorSpacing.xxs),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp, horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(text = action.glyph, style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
             Text(
                 text = action.label,
                 style = MaterialTheme.typography.labelMedium,
@@ -365,80 +456,282 @@ private fun QuickActionButton(action: QuickAction, onClick: () -> Unit, modifier
     }
 }
 
-// ────────── RECENT SECTIONS ──────────
+// ────────── 5. LIVE ACTIVITY TIMELINE ──────────
+
+/** Which production table a merged [TimelineEntry] came from — drives its [SDBadge] label only. */
+private enum class TimelineKind { Visitor, Call, Message, Delivery, AiEvent }
+
+private data class TimelineEntry(
+    val kind: TimelineKind,
+    val primary: String,
+    val secondary: String?,
+    val createdAt: String,
+)
+
+/**
+ * Merges [DashboardData.recentVisitors]/[recentCalls]/[recentMessages] with
+ * Delivery/AI-event entries derived from [DashboardData.recentVisitorVisits]
+ * into one time-sorted feed, per the brief's "Live Activity Timeline"
+ * (Visitor / Calls / Messages / Deliveries / AI events). Notifications are
+ * deliberately excluded here — they get their own preview section below,
+ * matching the brief's separate "Notifications Preview" (section 6).
+ *
+ * `visitor_visits` rows are only surfaced when [VisitorVisitDto.purpose] is
+ * set (a genuine delivery/AI classification) — rows with no purpose add no
+ * information beyond what [recentCalls]/[recentVisitors] already show and
+ * would otherwise read as a near-duplicate entry for the same event.
+ */
+private fun buildTimeline(data: DashboardData): List<TimelineEntry> {
+    val visitorEntries = data.recentVisitors.map {
+        TimelineEntry(
+            kind = TimelineKind.Visitor,
+            primary = it.eventType.replace('_', ' ').replaceFirstChar { c -> c.uppercase() },
+            secondary = it.aiIntent,
+            createdAt = it.createdAt,
+        )
+    }
+    val callEntries = data.recentCalls.map {
+        TimelineEntry(
+            kind = TimelineKind.Call,
+            primary = it.callStatus.replace('_', ' ').replaceFirstChar { c -> c.uppercase() },
+            secondary = if (it.duration > 0) "${it.duration}s" else null,
+            createdAt = it.startedAt,
+        )
+    }
+    val messageEntries = data.recentMessages.map {
+        TimelineEntry(
+            kind = TimelineKind.Message,
+            primary = it.messageType.replaceFirstChar { c -> c.uppercase() },
+            secondary = it.content,
+            createdAt = it.createdAt,
+        )
+    }
+    val visitEntries = data.recentVisitorVisits.filter { it.purpose != null }.map {
+        val isDelivery = it.purpose.orEmpty().contains("deliver", ignoreCase = true)
+        TimelineEntry(
+            kind = if (isDelivery) TimelineKind.Delivery else TimelineKind.AiEvent,
+            primary = it.purpose.orEmpty(),
+            secondary = if (it.accepted == false) "Not accepted" else null,
+            createdAt = it.createdAt,
+        )
+    }
+    return (visitorEntries + callEntries + messageEntries + visitEntries)
+        .sortedByDescending { runCatching { OffsetDateTime.parse(it.createdAt) }.getOrNull() }
+        .take(12)
+}
 
 @Composable
-private fun RecentVisitorsSection(visitors: List<VisitorLogDto>) {
-    SectionCard(title = "Recent Visitors") {
-        if (visitors.isEmpty()) {
-            EmptySectionText("No visitors yet. They'll show up here once someone scans your QR code.")
-        } else {
-            visitors.forEachIndexed { index, log ->
-                RowItem(
-                    primary = log.eventType.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                    secondary = log.aiIntent,
-                    trailing = formatRelativeTime(log.createdAt),
-                )
-                if (index != visitors.lastIndex) HorizontalDivider()
+private fun LiveActivityTimelineSection(data: DashboardData) {
+    val entries = remember(data) { buildTimeline(data) }
+    Column {
+        SDSectionHeader(title = "Live Activity", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
+        SDCard(modifier = Modifier.fillMaxWidth()) {
+            if (entries.isEmpty()) {
+                EmptySectionText("No activity yet. Visitor scans, calls, messages, and AI events will show up here.")
+            } else {
+                entries.forEachIndexed { index, entry ->
+                    TimelineRow(entry)
+                    if (index != entries.lastIndex) HorizontalDivider()
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RecentCallsSection(calls: List<CallLogDto>) {
-    SectionCard(title = "Recent Calls") {
-        if (calls.isEmpty()) {
-            EmptySectionText("No calls yet.")
-        } else {
-            calls.forEachIndexed { index, call ->
-                RowItem(
-                    primary = call.callStatus.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                    secondary = if (call.duration > 0) "${call.duration}s" else null,
-                    trailing = formatRelativeTime(call.startedAt),
+private fun TimelineRow(entry: TimelineEntry) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SDBadge(text = timelineKindLabel(entry.kind), status = timelineKindStatus(entry.kind))
+        Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.primary,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!entry.secondary.isNullOrBlank()) {
+                Text(
+                    text = entry.secondary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (index != calls.lastIndex) HorizontalDivider()
+            }
+        }
+        Text(
+            text = formatRelativeTime(entry.createdAt),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun timelineKindLabel(kind: TimelineKind): String = when (kind) {
+    TimelineKind.Visitor -> "Visitor"
+    TimelineKind.Call -> "Call"
+    TimelineKind.Message -> "Message"
+    TimelineKind.Delivery -> "Delivery"
+    TimelineKind.AiEvent -> "AI"
+}
+
+private fun timelineKindStatus(kind: TimelineKind): SDBadgeStatus = when (kind) {
+    TimelineKind.Visitor -> SDBadgeStatus.Info
+    TimelineKind.Call -> SDBadgeStatus.Warning
+    TimelineKind.Message -> SDBadgeStatus.Neutral
+    TimelineKind.Delivery -> SDBadgeStatus.Success
+    TimelineKind.AiEvent -> SDBadgeStatus.Info
+}
+
+// ────────── 6. NOTIFICATIONS PREVIEW ──────────
+
+@Composable
+private fun NotificationsPreviewSection(data: DashboardData) {
+    Column {
+        SDSectionHeader(
+            title = if (data.unreadNotificationCount > 0) {
+                "Notifications (${data.unreadNotificationCount} unread)"
+            } else {
+                "Notifications"
+            },
+            modifier = Modifier.padding(bottom = SmartDoorSpacing.xs),
+        )
+        SDCard(modifier = Modifier.fillMaxWidth()) {
+            if (data.recentNotifications.isEmpty()) {
+                EmptySectionText("You're all caught up.")
+            } else {
+                data.recentNotifications.take(3).forEachIndexed { index, notification ->
+                    NotificationRow(notification)
+                    if (index != data.recentNotifications.take(3).lastIndex) HorizontalDivider()
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RecentMessagesSection(messages: List<MessageLogDto>) {
-    SectionCard(title = "Recent Messages") {
-        if (messages.isEmpty()) {
-            EmptySectionText("No messages yet.")
-        } else {
-            messages.forEachIndexed { index, message ->
-                RowItem(
-                    primary = message.messageType.replaceFirstChar { it.uppercase() },
-                    secondary = message.content,
-                    trailing = formatRelativeTime(message.createdAt),
-                    emphasized = !message.isRead,
+private fun NotificationRow(notification: NotificationDto) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = notification.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (!notification.isRead) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (!notification.body.isNullOrBlank()) {
+                Text(
+                    text = notification.body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (index != messages.lastIndex) HorizontalDivider()
+            }
+        }
+        Text(
+            text = formatRelativeTime(notification.createdAt),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// ────────── 7. SMART DOOR STATUS (formerly "Device Health") ──────────
+
+/**
+ * Renamed from the brief's "Device Health" per CTO direction: SmartDoor's
+ * "device" is a static printed QR nameplate, not a networked sensor — there
+ * is no battery/signal/uptime telemetry anywhere in the schema. Rather than
+ * fabricate hardware status, this card shows the five real, already-fetched
+ * configuration signals the CTO approved: Plate Registered, QR Active, AI
+ * Receptionist, Masked Calling, Subscription Status. No online/offline
+ * hardware claim is made anywhere in this card.
+ */
+@Composable
+private fun SmartDoorStatusSection(data: DashboardData) {
+    Column {
+        SDSectionHeader(title = "Smart Door Status", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
+        SDCard(modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
+                StatusLine(label = "Plate Registered", active = data.plate != null)
+                StatusLine(label = "QR Active", active = data.plate?.status == "active")
+                StatusLine(label = "AI Receptionist", active = data.securityRules?.autoReplyEnabled == true)
+                StatusLine(label = "Masked Calling", active = data.securityRules?.callForwarding == true)
+                StatusLine(label = "Subscription Status", active = data.subscription?.status == "active")
             }
         }
     }
 }
 
 @Composable
-private fun RecentNotificationsSection(notifications: List<NotificationDto>, unreadCount: Int) {
-    SectionCard(title = if (unreadCount > 0) "Notifications ($unreadCount unread)" else "Notifications") {
-        if (notifications.isEmpty()) {
-            EmptySectionText("You're all caught up.")
-        } else {
-            notifications.forEachIndexed { index, notification ->
-                RowItem(
-                    primary = notification.title,
-                    secondary = notification.body,
-                    trailing = formatRelativeTime(notification.createdAt),
-                    emphasized = !notification.isRead,
-                )
-                if (index != notifications.lastIndex) HorizontalDivider()
+private fun StatusLine(label: String, active: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        SDBadge(
+            text = if (active) "Active" else "Inactive",
+            status = if (active) SDBadgeStatus.Success else SDBadgeStatus.Neutral,
+        )
+    }
+}
+
+// ────────── 8. SUBSCRIPTION SUMMARY ──────────
+
+@Composable
+private fun SubscriptionSummaryCard(data: DashboardData) {
+    Column {
+        SDSectionHeader(title = "Subscription", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
+        SDCard(modifier = Modifier.fillMaxWidth()) {
+            if (data.subscription == null) {
+                EmptySectionText("No active subscription plan.")
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = data.subscription.plan.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        SDBadge(
+                            text = data.subscription.status.replaceFirstChar { it.uppercase() },
+                            status = if (data.subscription.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Warning,
+                        )
+                    }
+                    Text(
+                        text = "Renews / expires ${formatDate(data.subscription.expiryDate)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
+}
+
+// ────────── SHARED PIECES ──────────
+
+@Composable
+private fun EmptySectionText(message: String) {
+    Text(
+        text = message,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = SmartDoorSpacing.sm),
+    )
 }
 
 @Composable
@@ -453,61 +746,6 @@ private fun LastSyncFooter(data: DashboardData) {
     )
 }
 
-// ────────── SHARED PIECES ──────────
-
-@Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            content()
-        }
-    }
-}
-
-@Composable
-private fun RowItem(primary: String, secondary: String?, trailing: String, emphasized: Boolean = false) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = primary,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!secondary.isNullOrBlank()) {
-                Text(
-                    text = secondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Text(
-            text = trailing,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun EmptySectionText(message: String) {
-    Text(
-        text = message,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(vertical = 12.dp),
-    )
-}
-
 @Composable
 private fun RefreshGlyph() {
     // Intentionally not androidx.compose.material.icons.Icons.Filled.Refresh:
@@ -516,7 +754,7 @@ private fun RefreshGlyph() {
     // dependency in this phase without being able to run a build to verify
     // resolution is riskier than a plain glyph. Swap in a real vector icon
     // in a later phase alongside a proper icon-set decision.
-    Text(text = "⟳", style = MaterialTheme.typography.titleLarge)
+    Text(text = "⟳", style = MaterialTheme.typography.titleLarge, color = SmartDoorSecondaryDark)
 }
 
 // ────────── SKELETON / LOADING ──────────
@@ -525,39 +763,17 @@ private fun RefreshGlyph() {
 private fun DashboardSkeleton() {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(SmartDoorSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.md),
     ) {
-        item { SkeletonBlock(height = 84.dp) }
-        item { SkeletonBlock(height = 64.dp) }
-        item { SkeletonBlock(height = 64.dp) }
-        item { SkeletonBlock(height = 96.dp) }
-        item { SkeletonBlock(height = 220.dp) }
-        item { SkeletonBlock(height = 160.dp) }
-        item { SkeletonBlock(height = 160.dp) }
+        item { SDSkeletonLoader(height = 96.dp, shape = RoundedCornerShape(20.dp)) }
+        item { SDSkeletonLoader(height = 72.dp) }
+        item { SDSkeletonLoaderGroup(lineCount = 2, lineHeight = 64.dp) }
+        item { SDSkeletonLoader(height = 180.dp) }
+        item { SDSkeletonLoader(height = 220.dp) }
+        item { SDSkeletonLoader(height = 140.dp) }
+        item { SDSkeletonLoader(height = 160.dp) }
     }
-}
-
-@Composable
-private fun SkeletonBlock(height: Dp) {
-    val transition = rememberInfiniteTransition(label = "skeleton")
-    val alpha by transition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.85f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 700),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "skeletonAlpha",
-    )
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(height)
-            .clip(RoundedCornerShape(12.dp))
-            .alpha(alpha),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {}
 }
 
 // ────────── FORMATTING HELPERS ──────────
