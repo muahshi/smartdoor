@@ -34,7 +34,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -242,7 +244,16 @@ private fun HeroSmartDoorCard(data: DashboardData) {
                 SDAvatar(name = data.owner.fullName, size = 40.dp)
             }
             Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
-            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+            // UI Stabilization pass: this was a plain Row, which never wraps —
+            // a long subscription plan label next to the plate-status badge
+            // could exceed the card's width on a small screen and get cut off
+            // by GlassCard's clip(shape). FlowRow keeps the same badges/
+            // spacing/colors but drops the second badge to its own line
+            // instead of clipping it when it doesn't fit.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
+                verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
+            ) {
                 SDBadge(
                     text = data.plate?.status?.replaceFirstChar { it.uppercase() } ?: "Not linked",
                     status = if (data.plate?.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
@@ -354,39 +365,46 @@ private fun AiActivityDot(active: Boolean) {
 
 // ────────── 3. SMART STATISTICS ──────────
 
+/** Below this measured width (covers small devices like the Samsung M05), the stat grid drops to 2 columns instead of 3. */
+private val StatGridNarrowBreakpoint = 380.dp
+
+private data class StatEntry(val label: String, val value: Int)
+
+/**
+ * UI Stabilization pass: this used to be a hardcoded 2-card row followed by
+ * a 3-card row, so the 3-across row was always the narrowest/most cramped
+ * on small-width devices (Samsung M05, small Pixels) regardless of what
+ * actually fit. [BoxWithConstraints] measures the real available width and
+ * picks 2 or 3 columns per row from that — same [CountUpStatCard]/
+ * [SDStatCard], same spacing tokens, same colors/typography/animation,
+ * just a width-aware row grouping instead of a fixed split.
+ */
 @Composable
 private fun SmartStatisticsSection(data: DashboardData) {
+    val stats = listOf(
+        StatEntry("Today's Visitors", data.todayVisitorCount),
+        StatEntry("Unread Messages", data.unreadMessageCount),
+        StatEntry("AI Handled", data.aiHandledCount),
+        StatEntry("Missed Visitors", data.missedVisitorCount),
+        StatEntry("Notifications", data.unreadNotificationCount),
+    )
     Column {
         SDSectionHeader(title = "Smart Statistics", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
-        Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
-                CountUpStatCard(
-                    label = "Today's Visitors",
-                    value = data.todayVisitorCount,
-                    modifier = Modifier.weight(1f),
-                )
-                CountUpStatCard(
-                    label = "Unread Messages",
-                    value = data.unreadMessageCount,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
-                CountUpStatCard(
-                    label = "AI Handled",
-                    value = data.aiHandledCount,
-                    modifier = Modifier.weight(1f),
-                )
-                CountUpStatCard(
-                    label = "Missed Visitors",
-                    value = data.missedVisitorCount,
-                    modifier = Modifier.weight(1f),
-                )
-                CountUpStatCard(
-                    label = "Notifications",
-                    value = data.unreadNotificationCount,
-                    modifier = Modifier.weight(1f),
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = if (maxWidth < StatGridNarrowBreakpoint) 2 else 3
+            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                stats.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                        row.forEach { stat ->
+                            CountUpStatCard(
+                                label = stat.label,
+                                value = stat.value,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        repeat(columns - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+                    }
+                }
             }
         }
     }
