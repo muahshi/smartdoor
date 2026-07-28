@@ -1,6 +1,6 @@
 package `in`.mysmartdoor.app.ui.screens.splash
 
-import `in`.mysmartdoor.app.core.session.SecureSessionManager
+import `in`.mysmartdoor.app.core.data.AuthRepository
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,18 +12,27 @@ import javax.inject.Inject
 
 /**
  * Backs [SplashScreen]'s session check — Phase 8 architecture decision:
- * Splash → existing session? → Dashboard, else → Login. Reads the same
- * encrypted [SecureSessionManager] store that `AuthRepository.loginOwner`
- * already writes an access token to on a successful login; this only
- * *reads* that existing flow, no new auth logic, no backend change.
+ * Splash → existing session? → Dashboard, else → Login.
  *
- * [hasSession] is `null` until the DataStore's first emission arrives,
- * then settles to `true`/`false`. [SplashScreen] waits for that first
- * non-null value before deciding where to navigate, rather than racing it.
+ * UI Stabilization pass: this used to decide `hasSession` purely from
+ * whether an encrypted access token *string* existed in
+ * `SecureSessionManager` — it never verified that token or re-attached it
+ * to the actual Supabase `Auth` session Postgrest calls rely on, which is
+ * what caused the intermittent "Owner profile not found" bug on Dashboard
+ * after a process restart (see [AuthRepository.restoreSession] for the
+ * full root-cause writeup).
+ *
+ * [hasSession] is now `null` only while [AuthRepository.restoreSession] is
+ * in flight, then settles to `true` (a verified session was restored and
+ * imported into the Supabase client) or `false` (no session, or the stored
+ * one failed verification — [AuthRepository.restoreSession] has already
+ * cleared it). [SplashScreen] waits for that first non-null value before
+ * deciding where to navigate, so Dashboard can never be reached with an
+ * unverified session. No backend/RLS/SQL change.
  */
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    sessionManager: SecureSessionManager,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
 
     private val _hasSession = MutableStateFlow<Boolean?>(null)
@@ -31,9 +40,7 @@ class SplashViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            sessionManager.accessTokenFlow.collect { token ->
-                _hasSession.value = !token.isNullOrBlank()
-            }
+            _hasSession.value = authRepository.restoreSession()
         }
     }
 }
