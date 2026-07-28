@@ -1,6 +1,7 @@
 package `in`.mysmartdoor.app.core.data
 
 import `in`.mysmartdoor.app.core.common.AppError
+import `in`.mysmartdoor.app.core.common.Logger
 import `in`.mysmartdoor.app.core.common.Result
 import `in`.mysmartdoor.app.core.config.EnvironmentConfig
 import `in`.mysmartdoor.app.core.network.dto.VerifyPinRequest
@@ -9,8 +10,10 @@ import `in`.mysmartdoor.app.core.session.SecureSessionManager
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionSource
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -113,5 +116,61 @@ class AuthRepository @Inject constructor(
         sessionManager.saveAccessToken(session.accessToken)
         sessionManager.saveRefreshToken(session.refreshToken)
         sessionManager.saveUserId(payload.ownerId.orEmpty())
+    }
+
+    /**
+     * UI Stabilization pass — session-restore fix.
+     *
+     * Root cause this replaces: [in.mysmartdoor.app.ui.screens.splash.SplashViewModel]
+     * used to decide Dashboard-vs-Login purely from whether an encrypted
+     * access token *string* existed in [SecureSessionManager] — it never
+     * re-attached that token to [client]'s actual in-memory `Auth` session
+     * (`SupabaseClientProvider` installs `Auth` with
+     * `autoLoadFromStorage = false`; nothing ever called `importSession`).
+     * Fresh logins worked because [loginOwnerInternal] populates that
+     * in-memory session directly via `verifyEmailOtp`, but any process
+     * restart (routine on low-RAM devices, after a reboot, or after the app
+     * sits backgrounded) started a brand-new [client] with an empty `Auth`
+     * session while Splash still saw a persisted token and sent the user to
+     * Dashboard anyway. The resulting `users` query then ran unauthenticated
+     * (anon key only), RLS matched nothing, and
+     * `DashboardRepository.fetchDashboard` threw its "Owner profile not
+     * found" [IllegalStateException].
+     *
+     * Fix: actually attempt to restore the session before Splash is allowed
+     * to decide. [client.auth.refreshSession] both validates the stored
+     * refresh token against the server and returns a fresh, real
+     * [io.github.jan.supabase.auth.user.UserSession] — a stored token is
+     * never trusted at face value. On success the new session is imported
+     * into [client]'s `Auth` state (so every later [DashboardRepository]
+     * Postgrest call carries a real JWT) and the rotated tokens are
+     * persisted back. On *any* failure — invalid/expired refresh token, no
+     * refresh token stored, network error — the local session is cleared
+     * and `false` is returned, so Splash always routes to Login rather than
+     * ever letting Dashboard load with an unverified session.
+     *
+     * No backend/RLS/SQL change: this only changes which Android-side call
+     * happens before navigation.
+     *
+     * @return true if a verified session was restored, false if the caller
+     *   should navigate to Login (and the local session has been cleared).
+     */
+    suspend fun restoreSession(): Boolean {
+        val refreshToken = sessionManager.refreshTokenFlow.first()
+        if (refreshToken.isNullOrBlank()) {
+            return false
+        }
+
+        return try {
+            val restoredSession = client.auth.refreshSession(refreshToken)
+            client.auth.importSession(restoredSession, autoRefresh = true, source = SessionSource.Storage)
+            sessionManager.saveAccessToken(restoredSession.accessToken)
+            sessionManager.saveRefreshToken(restoredSession.refreshToken)
+            true
+        } catch (e: Exception) {
+            Logger.e(message = "Session restore failed — clearing local session", throwable = e)
+            sessionManager.clearSession()
+            false
+        }
     }
 }
