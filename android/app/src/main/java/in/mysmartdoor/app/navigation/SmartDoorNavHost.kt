@@ -5,11 +5,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import `in`.mysmartdoor.app.ui.screens.account.AccountScreen
 import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
 import `in`.mysmartdoor.app.ui.screens.publicweb.PublicHomeScreen
+import `in`.mysmartdoor.app.ui.screens.settings.SettingsScreen
 import `in`.mysmartdoor.app.ui.screens.splash.SplashScreen
 import `in`.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen
 
@@ -78,6 +80,21 @@ fun SmartDoorNavHost(
         // Receptionist surfaces already use).
         composable(Routes.AI_RECEPTIONIST) {
             AiReceptionistScreen(navController)
+        }
+
+        // Phase 8 — SETTINGS, ACCOUNT & DEVICE MANAGEMENT: real screens,
+        // backed by SettingsViewModel/AccountViewModel + the new
+        // SettingsRepository (reads the same users/plates/subscriptions/
+        // security_rules tables DashboardRepository already reads, plus
+        // notification_preferences read/written for the first time this
+        // phase). Replaces the "coming soon" snackbar Dashboard's Settings
+        // and Account Quick Actions previously fell through to.
+        composable(Routes.SETTINGS) {
+            SettingsScreen(navController)
+        }
+
+        composable(Routes.ACCOUNT) {
+            AccountScreen(navController)
         }
     }
 }

@@ -162,6 +162,9 @@ fun DashboardScreen(
                             "Visitor History" -> navController.navigate(Routes.VISITOR_FEED)
                             "Messages" -> navController.navigate(Routes.MESSAGES)
                             "AI Receptionist" -> navController.navigate(Routes.AI_RECEPTIONIST)
+                            // Phase 8 — SETTINGS, ACCOUNT & DEVICE MANAGEMENT
+                            "Settings" -> navController.navigate(Routes.SETTINGS)
+                            "Account" -> navController.navigate(Routes.ACCOUNT)
                             else -> showComingSoon(feature)
                         }
                     },

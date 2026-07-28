@@ -30,4 +30,15 @@ object PublicWebLinks {
 
     /** Home page's existing FAQ section. */
     const val FAQ = "$BASE_URL/#faq"
+
+    /**
+     * Settings & Account phase — About / Help & Support section links.
+     * Both pages already exist in production (`legal/terms-of-service.html`,
+     * `legal/privacy-policy.html`) — reused as-is, no new page.
+     */
+    const val TERMS_OF_SERVICE = "$BASE_URL/legal/terms-of-service.html"
+    const val PRIVACY_POLICY = "$BASE_URL/legal/privacy-policy.html"
+
+    /** Production support inbox (`js/aiConsultantKnowledge.js#supportEmail`) — opened via a `mailto:` intent. */
+    const val SUPPORT_EMAIL = "support@mysmartdoor.in"
 }

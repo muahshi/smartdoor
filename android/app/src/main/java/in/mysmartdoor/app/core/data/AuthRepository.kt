@@ -173,4 +173,23 @@ class AuthRepository @Inject constructor(
             false
         }
     }
+
+    /**
+     * Settings & Account phase — Logout. Invalidates the server-side
+     * Supabase Auth session via [io.github.jan.supabase.auth.Auth.signOut]
+     * (best-effort: a network failure here shouldn't strand the owner
+     * signed-in-looking on-device) and always clears the local encrypted
+     * session via [SecureSessionManager.clearSession], so the caller can
+     * unconditionally navigate to [in.mysmartdoor.app.navigation.Routes.LOGIN]
+     * afterward regardless of connectivity.
+     */
+    suspend fun logout(): Result<Unit> {
+        try {
+            client.auth.signOut()
+        } catch (e: Exception) {
+            Logger.e(message = "Remote sign-out failed — clearing local session anyway", throwable = e)
+        }
+        sessionManager.clearSession()
+        return Result.Success(Unit)
+    }
 }
