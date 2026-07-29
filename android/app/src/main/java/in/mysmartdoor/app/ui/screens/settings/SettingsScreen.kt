@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import `in`.mysmartdoor.app.navigation.Routes
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +82,21 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val launchWebLink = rememberWebLinkLauncher()
+
+    // Phase 10 — LOGOUT RELIABILITY FIX. While logout is actually in
+    // flight (network signOut() call + local session clear), block the
+    // system back button rather than letting it pop this screen off the
+    // back stack. Settings' ViewModel is scoped to its NavBackStackEntry —
+    // popping it mid-logout would clear that ViewModelStore and cancel the
+    // in-flight coroutine before the session is wiped (see
+    // AuthRepository.logout doc for the full root-cause writeup). This is
+    // the other half of that fix: pair it with logout() itself now being
+    // resilient (NonCancellable) to any cancellation this doesn't catch.
+    BackHandler(enabled = uiState.isLoggingOut) {
+        // Intentionally does nothing — swallows the back press until
+        // logout finishes and LaunchedEffect(uiState.loggedOut) below
+        // navigates to Login on its own.
+    }
 
     LaunchedEffect(uiState.actionError) {
         uiState.actionError?.let {
@@ -165,6 +182,24 @@ fun SettingsScreen(
             onDismissClick = viewModel::dismissLogoutConfirm,
             isDanger = true,
         )
+    }
+
+    // Phase 10 — LOGOUT RELIABILITY FIX. Blocking overlay for the window
+    // between tapping "Log Out" and the session actually being cleared.
+    // Previously isLoggingOut existed in state but nothing rendered it —
+    // the owner got no feedback at all during the signOut() network call,
+    // which is exactly the gap that invited them to hit back mid-flight.
+    // Paired with the BackHandler above, this also visually communicates
+    // why back is (briefly) not doing anything.
+    if (uiState.isLoggingOut) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
+        }
     }
 }
 
