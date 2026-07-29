@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -603,20 +604,46 @@ private fun LiveActivityTimelineSection(data: DashboardData) {
     }
 }
 
+/**
+ * Phase 10 — LIVE ACTIVITY LAYOUT FIX. Three concrete gaps closed here,
+ * all in this Row/Column structure only — [buildTimeline] and every other
+ * repository/data path is untouched:
+ *
+ * 1. The trailing time [Text] had no `maxLines`/`overflow` at all. Any
+ *    future locale/format change to [formatRelativeTime] that produced a
+ *    longer string could wrap it to two lines with no ellipsis, breaking
+ *    this row's single-line height and reading as overlap against the
+ *    divider/next row. Now explicitly pinned to one line, always visible.
+ * 2. There was no spacing between the primary/secondary [Column] and the
+ *    trailing time text — an ellipsized long [entry.primary] (raw,
+ *    unbounded `purpose` text for Delivery/AI rows) could render right up
+ *    against the time label with zero gap. A [Spacer] now guarantees
+ *    breathing room between them at every width.
+ * 3. [SDBadge] had no width ceiling. At large accessibility font scale its
+ *    pill can grow considerably; as a non-weighted Row sibling it was free
+ *    to take whatever width it demanded, eating into the space left for
+ *    the weighted title/subtitle column. Capped so the badge can never
+ *    crowd out the text column it sits beside.
+ */
 @Composable
 private fun TimelineRow(entry: TimelineEntry) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SDBadge(text = timelineKindLabel(entry.kind), status = timelineKindStatus(entry.kind))
+        SDBadge(
+            text = timelineKindLabel(entry.kind),
+            status = timelineKindStatus(entry.kind),
+            modifier = Modifier.widthIn(max = 88.dp),
+        )
         Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f, fill = true)) {
             Text(
                 text = entry.primary,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
             if (!entry.secondary.isNullOrBlank()) {
                 Text(
@@ -625,13 +652,18 @@ private fun TimelineRow(entry: TimelineEntry) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
+        Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
         Text(
             text = formatRelativeTime(entry.createdAt),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
         )
     }
 }
