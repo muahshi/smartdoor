@@ -13,7 +13,9 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionSource
 import io.github.jan.supabase.functions.functions
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -182,14 +184,32 @@ class AuthRepository @Inject constructor(
      * session via [SecureSessionManager.clearSession], so the caller can
      * unconditionally navigate to [in.mysmartdoor.app.navigation.Routes.LOGIN]
      * afterward regardless of connectivity.
+     *
+     * Phase 10 — LOGOUT RELIABILITY FIX. Root cause: [logout] runs inside
+     * [in.mysmartdoor.app.ui.screens.settings.SettingsViewModel]'s
+     * `viewModelScope`, which is scoped to Settings' NavBackStackEntry. If
+     * the owner backs out of Settings while [client.auth.signOut] (a
+     * network call) is still in flight, Navigation-Compose clears that
+     * ViewModelStore, cancelling `viewModelScope` mid-suspension — killing
+     * this function before [sessionManager.clearSession] ever runs. Result:
+     * no crash, no error, just a session that silently never gets wiped —
+     * "logout doesn't work" with nothing in the logs to explain why.
+     *
+     * Fix: [withContext] + [NonCancellable] runs this body to completion
+     * even after the caller's Job has been cancelled — a normal `launch` on
+     * a cancelled scope never starts, but a coroutine already running keeps
+     * executing through a `NonCancellable` section instead of throwing at
+     * the next suspension point. No change to what signOut()/clearSession()
+     * do, no change to the auth flow itself — only a guarantee that once
+     * logout starts, it always finishes.
      */
-    suspend fun logout(): Result<Unit> {
+    suspend fun logout(): Result<Unit> = withContext(NonCancellable) {
         try {
             client.auth.signOut()
         } catch (e: Exception) {
             Logger.e(message = "Remote sign-out failed — clearing local session anyway", throwable = e)
         }
         sessionManager.clearSession()
-        return Result.Success(Unit)
+        Result.Success(Unit)
     }
 }
