@@ -14,6 +14,7 @@ import `in`.mysmartdoor.app.ui.screens.common.EmptyStateScreen
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -143,7 +145,10 @@ private fun MessagesContent(
                 onClear = { onSearchQueryChange("") },
             )
             Spacer(modifier = Modifier.height(SmartDoorSpacing.sm))
-            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
+            ) {
                 MessagesFilter.entries.forEach { filter ->
                     SDChip(
                         label = if (filter == MessagesFilter.Unread && uiState.unreadTotal > 0) {
