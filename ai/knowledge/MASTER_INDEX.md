@@ -101,7 +101,27 @@ starts from that pattern instead of re-deriving it from CTO/COO/CFO.
   unrelated and neither is renamed. It also flags a real Company-Brain
   gap found during its audit: a substantial native Android app
   (`android/`) has no entry anywhere in this knowledge base.
-- CEO — not yet defined (future phase).
+- **CEO** — fully defined as of SDOS Phase 8. See
+  `ai/executives/ceo/README.md` for the CEO's mission, responsibilities,
+  authority matrix, and cross-domain orchestration playbooks (executive
+  orchestration, briefing structure, a decision framework for
+  cross-executive conflicts, strategic planning synthesis, priority
+  management, a company health model, meeting cadence, founder
+  interaction, escalation routing, and the cross-executive communication
+  contract). Unlike the other five executives, the CEO owns no domain
+  data or Company Brain sources of its own — it reads all five sibling
+  executives' own `ai/executives/<role>/` documentation as its primary
+  input, alongside this Company Brain for shared business context. Built
+  from the exact gap named independently by all five sibling
+  executives' own `INTER_EXECUTIVE_COMMUNICATION.md` files ("no CEO
+  executive exists yet") and explicitly suggested as the next phase by
+  `ai/executives/cpo/ROADMAP.md`. `ai/executives/ceo/README.md` flags a
+  real, confirmed documentation gap found during its audit: the
+  `ai/core/standards/` shared standards library that this index (below)
+  and all five sibling executives reference as built in "Phase 5" does
+  not actually exist anywhere in the repository — `ai/core/` contains
+  only its own README, still describing itself as an empty Phase 0
+  placeholder.
 
 ## Shared Standards (SDOS Phase 5)
 

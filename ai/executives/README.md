@@ -45,8 +45,24 @@ ecosystem" of future hardware categories already documented in
 renumbered — and flags a real Company-Brain gap found during its audit:
 a native Android app in `android/` with no entry anywhere in
 `ai/knowledge/`).
-`ceo/` remains empty; no agents, personas, or decision logic execute for
-any role yet.
+As of SDOS Phase 8, `ceo/` fully defines the CEO executive's role,
+authority, and cross-domain orchestration playbooks (executive
+orchestration, briefing structure, a decision framework for
+cross-executive conflicts, strategic planning synthesis, priority
+management, a company health model, meeting cadence, founder
+interaction, escalation routing, and the cross-executive communication
+contract) — documentation only, no agent runtime or execution logic.
+Unlike every other executive, the CEO owns no domain of its own; its
+entire function is reading and synthesizing what `cto/`, `coo/`,
+`cfo/`, `cmo/`, and `cpo/` already define, per the gap each of those
+five folders' own `INTER_EXECUTIVE_COMMUNICATION.md` independently
+named ("no CEO executive exists yet"). See `ai/executives/ceo/README.md`
+(that file also flags a real, confirmed documentation gap found during
+its audit: the `ai/core/standards/` shared standards library referenced
+by all six executives as built in "Phase 5" does not actually exist
+anywhere in the repository — `ai/core/` contains only its own README,
+still describing itself as an empty Phase 0 placeholder). No agents,
+personas, or decision logic execute for any role yet.
 
 ## What will eventually go here
 - One subfolder per executive (e.g. `ceo/`, `cto/`, `coo/`, `cfo/`)
