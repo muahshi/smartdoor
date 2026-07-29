@@ -1,5 +1,6 @@
 package `in`.mysmartdoor.app.ui.screens.dashboard
 
+import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.data.model.DashboardData
 import `in`.mysmartdoor.app.core.network.dto.NotificationDto
 import `in`.mysmartdoor.app.core.network.dto.VisitorVisitDto
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,6 +55,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -71,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -219,52 +223,73 @@ private fun DashboardContent(
 // ────────── 1. HERO SMART DOOR CARD ──────────
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun HeroSmartDoorCard(data: DashboardData) {
+    // Phase 9 — PREMIUM UI MODERNIZATION: FlowRow requires an explicit
+    // ExperimentalLayoutApi opt-in to compile (it didn't have one, which is
+    // why this card never built). Fixing the missing opt-in was the trigger
+    // to also finish the responsiveness pass the surrounding comments
+    // already called for: the plate/avatar sizes and name typography below
+    // now scale down on narrow screens (BoxWithConstraints), same
+    // breakpoint SmartStatisticsSection already uses, so nothing new is
+    // introduced to the design language.
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PlatePreview(plateId = data.owner.plateId, modifier = Modifier.size(64.dp))
-                Spacer(modifier = Modifier.width(SmartDoorSpacing.md))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = data.owner.fullName,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val isNarrow = maxWidth < StatGridNarrowBreakpoint
+            val plateSize = if (isNarrow) 52.dp else 64.dp
+            val avatarSize = if (isNarrow) 32.dp else 40.dp
+            val nameStyle = if (isNarrow) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge
+
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlatePreview(plateId = data.owner.plateId, modifier = Modifier.size(plateSize))
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = data.owner.fullName,
+                            style = nameStyle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = data.owner.plateId,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = SmartDoorSecondaryDark,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = "Member since ${formatDate(data.owner.createdAt)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+                    SDAvatar(name = data.owner.fullName, size = avatarSize)
+                }
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
+                // This was a plain Row, which never wraps — a long
+                // subscription plan label next to the plate-status badge
+                // could exceed the card's width on a small screen and get
+                // cut off by GlassCard's clip(shape). FlowRow keeps the
+                // same badges/spacing/colors but drops the second badge to
+                // its own line instead of clipping it when it doesn't fit.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
+                    verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
+                ) {
+                    SDBadge(
+                        text = data.plate?.status?.replaceFirstChar { it.uppercase() } ?: "Not linked",
+                        status = if (data.plate?.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
                     )
-                    Text(
-                        text = data.owner.plateId,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = SmartDoorSecondaryDark,
-                    )
-                    Text(
-                        text = "Member since ${formatDate(data.owner.createdAt)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    SDBadge(
+                        text = subscriptionBadgeLabel(data),
+                        status = if (data.subscription?.status == "active") SDBadgeStatus.Info else SDBadgeStatus.Neutral,
                     )
                 }
-                SDAvatar(name = data.owner.fullName, size = 40.dp)
-            }
-            Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
-            // UI Stabilization pass: this was a plain Row, which never wraps —
-            // a long subscription plan label next to the plate-status badge
-            // could exceed the card's width on a small screen and get cut off
-            // by GlassCard's clip(shape). FlowRow keeps the same badges/
-            // spacing/colors but drops the second badge to its own line
-            // instead of clipping it when it doesn't fit.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
-                verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
-            ) {
-                SDBadge(
-                    text = data.plate?.status?.replaceFirstChar { it.uppercase() } ?: "Not linked",
-                    status = if (data.plate?.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
-                )
-                SDBadge(
-                    text = subscriptionBadgeLabel(data),
-                    status = if (data.subscription?.status == "active") SDBadgeStatus.Info else SDBadgeStatus.Neutral,
-                )
             }
         }
     }
@@ -431,18 +456,18 @@ private fun CountUpStatCard(label: String, value: Int, modifier: Modifier = Modi
 
 // ────────── 4. QUICK ACTIONS ──────────
 
-private data class QuickAction(val label: String, val glyph: String)
+private data class QuickAction(val label: String, val iconRes: Int)
 
 private val quickActions = listOf(
-    QuickAction("Visitor History", "🧾"),
-    QuickAction("Call History", "📞"),
-    QuickAction("Messages", "💬"),
-    QuickAction("QR Preview", "▦"),
-    QuickAction("Smart Plate", "🔌"),
-    QuickAction("AI Receptionist", "🤖"),
-    QuickAction("Settings", "⚙"),
-    QuickAction("Notifications", "🔔"),
-    QuickAction("Account", "👤"),
+    QuickAction("Visitor History", R.drawable.ic_receipt),
+    QuickAction("Call History", R.drawable.ic_call),
+    QuickAction("Messages", R.drawable.ic_chat),
+    QuickAction("QR Preview", R.drawable.ic_qr),
+    QuickAction("Smart Plate", R.drawable.ic_plug),
+    QuickAction("AI Receptionist", R.drawable.ic_bot),
+    QuickAction("Settings", R.drawable.ic_settings),
+    QuickAction("Notifications", R.drawable.ic_bell),
+    QuickAction("Account", R.drawable.ic_person),
 )
 
 @Composable
@@ -478,7 +503,12 @@ private fun QuickActionTile(action: QuickAction, onClick: () -> Unit, modifier: 
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(text = action.glyph, style = MaterialTheme.typography.titleLarge)
+            Icon(
+                painter = painterResource(id = action.iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = SmartDoorSecondaryDark,
+            )
             Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
             Text(
                 text = action.label,
@@ -783,13 +813,16 @@ private fun LastSyncFooter(data: DashboardData) {
 
 @Composable
 private fun RefreshGlyph() {
-    // Intentionally not androidx.compose.material.icons.Icons.Filled.Refresh:
-    // material-icons-core isn't a dependency anywhere in this app yet (grep
-    // confirms zero existing Icons.* usage), and adding a new Gradle
-    // dependency in this phase without being able to run a build to verify
-    // resolution is riskier than a plain glyph. Swap in a real vector icon
-    // in a later phase alongside a proper icon-set decision.
-    Text(text = "⟳", style = MaterialTheme.typography.titleLarge, color = SmartDoorSecondaryDark)
+    // Phase 9: swapped the emoji-glyph placeholder for a real vector icon
+    // (res/drawable/ic_refresh.xml) — no new Gradle dependency, just a
+    // resource, per the "no material-icons-core dependency" constraint the
+    // old comment here described.
+    Icon(
+        painter = painterResource(id = R.drawable.ic_refresh),
+        contentDescription = "Refresh",
+        modifier = Modifier.size(20.dp),
+        tint = SmartDoorSecondaryDark,
+    )
 }
 
 // ────────── SKELETON / LOADING ──────────

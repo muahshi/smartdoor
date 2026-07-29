@@ -1,9 +1,9 @@
 # ai/executives
 
 ## Purpose
-Home for individual AI executive roles — CEO, CTO, COO, CFO, and any future
-roles — that will eventually run on top of SDOS to help manage the SmartDoor
-business.
+Home for individual AI executive roles — CEO, CTO, COO, CFO, CMO, and any
+future roles — that will eventually run on top of SDOS to help manage the
+SmartDoor business.
 
 ## Status
 As of SDOS Phase 2, `cto/` fully defines the CTO executive's role,
@@ -21,7 +21,16 @@ As of SDOS Phase 5, the file skeleton and shared rules each of the
 above three follows are standardized in `ai/core/standards/` (see
 `ai/core/standards/README.md`) — a future executive should be built
 from that skeleton rather than by copying and adapting an existing
-role's folder by hand.
+role's folder by hand. As of SDOS Phase 6, `cmo/` fully defines the CMO
+executive's role, authority, and marketing playbooks (SEO/GEO/AEO,
+content, social media, paid ads, lead generation, branding, campaigns,
+competitor analysis, marketing analytics) — documentation only, no
+agent runtime or execution logic, and the first executive built from
+the Phase 5 skeleton rather than by hand. See `ai/executives/cmo/README.md`
+(that file also flags a numbering note: the build brief that produced
+`cmo/` referred to it as "Phase 5," which the Phase 5 standards library
+above already occupies — `cmo/` was filed as Phase 6 instead of
+overwriting that number).
 `ceo/` remains empty; no agents, personas, or decision logic execute for
 any role yet.
 

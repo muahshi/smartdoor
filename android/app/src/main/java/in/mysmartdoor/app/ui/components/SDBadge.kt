@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDangerDim
 import `in`.mysmartdoor.app.ui.theme.SmartDoorInfo
@@ -50,6 +51,8 @@ fun SDBadge(
         text = text,
         style = MaterialTheme.typography.labelSmall,
         color = contentColor,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .background(color = containerColor, shape = SmartDoorPillShape)
             .padding(horizontal = SmartDoorSpacing.xs, vertical = SmartDoorSpacing.xxs),

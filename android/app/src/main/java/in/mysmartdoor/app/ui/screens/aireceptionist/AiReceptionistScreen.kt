@@ -1,5 +1,6 @@
 package `in`.mysmartdoor.app.ui.screens.aireceptionist
 
+import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.data.model.AiReceptionistData
 import `in`.mysmartdoor.app.core.network.dto.AiCallScreeningDto
 import `in`.mysmartdoor.app.core.network.dto.AiCategoryBreakdownDto
@@ -38,6 +39,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -49,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -107,7 +110,12 @@ fun AiReceptionistScreen(
                                 color = SmartDoorSecondaryDark,
                             )
                         } else {
-                            Text(text = "⟳", style = MaterialTheme.typography.titleMedium)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_refresh),
+                                contentDescription = "Refresh",
+                                modifier = Modifier.size(20.dp),
+                                tint = SmartDoorSecondaryDark,
+                            )
                         }
                     }
                 },
@@ -345,7 +353,12 @@ private fun AiActivityCard(entry: AiCallScreeningDto) {
                     )
                     if (entry.conversationMode.startsWith("voice")) {
                         Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
-                        Text(text = "🎙️", style = MaterialTheme.typography.labelSmall)
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_mic),
+                            contentDescription = "Voice call",
+                            modifier = Modifier.size(12.dp),
+                            tint = SmartDoorSecondaryDark,
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))

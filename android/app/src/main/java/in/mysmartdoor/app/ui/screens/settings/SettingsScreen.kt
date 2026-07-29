@@ -1,5 +1,6 @@
 package `in`.mysmartdoor.app.ui.screens.settings
 
+import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.common.rememberWebLinkLauncher
 import `in`.mysmartdoor.app.core.config.PublicWebLinks
 import `in`.mysmartdoor.app.core.data.model.SettingsData
@@ -28,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -47,6 +49,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -113,7 +116,12 @@ fun SettingsScreen(
                                 color = SmartDoorSecondaryDark,
                             )
                         } else {
-                            Text(text = "⟳", style = MaterialTheme.typography.titleMedium)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_refresh),
+                                contentDescription = "Refresh",
+                                modifier = Modifier.size(20.dp),
+                                tint = SmartDoorSecondaryDark,
+                            )
                         }
                     }
                 },

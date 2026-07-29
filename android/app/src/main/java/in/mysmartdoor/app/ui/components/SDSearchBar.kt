@@ -1,6 +1,9 @@
 package `in`.mysmartdoor.app.ui.components
 
+import `in`.mysmartdoor.app.R
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -8,8 +11,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 
 /**
@@ -19,9 +24,10 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
  * design system doesn't need yet (single inline field is the whole
  * requirement), and matches [SmartDoorTextField]'s underlying approach.
  *
- * Leading/trailing glyphs are plain [Text] rather than
- * `androidx.compose.material.icons.Icons.*` — no `material-icons-core`
- * dependency exists in this app (see [SDTopBar]'s doc comment).
+ * Phase 9: leading/trailing glyphs are now real vector icons
+ * (res/drawable/ic_search.xml, ic_close.xml) instead of plain [Text] —
+ * no `material-icons-core` dependency was added, these are plain drawable
+ * resources.
  */
 @Composable
 fun SDSearchBar(
@@ -40,12 +46,20 @@ fun SDSearchBar(
         placeholder = { Text(text = placeholder) },
         singleLine = true,
         leadingIcon = {
-            Text(text = "⌕", style = MaterialTheme.typography.titleMedium)
+            Icon(
+                painter = painterResource(id = R.drawable.ic_search),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
         },
         trailingIcon = {
             if (value.isNotEmpty() && onClear != null) {
                 IconButton(onClick = onClear) {
-                    Text(text = "✕", style = MaterialTheme.typography.bodyMedium)
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_close),
+                        contentDescription = "Clear search",
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
             }
         },

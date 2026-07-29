@@ -68,6 +68,20 @@ starts from that pattern instead of re-deriving it from CTO/COO/CFO.
   `sql/57_commerce_engine_phase8a.sql`,
   `sql/58_gst_billing_phase8b.sql`) and existing legal documents
   (`docs/legal/refund-policy.md`).
+- **CMO** — fully defined as of SDOS Phase 6. See
+  `ai/executives/cmo/README.md` for the CMO's mission, responsibilities,
+  authority matrix, and marketing playbooks (SEO/GEO/AEO, content,
+  social media, paid ads, lead generation, branding, campaigns,
+  competitor analysis, marketing analytics). The CMO reads this Company
+  Brain (primarily `company_profile.md`, `products.md`, `features.md`,
+  `database.md`, `services.md`) as its background context, alongside
+  SmartDoor's real SEO/GEO surface (`index.html`, `robots.txt`,
+  `sitemap.xml`, `llms.txt`) and real campaign/growth schema
+  (`sql/57_commerce_engine_phase8a.sql`, `sql/11_beta_launch_schema.sql`,
+  `sql/13_customer_growth_schema.sql`). `ai/executives/cmo/README.md`
+  flags a numbering note: its build brief referred to it as "Phase 5,"
+  already occupied below by the shared standards library, so it was
+  filed as Phase 6.
 - CEO — not yet defined (future phase).
 
 ## Shared Standards (SDOS Phase 5)

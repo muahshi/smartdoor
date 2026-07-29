@@ -1,5 +1,6 @@
 package `in`.mysmartdoor.app.ui.screens.account
 
+import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.data.model.SettingsData
 import `in`.mysmartdoor.app.core.network.dto.PlateDto
 import `in`.mysmartdoor.app.core.network.dto.SubscriptionDto
@@ -32,11 +33,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -72,6 +78,20 @@ fun AccountScreen(
     viewModel: AccountViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Phase 9: if a refresh fails while data is already on screen, surface
+    // it as a Snackbar instead of falling through to ErrorScreen — the
+    // existing `data != null` branch below already keeps showing
+    // AccountContent, this just adds the missing user-facing feedback.
+    // Initial-load failures (data == null) are untouched: ErrorScreen still
+    // owns that case below.
+    LaunchedEffect(uiState.isRefreshing, uiState.errorMessage) {
+        val message = uiState.errorMessage
+        if (!uiState.isRefreshing && message != null && uiState.data != null) {
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -86,12 +106,18 @@ fun AccountScreen(
                                 color = SmartDoorSecondaryDark,
                             )
                         } else {
-                            Text(text = "⟳", style = MaterialTheme.typography.titleMedium)
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_refresh),
+                                contentDescription = "Refresh",
+                                modifier = Modifier.size(20.dp),
+                                tint = SmartDoorSecondaryDark,
+                            )
                         }
                     }
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             val data = uiState.data
