@@ -42,4 +42,10 @@ object Routes {
     const val SETTINGS = "settings"
     const val NOTIFICATIONS = "notifications"
     const val ACCOUNT = "account"
+
+    // Phase 12A — PREMIUM UI REBUILD. Reached from Dashboard's live-activity
+    // pill card (and the bottom nav's Home tab while already on this
+    // screen). Backed by the same DashboardViewModel/DashboardRepository
+    // DashboardScreen already uses — no new repository, no new query.
+    const val LIVE_ACTIVITY = "live_activity"
 }

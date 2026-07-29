@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import `in`.mysmartdoor.app.ui.screens.account.AccountScreen
 import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
+import `in`.mysmartdoor.app.ui.screens.liveactivity.LiveActivityScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
 import `in`.mysmartdoor.app.ui.screens.publicweb.PublicHomeScreen
@@ -95,6 +96,18 @@ fun SmartDoorNavHost(
 
         composable(Routes.ACCOUNT) {
             AccountScreen(navController)
+        }
+
+        // Phase 12A — PREMIUM UI REBUILD: full-screen Live Activity feed.
+        // Deliberately backed by the same DashboardViewModel Dashboard
+        // uses (hiltViewModel() with no explicit graph scoping resolves a
+        // new instance per back-stack entry, same as every other screen
+        // here) rather than a new ViewModel/repository — the CTO's Phase
+        // 12A brief is explicit that this reuses existing data, and
+        // DashboardData already carries every field the feed needs (see
+        // in.mysmartdoor.app.ui.timeline.buildTimeline).
+        composable(Routes.LIVE_ACTIVITY) {
+            LiveActivityScreen(navController)
         }
     }
 }

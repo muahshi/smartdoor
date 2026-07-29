@@ -53,6 +53,16 @@ val SmartDoorInfo = Color(0xFF00A2E8) // css --info
 val SmartDoorInfoDim = Color(0x2600A2E8) // css --info-dim (alpha 0.15)
 val SmartDoorOnInfo = Color(0xFF001A26)
 
+// Phase 12A — PREMIUM UI REBUILD. AI-specific accent, added the same way
+// Success/Warning/Danger/Info were: a semantic status color, not a new
+// design language. Used only for AI Receptionist/AI-handled visual
+// grouping (Live Activity's "AI" icon circle, AI stat tiles) so those
+// entries read as their own category instead of borrowing Info/cyan,
+// which is already spoken for by informational badges elsewhere.
+val SmartDoorAi = Color(0xFF9B6BF2)
+val SmartDoorAiDim = Color(0x269B6BF2) // AI accent at ~15% alpha
+val SmartDoorOnAi = Color(0xFF1E0F3D)
+
 // ────────── Glass overlay tokens ──────────
 // Used by GlassCard for the glassmorphism surface: a translucent tint of
 // the dark navy surface plus a hairline gold-tinted border, layered over
