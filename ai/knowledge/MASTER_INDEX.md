@@ -13,6 +13,17 @@ If you are building a **new** executive (not reading as an existing
 one), also read `ai/core/standards/README.md` first — it defines the
 shared file skeleton and rules every executive follows, so the new role
 starts from that pattern instead of re-deriving it from CTO/COO/CFO.
+As of SDOS Phase 9, that README also carries a resolution note: the
+standards library it points to physically lives at `core/standards/`
+(repository root), not `ai/core/standards/` — read it before assuming
+the path either doesn't exist (the Phase 8 finding) or lives where
+every reference says it does.
+
+If you are reasoning about the runtime itself (not a specific
+executive), start at `ai/core/README.md` instead — as of SDOS Phase 9
+it indexes the full runtime architecture (registration, context
+loading, the event bus, task/session models, permissions, and routing)
+that a future implementation phase will build against.
 
 ## Knowledge Map
 
@@ -115,13 +126,14 @@ starts from that pattern instead of re-deriving it from CTO/COO/CFO.
   from the exact gap named independently by all five sibling
   executives' own `INTER_EXECUTIVE_COMMUNICATION.md` files ("no CEO
   executive exists yet") and explicitly suggested as the next phase by
-  `ai/executives/cpo/ROADMAP.md`. `ai/executives/ceo/README.md` flags a
-  real, confirmed documentation gap found during its audit: the
-  `ai/core/standards/` shared standards library that this index (below)
-  and all five sibling executives reference as built in "Phase 5" does
-  not actually exist anywhere in the repository — `ai/core/` contains
-  only its own README, still describing itself as an empty Phase 0
-  placeholder.
+  `ai/executives/cpo/ROADMAP.md`. `ai/executives/ceo/README.md` flagged
+  a documentation gap found during its audit: the `ai/core/standards/`
+  shared standards library that this index (below) and all five sibling
+  executives reference as built in "Phase 5" appeared not to exist
+  anywhere in the repository. **SDOS Phase 9 corrected this finding**:
+  the library exists in full, just physically located at the repository
+  root (`core/standards/`) instead of `ai/core/standards/`. See
+  `ai/core/standards/README.md` for the full accounting.
 
 ## Shared Standards (SDOS Phase 5)
 
@@ -133,6 +145,26 @@ naming, folder, quality, and review conventions. See
 content (mission text, domain playbooks, actual approval tables) still
 lives entirely in each `ai/executives/<role>/` folder — Phase 5 only
 removed the duplicated *shape* that had been copy-pasted per role.
+
+**Phase 9 correction:** the eighteen files this section refers to
+physically live at `core/standards/` (repository root), not
+`ai/core/standards/`. `ai/core/standards/README.md` now holds an
+authoritative pointer explaining the discrepancy — it was not moved or
+duplicated in Phase 9 (see that file for why), pending a founder
+decision on which path should become authoritative.
+
+## SDOS Runtime Foundation (SDOS Phase 9)
+
+As of Phase 9, `ai/core/` also defines the runtime architecture the six
+existing executives' documentation has assumed since Phase 2: executive
+registration (`ai/core/registry/`), context loading
+(`ai/core/context/`), the event bus (`ai/core/events/`), task and
+session models (`ai/core/tasks/`, `ai/core/session/`), permissions and
+security (`ai/core/permissions/`), and task routing
+(`ai/core/router/`). See `ai/core/README.md` for the full index and
+`ai/core/runtime/RUNTIME_ARCHITECTURE.md` for how they fit together.
+Documentation, interfaces, and contracts only — no orchestration code,
+agent runtime, or automation exists as of this phase.
 
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 

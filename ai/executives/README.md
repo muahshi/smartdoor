@@ -57,12 +57,23 @@ entire function is reading and synthesizing what `cto/`, `coo/`,
 `cfo/`, `cmo/`, and `cpo/` already define, per the gap each of those
 five folders' own `INTER_EXECUTIVE_COMMUNICATION.md` independently
 named ("no CEO executive exists yet"). See `ai/executives/ceo/README.md`
-(that file also flags a real, confirmed documentation gap found during
-its audit: the `ai/core/standards/` shared standards library referenced
-by all six executives as built in "Phase 5" does not actually exist
-anywhere in the repository — `ai/core/` contains only its own README,
-still describing itself as an empty Phase 0 placeholder). No agents,
-personas, or decision logic execute for any role yet.
+(that file also flags a documentation gap found during its audit: the
+`ai/core/standards/` shared standards library referenced by all six
+executives as built in "Phase 5" appeared not to exist anywhere in the
+repository). As of SDOS Phase 9, that finding has been corrected, not
+just flagged further: the standards library exists in full, physically
+located at the repository root (`core/standards/`) rather than
+`ai/core/standards/` — see `ai/core/standards/README.md` for the
+complete accounting. Phase 9 also builds out `ai/core/` itself, which
+until this phase contained only its own placeholder `README.md`: it now
+defines the runtime architecture — executive registration, context
+loading, the event bus, task/session models, permissions, and task
+routing — that every one of the six executives' own `PROMPT_TEMPLATE.md`
+and `AUTHORITY_MATRIX.md` files has assumed exists since Phase 2. See
+`ai/core/README.md` for the full index. No agents, personas, or
+decision logic execute for any role yet, and nothing in Phase 9 changes
+that — it is architecture and contracts only, exactly like every phase
+before it.
 
 ## What will eventually go here
 - One subfolder per executive (e.g. `ceo/`, `cto/`, `coo/`, `cfo/`)
