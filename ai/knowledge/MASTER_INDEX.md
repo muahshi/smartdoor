@@ -82,6 +82,25 @@ starts from that pattern instead of re-deriving it from CTO/COO/CFO.
   flags a numbering note: its build brief referred to it as "Phase 5,"
   already occupied below by the shared standards library, so it was
   filed as Phase 6.
+- **CPO** — fully defined as of SDOS Phase 7. See
+  `ai/executives/cpo/README.md` for the CPO's mission, responsibilities,
+  authority matrix, and product playbooks (product strategy, roadmap
+  stewardship, feature prioritization, product discovery, customer
+  feedback triage, user research, product analytics/metrics, release
+  planning, experimentation, feature adoption). The CPO reads this
+  Company Brain (primarily `products/products.md`, `features/features.md`,
+  `database/database.md`, `services/services.md`) as its background
+  context, alongside SmartDoor's real feature/bug triage system
+  (`sql/11_beta_launch_schema.sql`, `sql/13_customer_growth_schema.sql`,
+  `services/customerGrowth.js`) and its documented future-capability
+  surface (`js/productCatalog.js`'s "Future Product Lines",
+  `design-system/future/README.md`). `ai/executives/cpo/README.md` flags
+  a naming note: `js/productCatalog.js` separately documents an
+  unrelated "Phase 7 ecosystem" (future hardware categories) that
+  happens to share a number with this SDOS build phase — the two are
+  unrelated and neither is renamed. It also flags a real Company-Brain
+  gap found during its audit: a substantial native Android app
+  (`android/`) has no entry anywhere in this knowledge base.
 - CEO — not yet defined (future phase).
 
 ## Shared Standards (SDOS Phase 5)

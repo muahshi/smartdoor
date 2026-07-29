@@ -31,6 +31,20 @@ the Phase 5 skeleton rather than by hand. See `ai/executives/cmo/README.md`
 `cmo/` referred to it as "Phase 5," which the Phase 5 standards library
 above already occupies — `cmo/` was filed as Phase 6 instead of
 overwriting that number).
+As of SDOS Phase 7, `cpo/` fully defines the CPO executive's role,
+authority, and product playbooks (product strategy, roadmap stewardship,
+feature prioritization, product discovery, customer feedback triage,
+user research, product analytics/metrics, release planning,
+experimentation, feature adoption) — documentation only, no agent
+runtime or execution logic, built from the Phase 5 skeleton per the
+suggestion in `ai/executives/cmo/ROADMAP.md`. See
+`ai/executives/cpo/README.md` (that file flags a naming note: this SDOS
+build phase shares the number "Phase 7" with an unrelated "Phase 7
+ecosystem" of future hardware categories already documented in
+`js/productCatalog.js` — the two are coincidental and neither is
+renumbered — and flags a real Company-Brain gap found during its audit:
+a native Android app in `android/` with no entry anywhere in
+`ai/knowledge/`).
 `ceo/` remains empty; no agents, personas, or decision logic execute for
 any role yet.
 
