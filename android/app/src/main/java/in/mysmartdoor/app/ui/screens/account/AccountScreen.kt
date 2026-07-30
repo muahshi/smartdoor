@@ -1,26 +1,41 @@
 package `in`.mysmartdoor.app.ui.screens.account
 
 import `in`.mysmartdoor.app.R
+import `in`.mysmartdoor.app.core.common.rememberWebLinkLauncher
+import `in`.mysmartdoor.app.core.config.PublicWebLinks
 import `in`.mysmartdoor.app.core.data.model.SettingsData
 import `in`.mysmartdoor.app.core.network.dto.PlateDto
 import `in`.mysmartdoor.app.core.network.dto.SubscriptionDto
+import `in`.mysmartdoor.app.navigation.Routes
+import `in`.mysmartdoor.app.ui.components.GlassCard
 import `in`.mysmartdoor.app.ui.components.SDAvatar
 import `in`.mysmartdoor.app.ui.components.SDBadge
 import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
+import `in`.mysmartdoor.app.ui.components.SDBottomNavigation
 import `in`.mysmartdoor.app.ui.components.SDCard
+import `in`.mysmartdoor.app.ui.components.SDDialog
 import `in`.mysmartdoor.app.ui.components.SDSectionHeader
+import `in`.mysmartdoor.app.ui.components.SDSkeletonLoaderGroup
 import `in`.mysmartdoor.app.ui.components.SDTopBar
 import `in`.mysmartdoor.app.ui.components.SmartDoorButton
 import `in`.mysmartdoor.app.ui.components.SmartDoorButtonVariant
 import `in`.mysmartdoor.app.ui.components.SmartDoorTextField
-import `in`.mysmartdoor.app.ui.screens.common.EmptyStateScreen
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
-import `in`.mysmartdoor.app.ui.screens.common.LoadingScreen
+import `in`.mysmartdoor.app.ui.screens.dashboard.dashboardBottomNavItems
+import `in`.mysmartdoor.app.ui.screens.settings.SettingsViewModel
+import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +46,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -57,19 +73,28 @@ import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
 /**
- * Account (Phase 8 — SETTINGS, ACCOUNT & DEVICE MANAGEMENT). Identity-
- * focused: Owner Profile, Plate Information, Subscription, Linked Device.
- * Toggles/preferences live on
- * [in.mysmartdoor.app.ui.screens.settings.SettingsScreen] instead —
- * Dashboard already treats "Settings" and "Account" as separate Quick
- * Actions.
+ * Profile (Phase 8 — SETTINGS, ACCOUNT & DEVICE MANAGEMENT; Phase 12B —
+ * PREMIUM SCREEN REBUILD). Identity-focused: Owner Profile header, plus a
+ * premium menu list — Subscription, Hardware, Notifications, Privacy,
+ * Help, Logout.
  *
  * Data comes entirely from [AccountViewModel] → the same
  * [in.mysmartdoor.app.core.data.SettingsRepository] read
  * [in.mysmartdoor.app.ui.screens.settings.SettingsScreen] uses — no
- * duplicate repository, no mock data. "Linked Device" has no separate
- * device table in production; the plate row itself is the device record
- * (see CTO audit), so its status/QR fields are shown directly from [PlateDto].
+ * duplicate repository, no mock data, no ViewModel changes this phase.
+ * "Hardware" has no separate device table in production; the plate row
+ * itself is the device record (see CTO audit), so its status/QR fields are
+ * shown directly from [PlateDto], same as before.
+ *
+ * The Notifications and Help rows navigate to
+ * [in.mysmartdoor.app.ui.screens.settings.SettingsScreen] — that is where
+ * the real notification-preference toggles and FAQ/support links already
+ * live; this screen doesn't duplicate that logic. Privacy opens the real
+ * Privacy Policy link via the same [rememberWebLinkLauncher] utility
+ * Settings already uses. Logout reuses [SettingsViewModel]'s existing,
+ * already-hardened logout flow (confirm dialog, blocking overlay, back-press
+ * guard) via a second instance of that same ViewModel scoped to this
+ * screen — no logout logic is re-implemented, only its UI is re-hosted here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,13 +104,16 @@ fun AccountScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val launchWebLink = rememberWebLinkLauncher()
 
-    // Phase 9: if a refresh fails while data is already on screen, surface
-    // it as a Snackbar instead of falling through to ErrorScreen — the
-    // existing `data != null` branch below already keeps showing
-    // AccountContent, this just adds the missing user-facing feedback.
-    // Initial-load failures (data == null) are untouched: ErrorScreen still
-    // owns that case below.
+    // Reused as-is from SettingsScreen — same ViewModel class, its own
+    // instance/state scoped to this screen's back-stack entry. Only the
+    // logout confirm/overlay/back-press wiring is duplicated here (UI only);
+    // requestLogout()/confirmLogout()/dismissLogoutConfirm() and the
+    // underlying AuthRepository call are the exact same production code.
+    val logoutViewModel: SettingsViewModel = hiltViewModel()
+    val logoutState by logoutViewModel.uiState.collectAsState()
+
     LaunchedEffect(uiState.isRefreshing, uiState.errorMessage) {
         val message = uiState.errorMessage
         if (!uiState.isRefreshing && message != null && uiState.data != null) {
@@ -93,10 +121,22 @@ fun AccountScreen(
         }
     }
 
+    BackHandler(enabled = logoutState.isLoggingOut) {
+        // Intentionally does nothing — see SettingsScreen's identical guard.
+    }
+
+    LaunchedEffect(logoutState.loggedOut) {
+        if (logoutState.loggedOut) {
+            navController.navigate(Routes.LOGIN) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             SDTopBar(
-                title = "Account",
+                title = "Profile",
                 actions = {
                     IconButton(onClick = { if (!uiState.isRefreshing) viewModel.refresh() }) {
                         if (uiState.isRefreshing) {
@@ -117,13 +157,33 @@ fun AccountScreen(
                 },
             )
         },
+        bottomBar = {
+            SDBottomNavigation(
+                items = dashboardBottomNavItems,
+                selectedRoute = Routes.ACCOUNT,
+                onItemSelected = { item ->
+                    if (item.route != Routes.ACCOUNT) {
+                        navController.navigate(item.route) { launchSingleTop = true }
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             val data = uiState.data
             when {
-                data != null -> AccountContent(data = data, uiState = uiState, viewModel = viewModel)
-                uiState.isLoading -> LoadingScreen(message = "Loading account…")
+                data != null -> AccountContent(
+                    data = data,
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    onNavigateSettings = { navController.navigate(Routes.SETTINGS) },
+                    onOpenPrivacyPolicy = { launchWebLink(PublicWebLinks.PRIVACY_POLICY) },
+                    onOpenFaq = { launchWebLink(PublicWebLinks.FAQ) },
+                    onEmailSupport = { launchWebLink("mailto:${PublicWebLinks.SUPPORT_EMAIL}") },
+                    onRequestLogout = logoutViewModel::requestLogout,
+                )
+                uiState.isLoading -> ProfileSkeleton()
                 uiState.errorMessage != null -> ErrorScreen(
                     message = uiState.errorMessage.orEmpty(),
                     onRetry = viewModel::load,
@@ -131,64 +191,75 @@ fun AccountScreen(
             }
         }
     }
+
+    if (logoutState.showLogoutConfirm) {
+        SDDialog(
+            title = "Log out?",
+            message = "You'll need your Plate ID and PIN to sign back in.",
+            confirmLabel = "Log Out",
+            onConfirmClick = logoutViewModel::confirmLogout,
+            onDismissRequest = logoutViewModel::dismissLogoutConfirm,
+            dismissLabel = "Cancel",
+            onDismissClick = logoutViewModel::dismissLogoutConfirm,
+            isDanger = true,
+        )
+    }
+
+    if (logoutState.isLoggingOut) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
 }
 
 @Composable
-private fun AccountContent(data: SettingsData, uiState: AccountUiState, viewModel: AccountViewModel) {
+private fun AccountContent(
+    data: SettingsData,
+    uiState: AccountUiState,
+    viewModel: AccountViewModel,
+    onNavigateSettings: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
+    onOpenFaq: () -> Unit,
+    onEmailSupport: () -> Unit,
+    onRequestLogout: () -> Unit,
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(SmartDoorSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.md),
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Owner Profile")
-                SDCard {
-                    OwnerProfileCard(data = data, uiState = uiState, viewModel = viewModel)
-                }
-            }
-        }
+        item { ProfileHeaderCard(data = data, uiState = uiState, viewModel = viewModel) }
 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Plate Information")
-                if (data.plate != null) {
-                    SDCard { PlateInfoCard(plate = data.plate) }
-                } else {
-                    EmptyStateScreen(
-                        modifier = Modifier.fillMaxWidth(),
-                        title = "No plate linked yet",
-                        subtitle = "Your Smart Door plate will show up here once it's provisioned.",
+                SDSectionHeader(title = "Account")
+                MenuListCard {
+                    SubscriptionMenuRow(subscription = data.subscription)
+                    MenuDivider()
+                    HardwareMenuRow(plate = data.plate)
+                    MenuDivider()
+                    NavMenuRow(
+                        iconRes = R.drawable.ic_bell,
+                        title = "Notifications",
+                        subtitle = "Quiet hours, sound, and alert preferences",
+                        onClick = onNavigateSettings,
                     )
-                }
-            }
-        }
-
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Subscription")
-                if (data.subscription != null) {
-                    SDCard { SubscriptionCard(subscription = data.subscription) }
-                } else {
-                    EmptyStateScreen(
-                        modifier = Modifier.fillMaxWidth(),
-                        title = "No active subscription",
-                        subtitle = "Hardware-only owners won't see a plan here — that's expected.",
+                    MenuDivider()
+                    NavMenuRow(
+                        iconRes = R.drawable.ic_shield,
+                        title = "Privacy",
+                        subtitle = "Read our Privacy Policy",
+                        onClick = onOpenPrivacyPolicy,
                     )
-                }
-            }
-        }
-
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Linked Device")
-                if (data.plate != null) {
-                    SDCard { LinkedDeviceCard(plate = data.plate) }
-                } else {
-                    EmptyStateScreen(
-                        modifier = Modifier.fillMaxWidth(),
-                        title = "No device linked yet",
-                    )
+                    MenuDivider()
+                    HelpMenuRow(onOpenFaq = onOpenFaq, onEmailSupport = onEmailSupport)
+                    MenuDivider()
+                    LogoutMenuRow(onClick = onRequestLogout)
                 }
             }
         }
@@ -196,134 +267,289 @@ private fun AccountContent(data: SettingsData, uiState: AccountUiState, viewMode
 }
 
 @Composable
-private fun OwnerProfileCard(data: SettingsData, uiState: AccountUiState, viewModel: AccountViewModel) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SDAvatar(name = data.owner.fullName, size = 48.dp)
-            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
-            Column(modifier = Modifier.weight(1f)) {
-                if (uiState.isEditingName) {
-                    var draftName by remember(uiState.isEditingName) { mutableStateOf(data.owner.fullName) }
-                    SmartDoorTextField(
-                        value = draftName,
-                        onValueChange = { draftName = it },
-                        label = "Full name",
-                        errorMessage = uiState.nameError,
-                    )
-                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
-                    Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
-                        SmartDoorButton(
-                            label = "Save",
-                            onClick = { viewModel.saveName(draftName) },
-                            isLoading = uiState.isSavingName,
-                            modifier = Modifier.weight(1f),
+private fun ProfileHeaderCard(data: SettingsData, uiState: AccountUiState, viewModel: AccountViewModel) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SDAvatar(name = data.owner.fullName, size = 64.dp)
+                Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+                Column(modifier = Modifier.weight(1f)) {
+                    if (uiState.isEditingName) {
+                        var draftName by remember(uiState.isEditingName) { mutableStateOf(data.owner.fullName) }
+                        SmartDoorTextField(
+                            value = draftName,
+                            onValueChange = { draftName = it },
+                            label = "Full name",
+                            errorMessage = uiState.nameError,
                         )
-                        SmartDoorButton(
-                            label = "Cancel",
-                            onClick = viewModel::cancelEditingName,
-                            variant = SmartDoorButtonVariant.Ghost,
-                            modifier = Modifier.weight(1f),
+                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+                        Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                            SmartDoorButton(
+                                label = "Save",
+                                onClick = { viewModel.saveName(draftName) },
+                                isLoading = uiState.isSavingName,
+                                modifier = Modifier.weight(1f),
+                            )
+                            SmartDoorButton(
+                                label = "Cancel",
+                                onClick = viewModel::cancelEditingName,
+                                variant = SmartDoorButtonVariant.Ghost,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = data.owner.fullName,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = data.owner.plateId,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = data.owner.phone,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                }
+                if (!uiState.isEditingName) {
+                    SmartDoorButton(label = "Edit", onClick = viewModel::startEditingName, variant = SmartDoorButtonVariant.Ghost)
+                }
+            }
+            data.owner.email?.let {
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+                InfoRow(label = "Email", value = it)
+            }
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+            InfoRow(label = "Registered", value = formatDate(data.owner.createdAt))
+        }
+    }
+}
+
+// ────────── Premium menu list ──────────
+
+@Composable
+private fun MenuListCard(content: @Composable ColumnScope.() -> Unit) {
+    SDCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+        Column(modifier = Modifier.padding(vertical = SmartDoorSpacing.xxs), content = content)
+    }
+}
+
+@Composable
+private fun MenuDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = SmartDoorSpacing.md)
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+    )
+}
+
+@Composable
+private fun MenuIconCircle(iconRes: Int, tint: androidx.compose.ui.graphics.Color) {
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .background(color = tint.copy(alpha = 0.14f), shape = CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = tint,
+        )
+    }
+}
+
+@Composable
+private fun SubscriptionMenuRow(subscription: SubscriptionDto?) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.clickable { expanded = !expanded }.padding(horizontal = SmartDoorSpacing.md, vertical = SmartDoorSpacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            MenuIconCircle(iconRes = R.drawable.ic_receipt, tint = SmartDoorSecondaryDark)
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+            Text(
+                text = "Subscription",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            if (subscription != null) {
+                SDBadge(
+                    text = subscription.status,
+                    status = if (subscription.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
+                )
+            } else {
+                Text(text = "None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
+            ChevronGlyph(expanded)
+        }
+        AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
+            Column(modifier = Modifier.padding(top = SmartDoorSpacing.xs, start = 46.dp)) {
+                if (subscription != null) {
+                    InfoRow(label = "Plan", value = subscription.plan)
+                    InfoRow(label = "Renews / Expires", value = formatDate(subscription.expiryDate))
                 } else {
                     Text(
-                        text = data.owner.fullName,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = data.owner.plateId,
+                        text = "Hardware-only owners won't see a plan here — that's expected.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            if (!uiState.isEditingName) {
-                SmartDoorButton(label = "Edit", onClick = viewModel::startEditingName, variant = SmartDoorButtonVariant.Ghost)
+        }
+    }
+}
+
+@Composable
+private fun HardwareMenuRow(plate: PlateDto?) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.clickable { expanded = !expanded }.padding(horizontal = SmartDoorSpacing.md, vertical = SmartDoorSpacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            MenuIconCircle(iconRes = R.drawable.ic_plug, tint = SmartDoorSecondaryDark)
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+            Text(
+                text = "Hardware",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            if (plate != null) {
+                SDBadge(text = plate.status, status = plateStatusBadge(plate.status))
+            } else {
+                Text(text = "None", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
+            ChevronGlyph(expanded)
+        }
+        AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
+            Column(modifier = Modifier.padding(top = SmartDoorSpacing.xs, start = 46.dp)) {
+                if (plate != null) {
+                    InfoRow(label = "Plate ID", value = plate.plateId)
+                    plate.productType?.let { InfoRow(label = "Product Type", value = it) }
+                    plate.expiryDate?.let { InfoRow(label = "Expires", value = formatDate(it)) }
+                    val qrProvisioned = plate.qrSlug.isNotBlank()
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            text = "QR Status",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        SDBadge(
+                            text = if (qrProvisioned) "Active" else "Not Provisioned",
+                            status = if (qrProvisioned) SDBadgeStatus.Success else SDBadgeStatus.Warning,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "No device linked yet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-        Spacer(modifier = Modifier.height(SmartDoorSpacing.sm))
-        InfoRow(label = "Registered Mobile", value = data.owner.phone)
-        data.owner.email?.let { InfoRow(label = "Email", value = it) }
-        InfoRow(label = "Registration Date", value = formatDate(data.owner.createdAt))
     }
 }
 
 @Composable
-private fun PlateInfoCard(plate: PlateDto) {
-    Column {
-        InfoRow(label = "Plate ID", value = plate.plateId)
-        plate.productType?.let { InfoRow(label = "Product Type", value = it) }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+private fun HelpMenuRow(onOpenFaq: () -> Unit, onEmailSupport: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.clickable { expanded = !expanded }.padding(horizontal = SmartDoorSpacing.md, vertical = SmartDoorSpacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            MenuIconCircle(iconRes = R.drawable.ic_help, tint = SmartDoorSecondaryDark)
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
             Text(
-                text = "Status",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = "Help",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
             )
-            SDBadge(text = plate.status, status = plateStatusBadge(plate.status))
+            ChevronGlyph(expanded)
         }
-        plate.expiryDate?.let { InfoRow(label = "Expires", value = formatDate(it)) }
+        AnimatedVisibility(visible = expanded, enter = expandVertically(), exit = shrinkVertically()) {
+            Column(
+                modifier = Modifier.padding(top = SmartDoorSpacing.xs, start = 46.dp),
+                verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
+            ) {
+                Text(
+                    text = "FAQ",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SmartDoorSecondaryDark,
+                    modifier = Modifier.clickable(onClick = onOpenFaq),
+                )
+                Text(
+                    text = "Email Support",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = SmartDoorSecondaryDark,
+                    modifier = Modifier.clickable(onClick = onEmailSupport),
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun SubscriptionCard(subscription: SubscriptionDto) {
-    Column {
-        InfoRow(label = "Plan", value = subscription.plan)
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "Status",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SDBadge(
-                text = subscription.status,
-                status = if (subscription.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
-            )
+private fun NavMenuRow(iconRes: Int, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = SmartDoorSpacing.md, vertical = SmartDoorSpacing.sm),
+    ) {
+        MenuIconCircle(iconRes = iconRes, tint = SmartDoorSecondaryDark)
+        Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        InfoRow(label = "Renews / Expires", value = formatDate(subscription.expiryDate))
+        Icon(
+            painter = painterResource(id = R.drawable.ic_chevron_right),
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
-private fun LinkedDeviceCard(plate: PlateDto) {
-    // Per CTO audit: there is no separate "device" table in production —
-    // the plate row itself is the device record. QR status is derived from
-    // whether a qr_slug has been provisioned for this plate.
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "Plate Status",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SDBadge(text = plate.status, status = plateStatusBadge(plate.status))
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "QR Status",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val qrProvisioned = plate.qrSlug.isNotBlank()
-            SDBadge(
-                text = if (qrProvisioned) "Active" else "Not Provisioned",
-                status = if (qrProvisioned) SDBadgeStatus.Success else SDBadgeStatus.Warning,
-            )
-        }
+private fun LogoutMenuRow(onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = SmartDoorSpacing.md, vertical = SmartDoorSpacing.sm),
+    ) {
+        MenuIconCircle(iconRes = R.drawable.ic_logout, tint = SmartDoorDanger)
+        Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+        Text(
+            text = "Logout",
+            style = MaterialTheme.typography.bodyLarge,
+            color = SmartDoorDanger,
+            modifier = Modifier.weight(1f),
+        )
     }
+}
+
+@Composable
+private fun ChevronGlyph(expanded: Boolean) {
+    Icon(
+        painter = painterResource(id = if (expanded) R.drawable.ic_close else R.drawable.ic_chevron_right),
+        contentDescription = null,
+        modifier = Modifier.size(16.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -334,6 +560,19 @@ private fun InfoRow(label: String, value: String) {
     ) {
         Text(text = label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(text = value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun ProfileSkeleton() {
+    Column(modifier = Modifier.fillMaxSize().padding(SmartDoorSpacing.md)) {
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            SDSkeletonLoaderGroup(lineCount = 3)
+        }
+        Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
+        SDCard(modifier = Modifier.fillMaxWidth()) {
+            SDSkeletonLoaderGroup(lineCount = 4)
+        }
     }
 }
 

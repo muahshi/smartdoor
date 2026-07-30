@@ -2,6 +2,7 @@ package `in`.mysmartdoor.app.ui.screens.messages
 
 import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.network.dto.ConversationDto
+import `in`.mysmartdoor.app.ui.components.GlassCard
 import `in`.mysmartdoor.app.ui.components.SDAvatar
 import `in`.mysmartdoor.app.ui.components.SDBadge
 import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
@@ -12,8 +13,10 @@ import `in`.mysmartdoor.app.ui.components.SDSkeletonLoaderGroup
 import `in`.mysmartdoor.app.ui.components.SDTopBar
 import `in`.mysmartdoor.app.ui.screens.common.EmptyStateScreen
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
+import `in`.mysmartdoor.app.ui.theme.SmartDoorInfo
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,6 +46,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,34 +58,26 @@ import java.time.Instant
 import java.time.OffsetDateTime
 
 /**
- * Messages Inbox (Phase 6 — MESSAGES V2).
+ * Messages Inbox (Phase 6 — MESSAGES V2; Phase 12B — PREMIUM SCREEN REBUILD).
  *
  * Data comes entirely from [MessagesViewModel] → [in.mysmartdoor.app.core.data.MessagesRepository],
  * which reads the existing production `conversations` / `messages` tables
  * (the same backend the website's Inbox tab already uses) — no mock data,
- * no new backend. Built entirely on existing design-system components
- * ([SDTopBar], [SDSearchBar], [SDChip], [SDCard], [SDAvatar], [SDBadge],
- * [SDSkeletonLoaderGroup], [EmptyStateScreen], [ErrorScreen]), matching
- * [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]'s structure.
+ * no new backend, no ViewModel/repository changes this phase. Visual-only
+ * upgrade built entirely on existing design-system components
+ * ([SDTopBar], [SDSearchBar], [SDChip], [GlassCard], [SDCard], [SDAvatar],
+ * [SDBadge], [SDSkeletonLoaderGroup], [EmptyStateScreen], [ErrorScreen]).
  *
- * Per CTO direction: initial load + pull-to-refresh only (no Realtime
- * subscription this phase — the refresh icon in [SDTopBar] is the refresh
- * mechanism, same pattern [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]
- * already uses; no swipe-refresh dependency exists in this project).
+ * The new "AI Summary" highlight card surfaces the most recent conversation
+ * that already has a real [ConversationDto.aiSummary] populated by the
+ * production AI pipeline — it is never generated/invented client-side, and
+ * it quietly disappears when no conversation in the current filtered list
+ * has one, or while the owner is actively searching/filtering.
  *
  * There is no visitor name/phone anywhere in this system (see
  * [in.mysmartdoor.app.core.network.dto.ConversationDto]'s doc comment), so
  * each [MessageConversationCard] identifies a thread by its owner-authored
  * tag / handled-by state / plate ID instead of a fabricated name.
- *
- * FUTURE-READY, NOT IMPLEMENTED (per CTO direction — architecture only):
- * AI Smart Reply, Voice Messages, Attachments, Translation, and
- * Conversation Summary all already have a real backing field on
- * [ConversationDto] ([ConversationDto.aiSummary], `messages.message_type`
- * 'voice' on the row-level DTO, etc.) or a natural extension point on this
- * screen (a thread-detail screen navigated to from [MessageConversationCard]),
- * without this phase wiring any of it up. No backend/API for these is
- * called from here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +138,7 @@ private fun MessagesContent(
             SDSearchBar(
                 value = uiState.searchQuery,
                 onValueChange = onSearchQueryChange,
-                placeholder = "Search messages",
+                placeholder = "Search messages, tags, plate",
                 onClear = { onSearchQueryChange("") },
             )
             Spacer(modifier = Modifier.height(SmartDoorSpacing.sm))
@@ -172,14 +169,81 @@ private fun MessagesContent(
                 title = "No messages yet",
                 subtitle = "Conversations with visitors — text, voice, or AI-handled — will show up here.",
             )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(SmartDoorSpacing.md),
-                verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
-            ) {
-                items(uiState.items, key = { it.id }) { entry ->
-                    MessageConversationCard(entry)
+            else -> {
+                val highlight = if (uiState.searchQuery.isBlank() && uiState.selectedFilter == MessagesFilter.All) {
+                    uiState.items.firstOrNull { !it.aiSummary.isNullOrBlank() }
+                } else {
+                    null
                 }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = SmartDoorSpacing.md,
+                        end = SmartDoorSpacing.md,
+                        top = SmartDoorSpacing.xs,
+                        bottom = SmartDoorSpacing.lg,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
+                ) {
+                    if (highlight != null) {
+                        item(key = "ai_summary_${highlight.id}") {
+                            AiSummaryCard(highlight)
+                            Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+                        }
+                    }
+                    items(uiState.items, key = { it.id }) { entry ->
+                        MessageConversationCard(entry)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Premium highlight card — surfaces the most recent conversation's real, backend-generated AI summary. */
+@Composable
+private fun AiSummaryCard(entry: ConversationDto) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(SmartDoorInfo.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_bot),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = SmartDoorInfo,
+                )
+            }
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "AI Summary",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+                    Text(
+                        text = formatRelativeTime(entry.lastMessageAt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+                Text(
+                    text = entry.aiSummary.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -192,7 +256,7 @@ private fun MessageConversationCard(entry: ConversationDto) {
 
     SDCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SDAvatar(name = threadLabel)
+            SDAvatar(name = threadLabel, size = 44.dp)
             Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -217,17 +281,18 @@ private fun MessageConversationCard(entry: ConversationDto) {
                 Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
                 Text(
                     text = entry.lastMessagePreview?.takeIf { it.isNotBlank() } ?: "No messages yet",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+                Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
                     handledByBadge(entry.handledBy)
                     statusBadge(entry.status)
                 }
             }
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = formatRelativeTime(entry.lastMessageAt),
@@ -251,7 +316,6 @@ private fun handledByBadge(handledBy: String) {
         else -> return
     }
     SDBadge(text = label, status = status)
-    Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
 }
 
 @Composable

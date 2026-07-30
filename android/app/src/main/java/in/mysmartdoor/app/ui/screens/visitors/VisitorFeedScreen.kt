@@ -2,19 +2,28 @@ package `in`.mysmartdoor.app.ui.screens.visitors
 
 import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.network.dto.VisitorActivityDto
+import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.SDAvatar
 import `in`.mysmartdoor.app.ui.components.SDBadge
 import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
-import `in`.mysmartdoor.app.ui.components.SDCard
+import `in`.mysmartdoor.app.ui.components.SDBottomNavigation
 import `in`.mysmartdoor.app.ui.components.SDChip
 import `in`.mysmartdoor.app.ui.components.SDSearchBar
 import `in`.mysmartdoor.app.ui.components.SDSectionHeader
 import `in`.mysmartdoor.app.ui.components.SDSkeletonLoaderGroup
 import `in`.mysmartdoor.app.ui.components.SDTopBar
+import `in`.mysmartdoor.app.ui.components.GlassCard
 import `in`.mysmartdoor.app.ui.screens.common.EmptyStateScreen
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
+import `in`.mysmartdoor.app.ui.screens.dashboard.dashboardBottomNavItems
+import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
+import `in`.mysmartdoor.app.ui.theme.SmartDoorInfo
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccess
+import `in`.mysmartdoor.app.ui.theme.SmartDoorWarning
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +42,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,6 +58,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,19 +72,28 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 
 /**
- * Visitors Timeline (Phase 4 — VISITORS V2).
+ * Visitors Timeline (Phase 4 — VISITORS V2; Phase 12B — PREMIUM SCREEN REBUILD).
  *
  * Data comes entirely from [VisitorFeedViewModel] → [in.mysmartdoor.app.core.data.VisitorRepository],
  * which reads the existing `get_owner_activity_feed` RPC — no mock data,
- * no new backend. Built entirely on Phase 1/2 design-system components
- * ([SDTopBar], [SDSearchBar], [SDChip], [SDCard], [SDAvatar], [SDBadge],
- * [SDSkeletonLoaderGroup], [EmptyStateScreen], [ErrorScreen]).
+ * no new backend, no ViewModel/repository changes this phase. Visual-only
+ * upgrade built entirely on existing design-system components ([SDTopBar],
+ * [SDSearchBar], [SDChip], [GlassCard], [SDAvatar], [SDBadge],
+ * [SDBottomNavigation], [SDSkeletonLoaderGroup], [EmptyStateScreen],
+ * [ErrorScreen]).
  *
  * Per CTO direction: no image-loading library is added this phase. Even
  * though [VisitorActivityDto.photoUrl] may be non-null, every row renders
  * an [SDAvatar] initials glyph — the architecture (the field is already
  * modeled end-to-end) is ready for a future phase to swap in a real image
- * once an image-loading dependency is approved.
+ * once an image-loading dependency is approved. The premium avatar "ring"
+ * added this phase is a pure status-color border around the existing
+ * initials glyph, not a photo.
+ *
+ * "Delivery status" (per the Phase 12B brief) is rendered from the real
+ * [VisitorActivityDto.label]/[VisitorActivityDto.labelColor] fields — the
+ * same owner-assigned label the production backend already stores per
+ * visitor entry — never a fabricated delivery state.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,6 +135,17 @@ fun VisitorFeedScreen(
                                 tint = SmartDoorSecondaryDark,
                             )
                         }
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            SDBottomNavigation(
+                items = dashboardBottomNavItems,
+                selectedRoute = Routes.VISITOR_FEED,
+                onItemSelected = { item ->
+                    if (item.route != Routes.VISITOR_FEED) {
+                        navController.navigate(item.route) { launchSingleTop = true }
                     }
                 },
             )
@@ -180,7 +211,12 @@ private fun VisitorFeedContent(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(SmartDoorSpacing.md),
+                    contentPadding = PaddingValues(
+                        start = SmartDoorSpacing.md,
+                        end = SmartDoorSpacing.md,
+                        top = SmartDoorSpacing.xs,
+                        bottom = SmartDoorSpacing.lg,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
                 ) {
                     grouped.forEach { (dayLabel, entries) ->
@@ -211,11 +247,20 @@ private fun VisitorFeedContent(
     }
 }
 
+/** Premium visitor row — status-ring avatar, badge row (status/label/delivery/favorite/blocked), relative time + duration. */
 @Composable
 private fun VisitorCard(entry: VisitorActivityDto) {
-    SDCard(modifier = Modifier.fillMaxWidth()) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SDAvatar(name = entry.visitorName ?: entry.phone ?: "?")
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .border(width = 2.dp, color = statusRingColor(entry.callStatus), shape = CircleShape)
+                    .padding(3.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                SDAvatar(name = entry.visitorName ?: entry.phone ?: "?", size = 44.dp)
+            }
             Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -226,16 +271,15 @@ private fun VisitorCard(entry: VisitorActivityDto) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs),
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState()),
+                ) {
                     statusBadge(entry.callStatus)
-                    if (entry.isFavorite) {
-                        Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
-                        SDBadge(text = "★ Favorite", status = SDBadgeStatus.Warning)
-                    }
-                    if (entry.blocked) {
-                        Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
-                        SDBadge(text = "Blocked", status = SDBadgeStatus.Danger)
-                    }
+                    labelBadge(entry.label, entry.labelColor)
+                    if (entry.isFavorite) SDBadge(text = "★ Favorite", status = SDBadgeStatus.Warning)
+                    if (entry.blocked) SDBadge(text = "Blocked", status = SDBadgeStatus.Danger)
                 }
                 if (entry.visitCount > 1) {
                     Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
@@ -246,6 +290,7 @@ private fun VisitorCard(entry: VisitorActivityDto) {
                     )
                 }
             }
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = formatRelativeTime(entry.createdAt),
@@ -265,6 +310,39 @@ private fun VisitorCard(entry: VisitorActivityDto) {
     }
 }
 
+/** Owner-assigned label (e.g. "Delivery", "Guest") shown from real [VisitorActivityDto.label]/[VisitorActivityDto.labelColor] data — never invented. */
+@Composable
+private fun labelBadge(label: String?, labelColor: String?) {
+    if (label.isNullOrBlank()) return
+    val dotColor = parseHexColorOrNull(labelColor) ?: SmartDoorInfo
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .background(color = dotColor, shape = CircleShape),
+        )
+        Spacer(modifier = Modifier.width(3.dp))
+        SDBadge(text = label, status = SDBadgeStatus.Info)
+    }
+}
+
+private fun parseHexColorOrNull(hex: String?): Color? {
+    if (hex.isNullOrBlank()) return null
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (e: IllegalArgumentException) {
+        null
+    }
+}
+
+private fun statusRingColor(callStatus: String?): Color = when (callStatus) {
+    "connected" -> SmartDoorSuccess
+    "missed" -> SmartDoorWarning
+    "rejected" -> SmartDoorDanger
+    "incoming" -> SmartDoorInfo
+    else -> SmartDoorSecondaryDark
+}
+
 @Composable
 private fun statusBadge(callStatus: String?) {
     val (label, status) = when (callStatus) {
@@ -282,7 +360,7 @@ private fun statusBadge(callStatus: String?) {
 private fun VisitorFeedSkeleton() {
     Column(modifier = Modifier.fillMaxSize().padding(SmartDoorSpacing.md)) {
         repeat(6) {
-            SDCard(modifier = Modifier.fillMaxWidth().padding(bottom = SmartDoorSpacing.sm)) {
+            GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = SmartDoorSpacing.sm)) {
                 SDSkeletonLoaderGroup(lineCount = 2)
             }
         }

@@ -5,9 +5,11 @@ import `in`.mysmartdoor.app.core.data.model.AiReceptionistData
 import `in`.mysmartdoor.app.core.network.dto.AiCallScreeningDto
 import `in`.mysmartdoor.app.core.network.dto.AiCategoryBreakdownDto
 import `in`.mysmartdoor.app.core.network.dto.AiReceptionistInsightsDto
+import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.GlassCard
 import `in`.mysmartdoor.app.ui.components.SDBadge
 import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
+import `in`.mysmartdoor.app.ui.components.SDBottomNavigation
 import `in`.mysmartdoor.app.ui.components.SDCard
 import `in`.mysmartdoor.app.ui.components.SDSectionHeader
 import `in`.mysmartdoor.app.ui.components.SDSkeletonLoaderGroup
@@ -15,11 +17,17 @@ import `in`.mysmartdoor.app.ui.components.SDStatCard
 import `in`.mysmartdoor.app.ui.components.SDTopBar
 import `in`.mysmartdoor.app.ui.screens.common.EmptyStateScreen
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
+import `in`.mysmartdoor.app.ui.screens.dashboard.dashboardBottomNavItems
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
+import `in`.mysmartdoor.app.ui.theme.SmartDoorMotion
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccess
 import `in`.mysmartdoor.app.ui.theme.SmartDoorWarning
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,35 +68,41 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import kotlin.math.roundToInt
 
 /**
- * AI Receptionist (Phase 7 — AI RECEPTIONIST V2).
+ * AI Receptionist (Phase 7 — AI RECEPTIONIST V2; Phase 12B — PREMIUM SCREEN REBUILD).
  *
  * Data comes entirely from [AiReceptionistViewModel] →
  * [in.mysmartdoor.app.core.data.AiReceptionistRepository], which reads the
  * exact same production backend the website's AI Receptionist surfaces
  * already use (`security_rules.current_status`, the
  * `get_ai_receptionist_insights` RPC, `ai_call_screenings`) — no mock data,
- * no new backend. Built entirely on existing design-system components
+ * no new backend, no ViewModel/repository changes this phase. Visual-only
+ * upgrade built entirely on existing design-system components
  * ([SDTopBar], [GlassCard], [SDStatCard], [SDCard], [SDBadge],
- * [SDSectionHeader], [SDSkeletonLoaderGroup], [EmptyStateScreen],
- * [ErrorScreen]), matching [in.mysmartdoor.app.ui.screens.messages.MessagesScreen]'s
- * structure.
+ * [SDBottomNavigation], [SDSectionHeader], [SDSkeletonLoaderGroup],
+ * [EmptyStateScreen], [ErrorScreen]).
  *
- * Every section hides gracefully when its backing data is null/empty
- * (owner status, insights, recent activity each degrade independently —
- * see [AiReceptionistData]) rather than showing a fake status or invented
- * numbers, per CTO direction.
+ * "Today's conversations" and "AI success rate" (per the Phase 12B brief)
+ * are both derived from real data already on [AiReceptionistData]: the
+ * former is a client-side count of [AiReceptionistData.recentActivity]
+ * entries whose `created_at` falls on today's date (same date-parsing
+ * approach [in.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen]
+ * already uses to group its own feed by day); the latter is
+ * [AiReceptionistInsightsDto]'s existing `avgConfidence`, already computed
+ * server-side and already rendered elsewhere on this screen. Neither is a
+ * new query. The waveform under the AI avatar is a purely decorative
+ * "listening" animation (no data behind it, like [in.mysmartdoor.app.ui.screens.dashboard.DashboardScreen]'s
+ * existing live-activity pulse) shown only while the AI is actually
+ * available to take calls.
  *
- * FUTURE READY, NOT IMPLEMENTED (per CTO direction — architecture only):
- * Voice AI, Video AI, Visitor Consent, Face Verification, Smart Delivery,
- * AI Learning, and Multi-language AI have no UI or backend call here. The
- * activity timeline's [AiActivityCard] is already the natural extension
- * point for a future detail/transcript screen (tap-through), and
- * [AiReceptionistData] documents the same for the repository layer — none
- * of it is wired up this phase.
+ * Every section still hides gracefully when its backing data is null/empty
+ * (owner status, insights, recent activity each degrade independently)
+ * rather than showing a fake status or invented numbers, per CTO direction.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +132,17 @@ fun AiReceptionistScreen(
                                 tint = SmartDoorSecondaryDark,
                             )
                         }
+                    }
+                },
+            )
+        },
+        bottomBar = {
+            SDBottomNavigation(
+                items = dashboardBottomNavItems,
+                selectedRoute = Routes.AI_RECEPTIONIST,
+                onItemSelected = { item ->
+                    if (item.route != Routes.AI_RECEPTIONIST) {
+                        navController.navigate(item.route) { launchSingleTop = true }
                     }
                 },
             )
@@ -151,13 +177,21 @@ private fun AiReceptionistContent(data: AiReceptionistData, onRetry: () -> Unit)
         return
     }
 
+    val todayCount = remember(data.recentActivity) { countToday(data.recentActivity) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(SmartDoorSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.md),
     ) {
         if (data.ownerStatus != null) {
-            item { AiStatusHero(status = data.ownerStatus) }
+            item {
+                AiAvatarHero(
+                    status = data.ownerStatus,
+                    todayCount = todayCount,
+                    successRatePct = insights?.let { (it.quality.avgConfidence * 100).roundToInt() },
+                )
+            }
         }
 
         if (insights != null) {
@@ -187,7 +221,7 @@ private fun AiReceptionistContent(data: AiReceptionistData, onRetry: () -> Unit)
     }
 }
 
-// ────────── AI Status hero ──────────
+// ────────── Premium AI avatar hero ──────────
 
 private data class StatusPresentation(val label: String, val color: Color)
 
@@ -198,34 +232,107 @@ private fun presentStatus(status: String): StatusPresentation = when (status) {
     else -> StatusPresentation("AI Active · Custom", SmartDoorSecondaryDark)
 }
 
+/** Premium AI avatar + status + waveform + "Today's conversations"/"AI Success Rate" stats, all from real data. */
 @Composable
-private fun AiStatusHero(status: String) {
+private fun AiAvatarHero(status: String, todayCount: Int, successRatePct: Int?) {
     val presentation = presentStatus(status)
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(presentation.color),
-            )
-            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
-            Column {
-                Text(
-                    text = presentation.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(presentation.color.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_bot),
+                        contentDescription = null,
+                        modifier = Modifier.size(30.dp),
+                        tint = presentation.color,
+                    )
+                }
+                Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(presentation.color),
+                        )
+                        Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
+                        Text(
+                            text = presentation.label,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Text(
+                        text = "Screening visitor calls before they reach you",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (status == "available") {
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.sm))
+                AiWaveform(color = presentation.color)
+            }
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs)) {
+                SDStatCard(
+                    label = "Today's Conversations",
+                    value = todayCount.toString(),
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = "Screening visitor calls before they reach you",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (successRatePct != null) {
+                    SDStatCard(
+                        label = "AI Success Rate",
+                        value = "$successRatePct%",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
 }
+
+/** Purely decorative "listening" waveform — no data behind it, same spirit as [in.mysmartdoor.app.ui.screens.dashboard.DashboardScreen]'s pulsing live dot. */
+@Composable
+private fun AiWaveform(color: Color) {
+    val transition = rememberInfiniteTransition(label = "ai_waveform")
+    val durations = listOf(520, 680, 460, 720, 560)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.height(28.dp),
+    ) {
+        durations.forEach { duration ->
+            val scale by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = duration, easing = SmartDoorMotion.standard),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "ai_waveform_bar",
+            )
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeightFraction(scale)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(color.copy(alpha = 0.85f)),
+            )
+        }
+    }
+}
+
+private fun Modifier.fillMaxHeightFraction(fraction: Float): Modifier =
+    this.height((28 * fraction.coerceIn(0.15f, 1f)).dp)
 
 // ────────── AI Quality ──────────
 
@@ -370,9 +477,8 @@ private fun AiActivityCard(entry: AiCallScreeningDto) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
-                Row {
+                Row(horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
                     suggestedActionBadge(entry.suggestedAction)
-                    Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
                     priorityBadge(entry.priority)
                 }
             }
@@ -418,6 +524,18 @@ private fun AiReceptionistSkeleton() {
             SDCard(modifier = Modifier.fillMaxWidth().padding(bottom = SmartDoorSpacing.sm)) {
                 SDSkeletonLoaderGroup(lineCount = 2)
             }
+        }
+    }
+}
+
+/** Client-side count of activity created "today" (device-local date) — same date-grouping approach VisitorFeedScreen uses. */
+private fun countToday(activity: List<AiCallScreeningDto>): Int {
+    val today = LocalDate.now()
+    return activity.count { entry ->
+        try {
+            OffsetDateTime.parse(entry.createdAt).atZoneSameInstant(ZoneId.systemDefault()).toLocalDate() == today
+        } catch (e: Exception) {
+            false
         }
     }
 }
