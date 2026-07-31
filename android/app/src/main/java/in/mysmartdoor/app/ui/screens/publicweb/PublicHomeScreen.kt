@@ -125,6 +125,7 @@ fun PublicHomeScreen(navController: NavHostController? = null) {
                                 onClick = { openWebLink(PublicWebLinks.PRODUCTS) },
                                 modifier = Modifier.fillMaxWidth(),
                                 variant = SmartDoorButtonVariant.Primary,
+                                leadingIconRes = R.drawable.ic_cart,
                             )
 
                             SmartDoorButton(
@@ -132,6 +133,7 @@ fun PublicHomeScreen(navController: NavHostController? = null) {
                                 onClick = { openWebLink(PublicWebLinks.FEATURES) },
                                 modifier = Modifier.fillMaxWidth(),
                                 variant = SmartDoorButtonVariant.Secondary,
+                                leadingIconRes = R.drawable.ic_bot,
                             )
 
                             SmartDoorButton(
@@ -139,6 +141,7 @@ fun PublicHomeScreen(navController: NavHostController? = null) {
                                 onClick = { openWebLink(PublicWebLinks.PRICING) },
                                 modifier = Modifier.fillMaxWidth(),
                                 variant = SmartDoorButtonVariant.Secondary,
+                                leadingIconRes = R.drawable.ic_receipt,
                             )
 
                             SmartDoorButton(
@@ -146,6 +149,7 @@ fun PublicHomeScreen(navController: NavHostController? = null) {
                                 onClick = { openWebLink(PublicWebLinks.FAQ) },
                                 modifier = Modifier.fillMaxWidth(),
                                 variant = SmartDoorButtonVariant.Ghost,
+                                leadingIconRes = R.drawable.ic_help,
                             )
 
                             SmartDoorButton(
@@ -153,6 +157,7 @@ fun PublicHomeScreen(navController: NavHostController? = null) {
                                 onClick = { openWebLink(PublicWebLinks.HOME) },
                                 modifier = Modifier.fillMaxWidth(),
                                 variant = SmartDoorButtonVariant.Ghost,
+                                leadingIconRes = R.drawable.ic_web,
                             )
                         }
                     }

@@ -470,6 +470,7 @@ private fun ExploreSection(
                 onClick = onExploreClick,
                 modifier = Modifier.fillMaxWidth().testTag("login_explore_button"),
                 variant = SmartDoorButtonVariant.Secondary,
+                leadingIconRes = R.drawable.ic_home,
             )
 
             SmartDoorButton(
@@ -477,6 +478,7 @@ private fun ExploreSection(
                 onClick = onAiReceptionistDemoClick,
                 modifier = Modifier.fillMaxWidth(),
                 variant = SmartDoorButtonVariant.Ghost,
+                leadingIconRes = R.drawable.ic_bot,
             )
 
             SmartDoorButton(
@@ -484,6 +486,7 @@ private fun ExploreSection(
                 onClick = onBuyClick,
                 modifier = Modifier.fillMaxWidth(),
                 variant = SmartDoorButtonVariant.Ghost,
+                leadingIconRes = R.drawable.ic_cart,
             )
 
             SmartDoorButton(
@@ -491,6 +494,7 @@ private fun ExploreSection(
                 onClick = onVisitWebsiteClick,
                 modifier = Modifier.fillMaxWidth(),
                 variant = SmartDoorButtonVariant.Ghost,
+                leadingIconRes = R.drawable.ic_web,
             )
         }
     }

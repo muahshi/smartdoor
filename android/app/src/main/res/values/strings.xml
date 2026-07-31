@@ -35,18 +35,18 @@
          Every action besides "Explore" opens the existing production
          website (mysmartdoor.in) — no native catalog/commerce. -->
     <string name="login_explore_section_title">New to My Smart Door?</string>
-    <string name="login_explore_button">🏠 Explore My Smart Door</string>
-    <string name="login_ai_receptionist_demo_button">🤖 Watch AI Receptionist Demo</string>
-    <string name="login_buy_button">🛒 Buy Smart Door</string>
-    <string name="login_visit_website_button">🌐 Visit Website</string>
+    <string name="login_explore_button">Explore My Smart Door</string>
+    <string name="login_ai_receptionist_demo_button">Watch AI Receptionist Demo</string>
+    <string name="login_buy_button">Buy Smart Door</string>
+    <string name="login_visit_website_button">Visit Website</string>
 
     <string name="public_home_wordmark">My Smart Door</string>
     <string name="public_home_tagline">India\'s 1st Smart Nameplate System</string>
     <string name="public_home_section_title">Explore My Smart Door</string>
-    <string name="public_home_buy_button">🛒 Buy Smart Door</string>
-    <string name="public_home_features_button">🤖 AI Receptionist &amp; Features</string>
-    <string name="public_home_pricing_button">💰 Pricing</string>
-    <string name="public_home_faq_button">❓ FAQ</string>
-    <string name="public_home_visit_website_button">🌐 Visit Website</string>
+    <string name="public_home_buy_button">Buy Smart Door</string>
+    <string name="public_home_features_button">AI Receptionist &amp; Features</string>
+    <string name="public_home_pricing_button">Pricing</string>
+    <string name="public_home_faq_button">FAQ</string>
+    <string name="public_home_visit_website_button">Visit Website</string>
     <string name="public_home_back_to_login_button">Already have a Smart Door? Login</string>
 </resources>

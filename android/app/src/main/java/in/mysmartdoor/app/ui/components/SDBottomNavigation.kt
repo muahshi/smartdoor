@@ -1,5 +1,9 @@
 package `in`.mysmartdoor.app.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -9,9 +13,11 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import `in`.mysmartdoor.app.ui.theme.SmartDoorGlassBorder
 import `in`.mysmartdoor.app.ui.theme.SmartDoorOnSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSurfaceDark
@@ -49,12 +55,19 @@ fun SDBottomNavigation(
     modifier: Modifier = Modifier,
 ) {
     NavigationBar(
-        modifier = modifier,
+        modifier = modifier.border(
+            border = BorderStroke(width = 1.dp, color = SmartDoorGlassBorder),
+        ),
         containerColor = SmartDoorSurfaceDark,
         tonalElevation = 0.dp,
     ) {
         items.forEach { item ->
             val selected = item.route == selectedRoute
+            val iconScale by animateFloatAsState(
+                targetValue = if (selected) 1f else 0.9f,
+                animationSpec = spring(dampingRatio = 0.6f),
+                label = "nav_icon_scale",
+            )
             NavigationBarItem(
                 selected = selected,
                 onClick = { onItemSelected(item) },
@@ -63,12 +76,12 @@ fun SDBottomNavigation(
                         item.icon != null -> Icon(
                             imageVector = item.icon,
                             contentDescription = item.label,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(22.dp).scale(iconScale),
                         )
                         item.iconRes != null -> Icon(
                             painter = painterResource(id = item.iconRes),
                             contentDescription = item.label,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(22.dp).scale(iconScale),
                         )
                     }
                 },

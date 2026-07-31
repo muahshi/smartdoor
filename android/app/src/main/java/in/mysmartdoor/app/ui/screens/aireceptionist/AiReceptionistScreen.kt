@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -483,10 +484,15 @@ private fun AiActivityCard(entry: AiCallScreeningDto) {
                     priorityBadge(entry.priority)
                 }
             }
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
             Text(
                 text = formatRelativeTime(entry.createdAt),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                modifier = Modifier.widthIn(max = 72.dp),
             )
         }
     }

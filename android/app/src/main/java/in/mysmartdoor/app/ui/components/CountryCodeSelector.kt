@@ -30,7 +30,7 @@ data class CountryCode(
     val dialCode: String,
     val displayName: String,
 ) {
-    /** e.g. "🇮🇳 +91" shown in the collapsed field. */
+    /** e.g. "IN  +91" shown in the collapsed field. */
     val label: String get() = "$isoCode  $dialCode"
 }
 

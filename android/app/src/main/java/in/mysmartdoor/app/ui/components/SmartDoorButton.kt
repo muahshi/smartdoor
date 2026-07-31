@@ -1,17 +1,23 @@
 package `in`.mysmartdoor.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import `in`.mysmartdoor.app.ui.theme.SmartDoorOnSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
@@ -42,6 +48,12 @@ enum class SmartDoorButtonVariant {
  * [isLoading] shows an inline spinner in place of [label] and forces
  * [enabled] to false while true — callers don't need to separately disable
  * the button during an in-flight action.
+ *
+ * [leadingIconRes] is an optional drawable-resource glyph rendered before
+ * [label] — the premium-design replacement for the raw emoji characters
+ * that used to be baked directly into button label strings (house/robot/
+ * cart/globe glyphs on the Login and Public Home explore buttons). Purely
+ * presentational: no behavior change for existing call sites that omit it.
  */
 @Composable
 fun SmartDoorButton(
@@ -51,6 +63,7 @@ fun SmartDoorButton(
     variant: SmartDoorButtonVariant = SmartDoorButtonVariant.Primary,
     enabled: Boolean = true,
     isLoading: Boolean = false,
+    leadingIconRes: Int? = null,
 ) {
     val isEnabled = enabled && !isLoading
     val shape = MaterialTheme.shapes.medium
@@ -71,7 +84,7 @@ fun SmartDoorButton(
                 contentColor = SmartDoorOnSecondaryDark,
             ),
         ) {
-            SmartDoorButtonContent(label, isLoading, SmartDoorOnSecondaryDark)
+            SmartDoorButtonContent(label, isLoading, SmartDoorOnSecondaryDark, leadingIconRes)
         }
 
         SmartDoorButtonVariant.Secondary -> OutlinedButton(
@@ -84,7 +97,7 @@ fun SmartDoorButton(
                 contentColor = SmartDoorSecondaryDark,
             ),
         ) {
-            SmartDoorButtonContent(label, isLoading, SmartDoorSecondaryDark)
+            SmartDoorButtonContent(label, isLoading, SmartDoorSecondaryDark, leadingIconRes)
         }
 
         SmartDoorButtonVariant.Ghost -> TextButton(
@@ -94,7 +107,7 @@ fun SmartDoorButton(
             shape = shape,
             contentPadding = contentPadding,
         ) {
-            SmartDoorButtonContent(label, isLoading, MaterialTheme.colorScheme.onSurface)
+            SmartDoorButtonContent(label, isLoading, MaterialTheme.colorScheme.onSurface, leadingIconRes)
         }
     }
 }
@@ -103,7 +116,8 @@ fun SmartDoorButton(
 private fun SmartDoorButtonContent(
     label: String,
     isLoading: Boolean,
-    contentColor: androidx.compose.ui.graphics.Color,
+    contentColor: Color,
+    leadingIconRes: Int? = null,
 ) {
     if (isLoading) {
         CircularProgressIndicator(
@@ -111,6 +125,19 @@ private fun SmartDoorButtonContent(
             color = contentColor,
             strokeWidth = 2.dp,
         )
+    } else if (leadingIconRes != null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
+        ) {
+            Icon(
+                painter = painterResource(id = leadingIconRes),
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(text = label, style = MaterialTheme.typography.labelLarge)
+        }
     } else {
         Text(text = label, style = MaterialTheme.typography.labelLarge)
     }

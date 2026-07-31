@@ -20,6 +20,7 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorAi
 import `in`.mysmartdoor.app.ui.theme.SmartDoorAiDim
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDangerDim
+import `in`.mysmartdoor.app.ui.theme.SmartDoorGlassBorder
 import `in`.mysmartdoor.app.ui.theme.SmartDoorInfo
 import `in`.mysmartdoor.app.ui.theme.SmartDoorInfoDim
 import `in`.mysmartdoor.app.ui.theme.SmartDoorMotion
@@ -27,6 +28,7 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccess
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccessDim
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSurfaceVariantDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
 import `in`.mysmartdoor.app.ui.theme.SmartDoorWarningDim
 import `in`.mysmartdoor.app.ui.timeline.TimelineEntry
@@ -88,6 +90,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -291,7 +295,7 @@ private fun HeroSmartDoorCard(data: DashboardData) {
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val isNarrow = maxWidth < StatGridNarrowBreakpoint
-            val plateSize = if (isNarrow) 88.dp else 108.dp
+            val plateSize = if (isNarrow) 96.dp else 116.dp
             val nameStyle = if (isNarrow) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall
 
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -303,8 +307,10 @@ private fun HeroSmartDoorCard(data: DashboardData) {
                             text = "SMART DOOR",
                             style = MaterialTheme.typography.labelMedium,
                             color = SmartDoorSecondaryDark,
+                            fontWeight = FontWeight.SemiBold,
                             letterSpacing = 2.sp,
                         )
+                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
                         Text(
                             text = data.owner.plateId,
                             style = nameStyle,
@@ -313,7 +319,7 @@ private fun HeroSmartDoorCard(data: DashboardData) {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             SDAvatar(name = data.owner.fullName, size = 20.dp)
                             Spacer(modifier = Modifier.width(SmartDoorSpacing.xxs))
@@ -327,6 +333,8 @@ private fun HeroSmartDoorCard(data: DashboardData) {
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
+                HorizontalDivider(color = SmartDoorGlassBorder, thickness = 1.dp)
                 Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
@@ -360,17 +368,25 @@ private fun HeroSmartDoorCard(data: DashboardData) {
  */
 @Composable
 private fun PlatePreview(plateId: String, modifier: Modifier = Modifier) {
+    val plateShape = RoundedCornerShape(20.dp)
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.background)
-            .border(width = 2.dp, color = SmartDoorSecondaryDark, shape = RoundedCornerShape(20.dp)),
+            .shadow(elevation = 6.dp, shape = plateShape, clip = false)
+            .clip(plateShape)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(SmartDoorSurfaceVariantDark, MaterialTheme.colorScheme.background),
+                ),
+            )
+            .border(width = 1.5.dp, color = SmartDoorSecondaryDark.copy(alpha = 0.7f), shape = plateShape)
+            .padding(6.dp)
+            .border(width = 1.dp, color = SmartDoorSecondaryDark.copy(alpha = 0.35f), shape = RoundedCornerShape(15.dp)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(id = R.drawable.ic_qr),
-            contentDescription = null,
+            contentDescription = "Smart Door QR for $plateId",
             tint = SmartDoorSecondaryDark,
             modifier = Modifier.size(40.dp),
         )
@@ -730,24 +746,46 @@ private fun NotificationsPreviewSection(data: DashboardData) {
 @Composable
 private fun NotificationRow(notification: NotificationDto) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = SmartDoorSpacing.sm),
+        // Top-aligned, not centered: a 2-line title + body stack is taller
+        // than the single-line timestamp, and center-aligning them let the
+        // timestamp drift into the body line on longer notifications.
+        verticalAlignment = Alignment.Top,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        if (!notification.isRead) {
+            Box(
+                modifier = Modifier
+                    .padding(top = SmartDoorSpacing.xxs)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(SmartDoorSecondaryDark),
+            )
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = true)
+                .padding(end = SmartDoorSpacing.sm),
+        ) {
             Text(
                 text = notification.title,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (!notification.isRead) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
             if (!notification.body.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
                 Text(
                     text = notification.body,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
@@ -755,6 +793,11 @@ private fun NotificationRow(notification: NotificationDto) {
             text = formatRelativeTime(notification.createdAt),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(max = 72.dp),
         )
     }
 }
