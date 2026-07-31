@@ -74,6 +74,21 @@ and `AUTHORITY_MATRIX.md` files has assumed exists since Phase 2. See
 decision logic execute for any role yet, and nothing in Phase 9 changes
 that — it is architecture and contracts only, exactly like every phase
 before it.
+As of SDOS Phase 10, `ai/integrations/` — the boundary every executive
+above will eventually read live data through — is documented for eight
+vendors (`github/`, `supabase/`, `groq/`, `razorpay/`, `firebase/`,
+`analytics/`, `notifications/`, `storage/`), each scoped to the
+specific, narrow reads that role's own domain would plausibly need
+(e.g. a future CFO capability reading `razorpay/`'s and `analytics/`'s
+documented payment/revenue status; a future COO capability reading
+`notifications/`'s and `firebase/`'s documented delivery health). This
+is documentation only — no executive gains any actual data access in
+this phase, and every one of the six roles' own `AUTHORITY_MATRIX.md`
+and `PERMISSION_MODEL.md` resolution (`AWAITING_APPROVAL` for
+everything, per Phase 9) is unchanged by it. Phase 10 also formalizes
+Phases 0–10's key architectural decisions as ADRs in `ai/docs/adr/`,
+including `ADR-0002-Executive-Model.md`, which records why this
+six-role, shared-skeleton structure was chosen in the first place.
 
 ## What will eventually go here
 - One subfolder per executive (e.g. `ceo/`, `cto/`, `coo/`, `cfo/`)

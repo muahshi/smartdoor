@@ -166,6 +166,21 @@ security (`ai/core/permissions/`), and task routing
 Documentation, interfaces, and contracts only — no orchestration code,
 agent runtime, or automation exists as of this phase.
 
+## Read-Only Integration Layer + ADRs (SDOS Phase 10)
+
+As of Phase 10, `ai/integrations/` is no longer empty — it documents
+eight future, read-only integration boundary points (`github/`,
+`supabase/`, `groq/`, `razorpay/`, `firebase/`, `analytics/`,
+`notifications/`, `storage/`), plus a shared registry, data-contract
+shape, read-only policy, and security guidelines. See
+`ai/integrations/INTEGRATION_REGISTRY.md` for the full index. This
+remains documentation only — **no integration in this registry has a
+working client, credential, or network path as of this phase**; actual
+data access continues to happen exclusively through `ai/integrations/`,
+once a future phase implements it. Phase 10 also introduces
+`ai/docs/adr/` — Architecture Decision Records for the significant
+decisions made across Phases 0–10. See `ai/docs/adr/README.md`.
+
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
 - SmartDoor's actual codebase and Supabase database are always the
@@ -176,4 +191,5 @@ agent runtime, or automation exists as of this phase.
   silently resolved in either direction.
 - Nothing in `ai/knowledge/` grants read or write access to production
   systems by itself — actual data access happens only through
-  `ai/integrations/` (not yet built as of this phase).
+  `ai/integrations/`, which as of Phase 10 documents eight future
+  read-only boundary points but implements none of them yet.

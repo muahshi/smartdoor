@@ -6,8 +6,30 @@ the existing SmartDoor backend (Supabase database and Edge Functions),
 which remains the single source of truth for all business data.
 
 ## Status
-Empty. Phase 0 does not implement any integration, client, or connection.
-No read or write access to SmartDoor's database exists yet.
+**SDOS Phase 10 (Read-Only Integration Layer + ADRs).** This phase
+documents, for the first time, what each future SDOS integration would
+be — its purpose, capabilities, read-only access policy, authentication
+approach, data contracts, error handling, security considerations, rate
+limits, and future capability — for eight boundary points: `github/`,
+`supabase/`, `groq/`, `razorpay/`, `firebase/`, `analytics/`,
+`notifications/`, and `storage/`.
+
+**This remains an architecture and documentation phase only.** Per
+`READONLY_POLICY.md` and `ai/core/permissions/READONLY_INTEGRATION_POLICY.md`
+(which this phase extends, not replaces), Phase 10 ships **zero**
+executable integration code, **zero** external network calls, and
+**zero** connections to any real service. No read or write access to
+SmartDoor's database, Razorpay, Groq, Firebase, or any other external
+system exists after this phase, exactly as it did not exist before it.
+Every file below describes future intent — clearly labeled "Future SDOS
+Capability" where relevant — not current behavior.
+
+See `INTEGRATION_REGISTRY.md` for the full list of documented
+integrations and their status, `DATA_CONTRACTS.md` for the shared
+input/output contract shape every integration follows,
+`READONLY_POLICY.md` for this folder's own read-only gate, and
+`SECURITY_GUIDELINES.md` for the security posture every future
+integration must satisfy before any code is written against it.
 
 ## What will eventually go here
 - A read-only (initially) client for querying SmartDoor's Supabase data
