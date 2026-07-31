@@ -22,15 +22,14 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.item
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -129,91 +128,89 @@ fun SmartPlateScreen(
 @Composable
 private fun SmartPlateContent(data: DashboardData, onOpenQrPreview: () -> Unit) {
     val plate = data.plate
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(SmartDoorSpacing.md),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(SmartDoorSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.lg),
     ) {
-        item {
-            if (plate == null) {
+        if (plate == null) {
+            SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                Text(
+                    text = "No Smart Plate registered to this account yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            Column {
+                SDSectionHeader(title = "Device Details", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
                 SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
+                        DetailLine(label = "Plate ID", value = plate.plateId)
+                        DetailLine(
+                            label = "Product Type",
+                            value = plate.productType?.replaceFirstChar { it.uppercase() } ?: "—",
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(text = "Status", style = MaterialTheme.typography.bodyMedium)
+                            SDBadge(
+                                text = plate.status.replaceFirstChar { it.uppercase() },
+                                status = if (plate.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
+                            )
+                        }
+                        DetailLine(label = "Expiry", value = plate.expiryDate ?: "—")
+                    }
+                }
+            }
+        }
+
+        Column {
+            SDSectionHeader(title = "Public Visitor Link", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
+            SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                if (plate == null) {
                     Text(
-                        text = "No Smart Plate registered to this account yet.",
+                        text = "Register a plate to get its QR link.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-            } else {
-                Column {
-                    SDSectionHeader(title = "Device Details", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
-                    SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                        Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                            DetailLine(label = "Plate ID", value = plate.plateId)
-                            DetailLine(
-                                label = "Product Type",
-                                value = plate.productType?.replaceFirstChar { it.uppercase() } ?: "—",
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(text = "Status", style = MaterialTheme.typography.bodyMedium)
-                                SDBadge(
-                                    text = plate.status.replaceFirstChar { it.uppercase() },
-                                    status = if (plate.status == "active") SDBadgeStatus.Success else SDBadgeStatus.Neutral,
-                                )
-                            }
-                            DetailLine(label = "Expiry", value = plate.expiryDate ?: "—")
-                        }
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
+                        Text(
+                            text = PublicWebLinks.visitorPage(plate.qrSlug),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        SmartDoorButton(
+                            label = "View QR Code",
+                            onClick = onOpenQrPreview,
+                            variant = SmartDoorButtonVariant.Primary,
+                            leadingIconRes = R.drawable.ic_qr,
+                        )
                     }
                 }
             }
         }
-        item {
-            Column {
-                SDSectionHeader(title = "Public Visitor Link", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
-                SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                    if (plate == null) {
-                        Text(
-                            text = "Register a plate to get its QR link.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                            Text(
-                                text = PublicWebLinks.visitorPage(plate.qrSlug),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            SmartDoorButton(
-                                label = "View QR Code",
-                                onClick = onOpenQrPreview,
-                                variant = SmartDoorButtonVariant.Primary,
-                                leadingIconRes = R.drawable.ic_qr,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        item {
-            Column {
-                SDSectionHeader(title = "Subscription", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
-                SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                    if (data.subscription == null) {
-                        Text(
-                            text = "No active subscription plan.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
-                            DetailLine(label = "Plan", value = data.subscription.plan.replaceFirstChar { it.uppercase() })
-                            DetailLine(label = "Status", value = data.subscription.status.replaceFirstChar { it.uppercase() })
-                            DetailLine(label = "Renews / Expires", value = data.subscription.expiryDate)
-                        }
+
+        Column {
+            SDSectionHeader(title = "Subscription", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
+            SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                if (data.subscription == null) {
+                    Text(
+                        text = "No active subscription plan.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
+                        DetailLine(label = "Plan", value = data.subscription.plan.replaceFirstChar { it.uppercase() })
+                        DetailLine(label = "Status", value = data.subscription.status.replaceFirstChar { it.uppercase() })
+                        DetailLine(label = "Renews / Expires", value = data.subscription.expiryDate)
                     }
                 }
             }
