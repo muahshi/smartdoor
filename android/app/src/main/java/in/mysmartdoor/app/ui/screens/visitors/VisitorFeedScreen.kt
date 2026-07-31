@@ -278,7 +278,7 @@ private fun VisitorCard(entry: VisitorActivityDto) {
                 ) {
                     statusBadge(entry.callStatus)
                     labelBadge(entry.label, entry.labelColor)
-                    if (entry.isFavorite) SDBadge(text = "★ Favorite", status = SDBadgeStatus.Warning)
+                    if (entry.isFavorite) SDBadge(text = "Favorite", status = SDBadgeStatus.Warning)
                     if (entry.blocked) SDBadge(text = "Blocked", status = SDBadgeStatus.Danger)
                 }
                 if (entry.visitCount > 1) {

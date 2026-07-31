@@ -378,7 +378,7 @@ private fun AiQualitySection(insights: AiReceptionistInsightsDto) {
         if (q.duplicateCount > 0) {
             Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
             Text(
-                text = "🔁 ${q.duplicateCount} repeat call${if (q.duplicateCount == 1) "" else "s"} detected in this window.",
+                text = "${q.duplicateCount} repeat call${if (q.duplicateCount == 1) "" else "s"} detected in this window.",
                 style = MaterialTheme.typography.bodySmall,
                 color = SmartDoorWarning,
             )
