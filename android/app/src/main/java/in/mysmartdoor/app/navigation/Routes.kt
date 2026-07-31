@@ -9,14 +9,15 @@ package `in`.mysmartdoor.app.navigation
  * single `composable(Routes.X) { XScreen() }` block, without touching this
  * file or the graph's overall structure.
  *
- * Owner Dashboard V1 phase: [DASHBOARD] itself is now registered with the
- * real [in.mysmartdoor.app.ui.screens.dashboard.DashboardScreen]. Its Quick
- * Actions each need a destination contract, so the remaining constants
- * below are added the same way [VISITOR_FEED] already was — declared here,
- * not yet registered in the NavHost, and not yet navigated to (the
- * Dashboard's Quick Action buttons show a "coming soon" snackbar instead
- * of navigating to an unregistered route). Each one is future-roadmap
- * scope (Visitor Timeline, Messaging, AI Receptionist config, etc.).
+ * Owner Dashboard V1 phase: [DASHBOARD] itself is registered with the real
+ * [in.mysmartdoor.app.ui.screens.dashboard.DashboardScreen].
+ *
+ * Phase 12E — ANDROID FEATURE COMPLETION PASS: every constant below is now
+ * registered in [SmartDoorNavHost] and reachable from a Dashboard Quick
+ * Action / bottom-nav item — none fall through to a "coming soon" snackbar
+ * anymore. [CALL_HISTORY], [QR_PREVIEW], [SMART_PLATE], and [NOTIFICATIONS]
+ * were the last four; each reuses the existing DashboardViewModel /
+ * DashboardRepository, same as [LIVE_ACTIVITY] already did.
  */
 object Routes {
     const val SPLASH = "splash"
@@ -32,8 +33,8 @@ object Routes {
     // declared here per CTO decision — only what this phase registers.
     const val PUBLIC_HOME = "public_home"
 
-    // Owner Dashboard V1 — Quick Action destination contracts only; no
-    // composable registered yet, see class doc above.
+    // Owner Dashboard V1 — Quick Action destinations. All registered in
+    // SmartDoorNavHost (see class doc above).
     const val CALL_HISTORY = "call_history"
     const val MESSAGES = "messages"
     const val QR_PREVIEW = "qr_preview"

@@ -189,9 +189,13 @@ fun DashboardScreen(
                     onQuickAction = { feature ->
                         when (feature) {
                             "Visitor History" -> navController.navigate(Routes.VISITOR_FEED)
+                            "Call History" -> navController.navigate(Routes.CALL_HISTORY)
                             "Messages" -> navController.navigate(Routes.MESSAGES)
+                            "QR Preview" -> navController.navigate(Routes.QR_PREVIEW)
+                            "Smart Plate" -> navController.navigate(Routes.SMART_PLATE)
                             "AI Receptionist" -> navController.navigate(Routes.AI_RECEPTIONIST)
                             "Settings" -> navController.navigate(Routes.SETTINGS)
+                            "Notifications" -> navController.navigate(Routes.NOTIFICATIONS)
                             "Account" -> navController.navigate(Routes.ACCOUNT)
                             else -> showComingSoon(feature)
                         }

@@ -7,12 +7,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import `in`.mysmartdoor.app.ui.screens.account.AccountScreen
 import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
+import `in`.mysmartdoor.app.ui.screens.callhistory.CallHistoryScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.liveactivity.LiveActivityScreen
 import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
+import `in`.mysmartdoor.app.ui.screens.notifications.NotificationsScreen
 import `in`.mysmartdoor.app.ui.screens.publicweb.PublicHomeScreen
 import `in`.mysmartdoor.app.ui.screens.settings.SettingsScreen
+import `in`.mysmartdoor.app.ui.screens.smartplate.QrPreviewScreen
+import `in`.mysmartdoor.app.ui.screens.smartplate.SmartPlateScreen
 import `in`.mysmartdoor.app.ui.screens.splash.SplashScreen
 import `in`.mysmartdoor.app.ui.screens.visitors.VisitorFeedScreen
 
@@ -108,6 +112,28 @@ fun SmartDoorNavHost(
         // in.mysmartdoor.app.ui.timeline.buildTimeline).
         composable(Routes.LIVE_ACTIVITY) {
             LiveActivityScreen(navController)
+        }
+
+        // Owner Dashboard V1 — remaining Quick Action destinations. All four
+        // reuse DashboardViewModel/DashboardRepository exactly like
+        // LIVE_ACTIVITY above (same instance-per-back-stack-entry pattern);
+        // no new repository, ViewModel, or query for any of them. Replaces
+        // the "coming soon" snackbar DashboardScreen previously fell through
+        // to for these four Quick Actions.
+        composable(Routes.CALL_HISTORY) {
+            CallHistoryScreen(navController)
+        }
+
+        composable(Routes.NOTIFICATIONS) {
+            NotificationsScreen(navController)
+        }
+
+        composable(Routes.SMART_PLATE) {
+            SmartPlateScreen(navController)
+        }
+
+        composable(Routes.QR_PREVIEW) {
+            QrPreviewScreen(navController)
         }
     }
 }

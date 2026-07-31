@@ -41,4 +41,13 @@ object PublicWebLinks {
 
     /** Production support inbox (`js/aiConsultantKnowledge.js#supportEmail`) — opened via a `mailto:` intent. */
     const val SUPPORT_EMAIL = "support@mysmartdoor.in"
+
+    /**
+     * Owner Dashboard V1 Quick Actions (Smart Plate / QR Preview) —
+     * the exact same public visitor URL the physical nameplate's printed
+     * QR code already encodes, built from `plates.qr_slug` via the
+     * existing `/p/:slug` -> `/visitor.html?plate=:slug` rewrite (see
+     * `vercel.json`). No new route, no new Edge Function.
+     */
+    fun visitorPage(qrSlug: String): String = "$BASE_URL/p/$qrSlug"
 }
