@@ -39,8 +39,10 @@ import `in`.mysmartdoor.app.ui.timeline.timelineKindLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.fadeIn
@@ -48,6 +50,8 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -90,9 +94,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -273,7 +279,7 @@ private fun GreetingHeader(data: DashboardData) {
     val firstName = data.owner.fullName.trim().substringBefore(' ')
     Column {
         Text(
-            text = "${timeOfDayGreeting()}, $firstName",
+            text = "${timeOfDayGreeting()}, $firstName \uD83D\uDC4B",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
@@ -414,32 +420,44 @@ private fun subscriptionBadgeLabel(data: DashboardData): String {
 @Composable
 private fun LiveScanPillCard(data: DashboardData, onClick: () -> Unit) {
     val latest = data.recentVisitors.firstOrNull()
+    val shape = RoundedCornerShape(16.dp)
     SDCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().premiumEdge(shape),
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = shape,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             PulsingLiveDot()
             Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (latest != null) {
-                        "Someone ${latest.eventType.replace('_', ' ')}"
-                    } else {
-                        "No recent activity yet"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SDBadge(text = "LIVE", status = SDBadgeStatus.Danger)
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+                    Text(
+                        text = if (latest != null) {
+                            "Someone ${latest.eventType.replace('_', ' ')}"
+                        } else {
+                            "No recent activity yet"
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
                 Text(
                     text = formatRelativeTime(latest?.createdAt),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Icon(
+                painter = painterResource(id = R.drawable.ic_chevron_right),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
@@ -470,8 +488,9 @@ private fun PulsingLiveDot() {
 private fun AiReceptionistCard(data: DashboardData) {
     val aiEnabled = data.securityRules?.autoReplyEnabled == true
     val lastInteraction = data.recentVisitorVisits.firstOrNull { it.purpose != null }
+    val aiShape = RoundedCornerShape(18.dp)
 
-    SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+    SDCard(modifier = Modifier.fillMaxWidth().premiumEdge(aiShape), shape = aiShape) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -542,8 +561,17 @@ private fun IconStatTile(stat: StatEntry, modifier: Modifier = Modifier) {
         animationSpec = tween(SmartDoorMotion.durationLong, easing = SmartDoorMotion.standard),
         label = "count_up_${stat.label}",
     )
-    SDCard(modifier = modifier, shape = RoundedCornerShape(16.dp)) {
+    val tileShape = RoundedCornerShape(16.dp)
+    SDCard(modifier = modifier.premiumEdge(tileShape), shape = tileShape) {
         Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(stat.tint.copy(alpha = 0.7f)),
+            )
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
             IconCircle(iconRes = stat.iconRes, tint = stat.tint, tintDim = stat.tintDim, size = 32.dp)
             Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
             Text(
@@ -563,14 +591,21 @@ private fun IconStatTile(stat: StatEntry, modifier: Modifier = Modifier) {
     }
 }
 
-/** Small circular icon badge — the "icon in a tinted circle" motif the premium reference uses everywhere. */
+/**
+ * Small circular icon badge — the "icon in a tinted ringed circle" motif the
+ * premium reference uses everywhere (stat tiles, quick actions, timeline
+ * rows, AI card). Phase 12E.4: added a hairline ring in [tint] around the
+ * dim fill so the circle reads as a glowing badge rather than a flat tinted
+ * disc — purely a visual refinement, same call signature as before.
+ */
 @Composable
 private fun IconCircle(iconRes: Int, tint: Color, tintDim: Color, size: androidx.compose.ui.unit.Dp) {
     Box(
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(tintDim),
+            .background(tintDim)
+            .border(width = 1.dp, color = tint.copy(alpha = 0.55f), shape = CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -581,6 +616,17 @@ private fun IconCircle(iconRes: Int, tint: Color, tintDim: Color, size: androidx
         )
     }
 }
+
+/**
+ * Hairline gold-tinted edge — Phase 12E.4. Applied to every ordinary
+ * [SDCard] on the Dashboard so cards read as defined premium surfaces
+ * (matching the reference's crisp card edges) instead of flat, borderless
+ * blocks. [SDCard] itself is untouched (no shared-component signature
+ * change); this is a local modifier applied at each Dashboard call site,
+ * so no other screen using [SDCard] is affected.
+ */
+private fun Modifier.premiumEdge(shape: Shape) =
+    this.border(width = 1.dp, color = SmartDoorGlassBorder, shape = shape)
 
 // ────────── 4. QUICK ACTIONS ──────────
 
@@ -623,9 +669,20 @@ private fun QuickActionsSection(onAction: (String) -> Unit) {
 
 @Composable
 private fun QuickActionTile(action: QuickAction, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.5f),
+        label = "quick_action_press_scale",
+    )
+    val tileShape = RoundedCornerShape(16.dp)
     SDCard(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier
+            .scale(scale)
+            .premiumEdge(tileShape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        shape = tileShape,
         contentPadding = PaddingValues(vertical = SmartDoorSpacing.sm, horizontal = SmartDoorSpacing.xxs),
     ) {
         Column(
@@ -665,7 +722,8 @@ private fun LiveActivityPreviewSection(data: DashboardData, onSeeAll: () -> Unit
             onActionClick = onSeeAll,
             modifier = Modifier.padding(bottom = SmartDoorSpacing.xs),
         )
-        SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+        val activityShape = RoundedCornerShape(18.dp)
+        SDCard(modifier = Modifier.fillMaxWidth().premiumEdge(activityShape), shape = activityShape) {
             if (entries.isEmpty()) {
                 EmptySectionText("No activity yet. Visitor scans, calls, messages, and AI events will show up here.")
             } else {
@@ -734,7 +792,8 @@ private fun NotificationsPreviewSection(data: DashboardData) {
             },
             modifier = Modifier.padding(bottom = SmartDoorSpacing.xs),
         )
-        SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+        val notifShape = RoundedCornerShape(18.dp)
+        SDCard(modifier = Modifier.fillMaxWidth().premiumEdge(notifShape), shape = notifShape) {
             if (data.recentNotifications.isEmpty()) {
                 EmptySectionText("You're all caught up.")
             } else {
@@ -810,9 +869,10 @@ private fun NotificationRow(notification: NotificationDto) {
 
 @Composable
 private fun SmartDoorStatusSection(data: DashboardData) {
+    val statusShape = RoundedCornerShape(18.dp)
     Column {
         SDSectionHeader(title = "Smart Door Status", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
-        SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+        SDCard(modifier = Modifier.fillMaxWidth().premiumEdge(statusShape), shape = statusShape) {
             Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
                 StatusLine(label = "Plate Registered", active = data.plate != null)
                 StatusLine(label = "QR Active", active = data.plate?.status == "active")
@@ -824,6 +884,12 @@ private fun SmartDoorStatusSection(data: DashboardData) {
     }
 }
 
+/**
+ * Phase 12E.4: added a small status-colored icon circle before the label
+ * (matching the reference's icon-led rows) — [ic_shield][R.drawable.ic_shield]
+ * for an active row, a muted variant of the same glyph otherwise. Same
+ * boolean-driven signature as before, no behavior change.
+ */
 @Composable
 private fun StatusLine(label: String, active: Boolean) {
     Row(
@@ -831,7 +897,16 @@ private fun StatusLine(label: String, active: Boolean) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconCircle(
+                iconRes = R.drawable.ic_shield,
+                tint = if (active) SmartDoorSuccess else MaterialTheme.colorScheme.onSurfaceVariant,
+                tintDim = if (active) SmartDoorSuccessDim else MaterialTheme.colorScheme.surfaceVariant,
+                size = 28.dp,
+            )
+            Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        }
         SDBadge(
             text = if (active) "Active" else "Inactive",
             status = if (active) SDBadgeStatus.Success else SDBadgeStatus.Neutral,
@@ -845,7 +920,8 @@ private fun StatusLine(label: String, active: Boolean) {
 private fun SubscriptionSummaryCard(data: DashboardData) {
     Column {
         SDSectionHeader(title = "Subscription", modifier = Modifier.padding(bottom = SmartDoorSpacing.xs))
-        SDCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+        val subShape = RoundedCornerShape(18.dp)
+        SDCard(modifier = Modifier.fillMaxWidth().premiumEdge(subShape), shape = subShape) {
             if (data.subscription == null) {
                 EmptySectionText("No active subscription plan.")
             } else {
