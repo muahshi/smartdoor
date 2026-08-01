@@ -9,25 +9,31 @@ import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
 import `in`.mysmartdoor.app.ui.components.SDBottomNavigation
 import `in`.mysmartdoor.app.ui.components.SDChip
 import `in`.mysmartdoor.app.ui.components.SDSearchBar
-import `in`.mysmartdoor.app.ui.components.SDSectionHeader
-import `in`.mysmartdoor.app.ui.components.SDSkeletonLoaderGroup
+import `in`.mysmartdoor.app.ui.components.SDSkeletonLoader
 import `in`.mysmartdoor.app.ui.components.SDTopBar
 import `in`.mysmartdoor.app.ui.components.GlassCard
-import `in`.mysmartdoor.app.ui.screens.common.EmptyStateScreen
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.dashboardBottomNavItems
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
 import `in`.mysmartdoor.app.ui.theme.SmartDoorInfo
+import `in`.mysmartdoor.app.ui.theme.SmartDoorMotion
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccess
+import `in`.mysmartdoor.app.ui.theme.SmartDoorSurfaceVariantDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorWarning
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +45,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -55,16 +62,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -72,23 +84,32 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 
 /**
- * Visitors Timeline (Phase 4 — VISITORS V2; Phase 12B — PREMIUM SCREEN REBUILD).
+ * Visitors Timeline (Phase 4 — VISITORS V2; Phase 12B — PREMIUM SCREEN
+ * REBUILD; Phase 12E.5 — PREMIUM VISITORS & MESSAGES).
  *
  * Data comes entirely from [VisitorFeedViewModel] → [in.mysmartdoor.app.core.data.VisitorRepository],
  * which reads the existing `get_owner_activity_feed` RPC — no mock data,
  * no new backend, no ViewModel/repository changes this phase. Visual-only
  * upgrade built entirely on existing design-system components ([SDTopBar],
  * [SDSearchBar], [SDChip], [GlassCard], [SDAvatar], [SDBadge],
- * [SDBottomNavigation], [SDSkeletonLoaderGroup], [EmptyStateScreen],
- * [ErrorScreen]).
+ * [SDBottomNavigation], [SDSkeletonLoader], [ErrorScreen]).
+ *
+ * Phase 12E.5 keeps every Phase 12B behavior (search, filter chips,
+ * infinite scroll, day grouping, refresh) and layers on: a badge row that
+ * wraps via [FlowRow] instead of clipping/scrolling off-card, a staggered
+ * fade+slide entrance for the list, a card-shaped skeleton that previews
+ * the real row layout instead of generic bars, and dedicated empty states
+ * for "no visitors yet" vs. "no results for this search/filter" (both
+ * scoped to this file — the shared `EmptyStateScreen` used by other
+ * screens is intentionally left untouched).
  *
  * Per CTO direction: no image-loading library is added this phase. Even
  * though [VisitorActivityDto.photoUrl] may be non-null, every row renders
  * an [SDAvatar] initials glyph — the architecture (the field is already
  * modeled end-to-end) is ready for a future phase to swap in a real image
  * once an image-loading dependency is approved. The premium avatar "ring"
- * added this phase is a pure status-color border around the existing
- * initials glyph, not a photo.
+ * added in 12B is a pure status-color border around the existing initials
+ * glyph, not a photo.
  *
  * "Delivery status" (per the Phase 12B brief) is rendered from the real
  * [VisitorActivityDto.label]/[VisitorActivityDto.labelColor] fields — the
@@ -174,6 +195,9 @@ private fun VisitorFeedContent(
     onFilterSelected: (VisitorFeedFilter) -> Unit,
     onRetry: () -> Unit,
 ) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = SmartDoorSpacing.md, vertical = SmartDoorSpacing.sm)) {
             SDSearchBar(
@@ -197,47 +221,52 @@ private fun VisitorFeedContent(
             }
         }
 
+        val hasActiveQuery = uiState.searchQuery.isNotBlank() || uiState.selectedFilter != VisitorFeedFilter.All
+
         when {
             uiState.errorMessage != null && uiState.items.isEmpty() -> ErrorScreen(
                 message = uiState.errorMessage,
                 onRetry = onRetry,
             )
-            uiState.items.isEmpty() -> EmptyStateScreen(
-                title = "No visitors yet",
-                subtitle = "Visitor calls, deliveries, and guests will show up here once someone rings your Smart Door.",
-            )
+            uiState.items.isEmpty() -> VisitorEmptyState(hasActiveQuery = hasActiveQuery)
             else -> {
                 val grouped = remember(uiState.items) { groupByDay(uiState.items) }
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = SmartDoorSpacing.md,
-                        end = SmartDoorSpacing.md,
-                        top = SmartDoorSpacing.xs,
-                        bottom = SmartDoorSpacing.lg,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.emphasized)) +
+                        slideInVertically(
+                            animationSpec = tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.emphasized),
+                            initialOffsetY = { it / 16 },
+                        ),
                 ) {
-                    grouped.forEach { (dayLabel, entries) ->
-                        item(key = "header_$dayLabel") {
-                            SDSectionHeader(
-                                title = dayLabel,
-                                modifier = Modifier.padding(vertical = SmartDoorSpacing.xxs),
-                            )
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = SmartDoorSpacing.md,
+                            end = SmartDoorSpacing.md,
+                            top = SmartDoorSpacing.xs,
+                            bottom = SmartDoorSpacing.lg,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
+                    ) {
+                        grouped.forEach { (dayLabel, entries) ->
+                            item(key = "header_$dayLabel") {
+                                VisitorDayHeader(label = dayLabel, count = entries.size)
+                            }
+                            visitorItemsIndexed(entries) { index, entry ->
+                                VisitorCard(entry, staggerIndex = index)
+                            }
                         }
-                        items(entries, key = { it.id }) { entry ->
-                            VisitorCard(entry)
-                        }
-                    }
-                    if (uiState.isLoadingMore) {
-                        item(key = "loading_more") {
-                            Box(modifier = Modifier.fillMaxWidth().padding(SmartDoorSpacing.md)) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp).align(Alignment.Center),
-                                    strokeWidth = 2.dp,
-                                    color = SmartDoorSecondaryDark,
-                                )
+                        if (uiState.isLoadingMore) {
+                            item(key = "loading_more") {
+                                Box(modifier = Modifier.fillMaxWidth().padding(SmartDoorSpacing.md)) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp).align(Alignment.Center),
+                                        strokeWidth = 2.dp,
+                                        color = SmartDoorSecondaryDark,
+                                    )
+                                }
                             }
                         }
                     }
@@ -247,63 +276,119 @@ private fun VisitorFeedContent(
     }
 }
 
-/** Premium visitor row — status-ring avatar, badge row (status/label/delivery/favorite/blocked), relative time + duration. */
+/** [LazyColumn.items] with a per-group index (used to stagger each card's entrance), keyed by entry id. */
+private fun LazyListScope.visitorItemsIndexed(
+    entries: List<VisitorActivityDto>,
+    itemContent: @Composable (Int, VisitorActivityDto) -> Unit,
+) {
+    items(entries.size, key = { entries[it].id }) { index ->
+        itemContent(index, entries[index])
+    }
+}
+
+/** Day-group header — "Today · 5" style count, gold uppercase label, and a hairline divider so groups read cleanly without extra vertical bulk. */
 @Composable
-private fun VisitorCard(entry: VisitorActivityDto) {
-    GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .border(width = 2.dp, color = statusRingColor(entry.callStatus), shape = CircleShape)
-                    .padding(3.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                SDAvatar(name = entry.visitorName ?: entry.phone ?: "?", size = 44.dp)
-            }
-            Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.visitorName?.takeIf { it.isNotBlank() } ?: entry.phone ?: "Unknown visitor",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs),
+private fun VisitorDayHeader(label: String, count: Int) {
+    Column(modifier = Modifier.padding(top = SmartDoorSpacing.xs, bottom = SmartDoorSpacing.xxs)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = label.uppercase(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = SmartDoorSecondaryDark,
+            )
+            Text(
+                text = "$count",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)),
+        )
+    }
+}
+
+/** Premium visitor row — status-ring avatar, wrapping badge row (status/label/delivery/favorite/blocked), relative time + duration, staggered fade-in. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun VisitorCard(entry: VisitorActivityDto, staggerIndex: Int = 0) {
+    var visible by remember(entry.id) { mutableStateOf(false) }
+    LaunchedEffect(entry.id) {
+        delay((staggerIndex.coerceAtMost(8) * 35).toLong())
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(SmartDoorMotion.durationShort, easing = SmartDoorMotion.standard)) +
+            slideInVertically(
+                animationSpec = tween(SmartDoorMotion.durationShort, easing = SmartDoorMotion.standard),
+                initialOffsetY = { it / 6 },
+            ),
+    ) {
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
                     modifier = Modifier
-                        .horizontalScroll(rememberScrollState()),
+                        .size(52.dp)
+                        .border(width = 2.dp, color = statusRingColor(entry.callStatus), shape = CircleShape)
+                        .padding(3.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    statusBadge(entry.callStatus)
-                    labelBadge(entry.label, entry.labelColor)
-                    if (entry.isFavorite) SDBadge(text = "Favorite", status = SDBadgeStatus.Warning)
-                    if (entry.blocked) SDBadge(text = "Blocked", status = SDBadgeStatus.Danger)
+                    SDAvatar(name = entry.visitorName ?: entry.phone ?: "?", size = 44.dp)
                 }
-                if (entry.visitCount > 1) {
-                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+                Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${entry.visitCount} visits",
+                        text = entry.visitorName?.takeIf { it.isNotBlank() } ?: entry.phone ?: "Unknown visitor",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (entry.visitCount > 1) {
+                        Text(
+                            text = "${entry.visitCount} visits",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs),
+                        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs),
+                    ) {
+                        statusBadge(entry.callStatus)
+                        labelBadge(entry.label, entry.labelColor)
+                        if (entry.isFavorite) SDBadge(text = "Favorite", status = SDBadgeStatus.Warning)
+                        if (entry.blocked) SDBadge(text = "Blocked", status = SDBadgeStatus.Danger)
+                    }
+                }
+                Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = formatRelativeTime(entry.createdAt),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
-                }
-            }
-            Spacer(modifier = Modifier.width(SmartDoorSpacing.xs))
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = formatRelativeTime(entry.createdAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (entry.duration > 0) {
-                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
-                    Text(
-                        text = "${entry.duration}s",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (entry.duration > 0) {
+                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
+                        Text(
+                            text = formatDuration(entry.duration),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -356,13 +441,76 @@ private fun statusBadge(callStatus: String?) {
     SDBadge(text = label, status = status)
 }
 
+/** Card-shaped skeleton — an avatar circle + two line placeholders, so the loading state previews the real row instead of generic bars. */
 @Composable
 private fun VisitorFeedSkeleton() {
     Column(modifier = Modifier.fillMaxSize().padding(SmartDoorSpacing.md)) {
         repeat(6) {
             GlassCard(modifier = Modifier.fillMaxWidth().padding(bottom = SmartDoorSpacing.sm)) {
-                SDSkeletonLoaderGroup(lineCount = 2)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(SmartDoorSurfaceVariantDark),
+                    )
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+                    Column(modifier = Modifier.weight(1f)) {
+                        SDSkeletonLoader(height = 14.dp, modifier = Modifier.fillMaxWidth(0.6f))
+                        Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+                        SDSkeletonLoader(height = 12.dp, modifier = Modifier.fillMaxWidth(0.4f))
+                    }
+                    Spacer(modifier = Modifier.width(SmartDoorSpacing.sm))
+                    SDSkeletonLoader(height = 10.dp, modifier = Modifier.width(40.dp))
+                }
             }
+        }
+    }
+}
+
+/**
+ * Premium empty state, scoped to this screen only (the shared
+ * `EmptyStateScreen` used elsewhere in the app is untouched). Distinguishes
+ * a true empty inbox from an empty result set caused by the owner's own
+ * search/filter, so the copy always matches what actually happened.
+ */
+@Composable
+private fun VisitorEmptyState(hasActiveQuery: Boolean) {
+    Box(modifier = Modifier.fillMaxSize().padding(SmartDoorSpacing.lg), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(SmartDoorSecondaryDark.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(
+                        id = if (hasActiveQuery) R.drawable.ic_search else R.drawable.ic_people,
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = SmartDoorSecondaryDark,
+                )
+            }
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.md))
+            Text(
+                text = if (hasActiveQuery) "No matching visitors" else "No visitors yet",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(SmartDoorSpacing.xs))
+            Text(
+                text = if (hasActiveQuery) {
+                    "Try a different name, phone number, or clear your filters."
+                } else {
+                    "Visitor calls, deliveries, and guests will show up here once someone rings your Smart Door."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -401,4 +549,12 @@ private fun formatRelativeTime(iso: String?): String {
     } catch (e: Exception) {
         "—"
     }
+}
+
+/** "45s" for sub-minute durations, "1m 05s" beyond that — same underlying [VisitorActivityDto.duration] seconds value, just friendlier formatting. */
+private fun formatDuration(totalSeconds: Int): String {
+    if (totalSeconds < 60) return "${totalSeconds}s"
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return if (seconds == 0) "${minutes}m" else "${minutes}m ${seconds.toString().padStart(2, '0')}s"
 }
