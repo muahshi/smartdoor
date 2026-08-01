@@ -1,5 +1,9 @@
 package `in`.mysmartdoor.app.ui.screens.publicweb
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -29,15 +38,18 @@ import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.common.rememberWebLinkLauncher
 import `in`.mysmartdoor.app.core.config.PublicWebLinks
 import `in`.mysmartdoor.app.navigation.Routes
-import `in`.mysmartdoor.app.ui.components.GlassCard
+import `in`.mysmartdoor.app.ui.components.SDActionCard
+import `in`.mysmartdoor.app.ui.components.SDActionCardEmphasis
 import `in`.mysmartdoor.app.ui.components.SmartDoorButton
 import `in`.mysmartdoor.app.ui.components.SmartDoorButtonVariant
 import `in`.mysmartdoor.app.ui.components.SmartDoorScaffold
 import `in`.mysmartdoor.app.ui.theme.SmartDoorBackgroundDark
+import `in`.mysmartdoor.app.ui.theme.SmartDoorMotion
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSurfaceVariantDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
+import kotlinx.coroutines.delay
 
 /**
  * Phase 8 — PUBLIC ONBOARDING & MARKETING EXPERIENCE.
@@ -60,6 +72,16 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorTheme
  * [navController] is nullable so the Preview below can render with no
  * navigation graph attached.
  */
+
+/** One entry in the Explore action list — drives [SDActionCard] + the web link it opens. */
+private data class ExploreAction(
+    val titleRes: Int,
+    val subtitleRes: Int,
+    val iconRes: Int,
+    val link: String,
+    val emphasis: SDActionCardEmphasis = SDActionCardEmphasis.Standard,
+)
+
 @Composable
 fun PublicHomeScreen(navController: NavHostController? = null) {
     val openWebLink = rememberWebLinkLauncher()
@@ -103,62 +125,81 @@ fun PublicHomeScreen(navController: NavHostController? = null) {
 
                     Spacer(modifier = Modifier.height(SmartDoorSpacing.xl))
 
-                    GlassCard(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .widthIn(max = 480.dp),
-                        contentPadding = PaddingValues(SmartDoorSpacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
                     ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.public_home_section_title),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
+                        Text(
+                            text = stringResource(R.string.public_home_section_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(
+                                start = SmartDoorSpacing.xxs,
+                                bottom = SmartDoorSpacing.xxs,
+                            ),
+                        )
 
-                            SmartDoorButton(
-                                label = stringResource(R.string.public_home_buy_button),
-                                onClick = { openWebLink(PublicWebLinks.PRODUCTS) },
-                                modifier = Modifier.fillMaxWidth(),
-                                variant = SmartDoorButtonVariant.Primary,
-                                leadingIconRes = R.drawable.ic_cart,
+                        val actions = remember {
+                            listOf(
+                                ExploreAction(
+                                    R.string.public_home_buy_button,
+                                    R.string.public_home_buy_button_subtitle,
+                                    R.drawable.ic_cart,
+                                    PublicWebLinks.PRODUCTS,
+                                    SDActionCardEmphasis.Featured,
+                                ),
+                                ExploreAction(
+                                    R.string.public_home_features_button,
+                                    R.string.public_home_features_button_subtitle,
+                                    R.drawable.ic_bot,
+                                    PublicWebLinks.FEATURES,
+                                ),
+                                ExploreAction(
+                                    R.string.public_home_pricing_button,
+                                    R.string.public_home_pricing_button_subtitle,
+                                    R.drawable.ic_receipt,
+                                    PublicWebLinks.PRICING,
+                                ),
+                                ExploreAction(
+                                    R.string.public_home_faq_button,
+                                    R.string.public_home_faq_button_subtitle,
+                                    R.drawable.ic_help,
+                                    PublicWebLinks.FAQ,
+                                ),
+                                ExploreAction(
+                                    R.string.public_home_visit_website_button,
+                                    R.string.public_home_visit_website_button_subtitle,
+                                    R.drawable.ic_web,
+                                    PublicWebLinks.HOME,
+                                ),
                             )
+                        }
 
-                            SmartDoorButton(
-                                label = stringResource(R.string.public_home_features_button),
-                                onClick = { openWebLink(PublicWebLinks.FEATURES) },
-                                modifier = Modifier.fillMaxWidth(),
-                                variant = SmartDoorButtonVariant.Secondary,
-                                leadingIconRes = R.drawable.ic_bot,
-                            )
-
-                            SmartDoorButton(
-                                label = stringResource(R.string.public_home_pricing_button),
-                                onClick = { openWebLink(PublicWebLinks.PRICING) },
-                                modifier = Modifier.fillMaxWidth(),
-                                variant = SmartDoorButtonVariant.Secondary,
-                                leadingIconRes = R.drawable.ic_receipt,
-                            )
-
-                            SmartDoorButton(
-                                label = stringResource(R.string.public_home_faq_button),
-                                onClick = { openWebLink(PublicWebLinks.FAQ) },
-                                modifier = Modifier.fillMaxWidth(),
-                                variant = SmartDoorButtonVariant.Ghost,
-                                leadingIconRes = R.drawable.ic_help,
-                            )
-
-                            SmartDoorButton(
-                                label = stringResource(R.string.public_home_visit_website_button),
-                                onClick = { openWebLink(PublicWebLinks.HOME) },
-                                modifier = Modifier.fillMaxWidth(),
-                                variant = SmartDoorButtonVariant.Ghost,
-                                leadingIconRes = R.drawable.ic_web,
-                            )
+                        actions.forEachIndexed { index, action ->
+                            var visible by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                delay(index * 70L)
+                                visible = true
+                            }
+                            AnimatedVisibility(
+                                visible = visible,
+                                enter = fadeIn(tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.standard)) +
+                                    slideInVertically(
+                                        animationSpec = tween(SmartDoorMotion.durationMedium, easing = SmartDoorMotion.standard),
+                                        initialOffsetY = { it / 4 },
+                                    ),
+                            ) {
+                                SDActionCard(
+                                    title = stringResource(action.titleRes),
+                                    subtitle = stringResource(action.subtitleRes),
+                                    iconRes = action.iconRes,
+                                    onClick = { openWebLink(action.link) },
+                                    emphasis = action.emphasis,
+                                )
+                            }
                         }
                     }
 

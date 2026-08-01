@@ -64,6 +64,8 @@ import `in`.mysmartdoor.app.core.common.rememberWebLinkLauncher
 import `in`.mysmartdoor.app.core.config.PublicWebLinks
 import `in`.mysmartdoor.app.navigation.Routes
 import `in`.mysmartdoor.app.ui.components.GlassCard
+import `in`.mysmartdoor.app.ui.components.SDActionCard
+import `in`.mysmartdoor.app.ui.components.SDActionCardEmphasis
 import `in`.mysmartdoor.app.ui.components.SDBadge
 import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
 import `in`.mysmartdoor.app.ui.components.SmartDoorButton
@@ -448,55 +450,52 @@ private fun ExploreSection(
     onBuyClick: () -> Unit,
     onVisitWebsiteClick: () -> Unit,
 ) {
-    GlassCard(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 480.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(SmartDoorSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xs),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm),
-        ) {
-            Text(
-                text = stringResource(R.string.login_explore_section_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+        Text(
+            text = stringResource(R.string.login_explore_section_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(
+                start = SmartDoorSpacing.xxs,
+                bottom = SmartDoorSpacing.xxs,
+            ),
+        )
 
-            SmartDoorButton(
-                label = stringResource(R.string.login_explore_button),
-                onClick = onExploreClick,
-                modifier = Modifier.fillMaxWidth().testTag("login_explore_button"),
-                variant = SmartDoorButtonVariant.Secondary,
-                leadingIconRes = R.drawable.ic_home,
-            )
+        SDActionCard(
+            title = stringResource(R.string.login_explore_button),
+            subtitle = stringResource(R.string.login_explore_button_subtitle),
+            iconRes = R.drawable.ic_home,
+            onClick = onExploreClick,
+            emphasis = SDActionCardEmphasis.Featured,
+            modifier = Modifier.testTag("login_explore_button"),
+        )
 
-            SmartDoorButton(
-                label = stringResource(R.string.login_ai_receptionist_demo_button),
-                onClick = onAiReceptionistDemoClick,
-                modifier = Modifier.fillMaxWidth(),
-                variant = SmartDoorButtonVariant.Ghost,
-                leadingIconRes = R.drawable.ic_bot,
-            )
+        SDActionCard(
+            title = stringResource(R.string.login_ai_receptionist_demo_button),
+            subtitle = stringResource(R.string.login_ai_receptionist_demo_button_subtitle),
+            iconRes = R.drawable.ic_bot,
+            onClick = onAiReceptionistDemoClick,
+        )
 
-            SmartDoorButton(
-                label = stringResource(R.string.login_buy_button),
-                onClick = onBuyClick,
-                modifier = Modifier.fillMaxWidth(),
-                variant = SmartDoorButtonVariant.Ghost,
-                leadingIconRes = R.drawable.ic_cart,
-            )
+        SDActionCard(
+            title = stringResource(R.string.login_buy_button),
+            subtitle = stringResource(R.string.login_buy_button_subtitle),
+            iconRes = R.drawable.ic_cart,
+            onClick = onBuyClick,
+        )
 
-            SmartDoorButton(
-                label = stringResource(R.string.login_visit_website_button),
-                onClick = onVisitWebsiteClick,
-                modifier = Modifier.fillMaxWidth(),
-                variant = SmartDoorButtonVariant.Ghost,
-                leadingIconRes = R.drawable.ic_web,
-            )
-        }
+        SDActionCard(
+            title = stringResource(R.string.login_visit_website_button),
+            subtitle = stringResource(R.string.login_visit_website_button_subtitle),
+            iconRes = R.drawable.ic_web,
+            onClick = onVisitWebsiteClick,
+        )
     }
 }
 
