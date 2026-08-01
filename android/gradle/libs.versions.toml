@@ -22,6 +22,16 @@ kotlinSerializationPlugin = "2.0.21"
 # Phase A1.5 — verify-pin integration additions.
 hiltNavigationCompose = "1.2.0"
 
+# Phase 12E.2 — PREMIUM APP IDENTITY. coreSplashscreen backs the official
+# Android 12+ SplashScreen API (system splash shown before the Premium
+# Compose splash). zxing is a small, well-established QR *encoder* only
+# (no camera/scanning module pulled in) — used to render the Smart Plate's
+# QR code as a real scannable bitmap instead of the placeholder icon
+# QrPreviewScreen already documents using ("no QR-bitmap rendering library
+# exists anywhere in this Gradle project today").
+coreSplashscreen = "1.0.1"
+zxingCore = "3.5.3"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -64,6 +74,10 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+# Phase 12E.2 — PREMIUM APP IDENTITY.
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -169,6 +169,11 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
 
+    // Phase 12E.2 — PREMIUM APP IDENTITY: official Android 12+ SplashScreen
+    // API (system splash) + QR bitmap encoder for the dynamic Smart Plate.
+    implementation(libs.androidx.core.splashscreen)
+    implementation(libs.zxing.core)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

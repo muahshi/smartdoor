@@ -1,5 +1,6 @@
 <resources>
-    <!-- Placeholder brand color for launcher icon background — swap for
-         final brand asset when a real icon is provided. -->
-    <color name="ic_launcher_background">#0F172A</color>
+    <!-- Phase 12E.2 — Premium App Identity. Matches the black canvas of the
+         final brand launcher icon (app_icon_1024.png) exactly, replacing the
+         earlier placeholder navy (#0F172A). -->
+    <color name="ic_launcher_background">#000000</color>
 </resources>

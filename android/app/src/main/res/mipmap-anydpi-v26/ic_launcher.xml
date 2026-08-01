@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Phase 12E.2 — Premium App Identity. Foreground/monochrome now point at
+     the real brand mark (app_icon_1024.png), replacing the earlier
+     placeholder door/shield vector. Background is the icon's own black
+     canvas color (@color/ic_launcher_background). -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />
-    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>

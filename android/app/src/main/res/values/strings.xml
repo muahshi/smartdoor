@@ -49,4 +49,14 @@
     <string name="public_home_faq_button">FAQ</string>
     <string name="public_home_visit_website_button">Visit Website</string>
     <string name="public_home_back_to_login_button">Already have a Smart Door? Login</string>
+
+    <!-- Phase 12E.2 — PREMIUM APP IDENTITY: Premium Splash + dynamic Smart
+         Plate card. Static UI copy only — every owner-specific value
+         (name, Plate ID, subscription plan, AI status) comes from
+         SplashViewModel.plateSnapshot, never hardcoded here. -->
+    <string name="splash_loading">Loading…</string>
+    <string name="splash_scan_to_connect">Scan to Connect</string>
+    <string name="splash_subscription_label">Subscription: %1$s</string>
+    <string name="splash_ai_active">AI Receptionist Active</string>
+    <string name="splash_ai_inactive">AI Receptionist Off</string>
 </resources>
