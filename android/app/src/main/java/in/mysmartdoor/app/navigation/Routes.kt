@@ -49,4 +49,11 @@ object Routes {
     // screen). Backed by the same DashboardViewModel/DashboardRepository
     // DashboardScreen already uses — no new repository, no new query.
     const val LIVE_ACTIVITY = "live_activity"
+
+    // Phase 12E.9 — SMART ANALYTICS. Reached from a Dashboard Quick Action
+    // tile and a Profile menu row, same convention as every other
+    // Quick-Action destination above. Backed by the new
+    // AnalyticsViewModel/AnalyticsRepository (existing tables/RPC only —
+    // see AnalyticsRepository's doc comment).
+    const val ANALYTICS = "analytics"
 }

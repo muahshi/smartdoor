@@ -201,6 +201,7 @@ fun AccountScreen(
                     uiState = uiState,
                     viewModel = viewModel,
                     onNavigateSettings = { navController.navigate(Routes.SETTINGS) },
+                    onNavigateAnalytics = { navController.navigate(Routes.ANALYTICS) },
                     onOpenPrivacyPolicy = { launchWebLink(PublicWebLinks.PRIVACY_POLICY) },
                     onOpenFaq = { launchWebLink(PublicWebLinks.FAQ) },
                     onEmailSupport = { launchWebLink("mailto:${PublicWebLinks.SUPPORT_EMAIL}") },
@@ -246,6 +247,7 @@ private fun AccountContent(
     uiState: AccountUiState,
     viewModel: AccountViewModel,
     onNavigateSettings: () -> Unit,
+    onNavigateAnalytics: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
     onOpenFaq: () -> Unit,
     onEmailSupport: () -> Unit,
@@ -273,6 +275,13 @@ private fun AccountContent(
                         title = "Notifications",
                         subtitle = "Quiet hours, sound, and alert preferences",
                         onClick = onNavigateSettings,
+                    )
+                    MenuDivider()
+                    NavMenuRow(
+                        iconRes = R.drawable.ic_chart,
+                        title = "Smart Analytics",
+                        subtitle = "Visitor and call trends, AI performance",
+                        onClick = onNavigateAnalytics,
                     )
                     MenuDivider()
                     NavMenuRow(

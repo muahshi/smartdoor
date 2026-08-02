@@ -203,6 +203,7 @@ fun DashboardScreen(
                             "Settings" -> navController.navigate(Routes.SETTINGS)
                             "Notifications" -> navController.navigate(Routes.NOTIFICATIONS)
                             "Account" -> navController.navigate(Routes.ACCOUNT)
+                            "Analytics" -> navController.navigate(Routes.ANALYTICS)
                             else -> showComingSoon(feature)
                         }
                     },
@@ -639,6 +640,7 @@ private val quickActions = listOf(
     QuickAction("QR Preview", R.drawable.ic_qr),
     QuickAction("Smart Plate", R.drawable.ic_plug),
     QuickAction("AI Receptionist", R.drawable.ic_bot),
+    QuickAction("Analytics", R.drawable.ic_chart),
     QuickAction("Settings", R.drawable.ic_settings),
     QuickAction("Notifications", R.drawable.ic_bell),
     QuickAction("Account", R.drawable.ic_person),

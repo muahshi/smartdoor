@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import `in`.mysmartdoor.app.ui.screens.account.AccountScreen
 import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
+import `in`.mysmartdoor.app.ui.screens.analytics.AnalyticsScreen
 import `in`.mysmartdoor.app.ui.screens.callhistory.CallHistoryScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.liveactivity.LiveActivityScreen
@@ -134,6 +135,14 @@ fun SmartDoorNavHost(
 
         composable(Routes.QR_PREVIEW) {
             QrPreviewScreen(navController)
+        }
+
+        // Phase 12E.9 — SMART ANALYTICS: real screen, backed by the new
+        // AnalyticsViewModel/AnalyticsRepository (reads the existing
+        // visitor_logs/call_logs/visitor_visits tables and the existing
+        // get_ai_receptionist_insights RPC — no new backend).
+        composable(Routes.ANALYTICS) {
+            AnalyticsScreen(navController)
         }
     }
 }
