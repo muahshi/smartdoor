@@ -737,18 +737,7 @@ private fun AiActivityCard(entry: AiCallScreeningDto) {
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                entry.purpose?.takeIf { it.isNotBlank() }?.let { intent ->
-                    Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
-                    Text(
-                        text = "Intent: $intent",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                entry.aiSummary?.takeIf { it.isNotBlank() && it != entry.purpose }?.let { summary ->
+                entry.aiSummary?.takeIf { it.isNotBlank() }?.let { summary ->
                     Spacer(modifier = Modifier.height(SmartDoorSpacing.xxs))
                     Text(
                         text = summary,
