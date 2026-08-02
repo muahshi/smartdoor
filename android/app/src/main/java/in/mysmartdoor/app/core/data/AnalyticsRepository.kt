@@ -181,16 +181,16 @@ class AnalyticsRepository @Inject constructor(
         ).decodeAs()
 
     private fun VisitorLogDto.dateIn(zone: ZoneId): LocalDate =
-        parseIsoOrEpoch(createdAt).atZoneSameInstant(zone).toLocalDate()
+        parseIsoOrEpoch(createdAt).atZone(zone).toLocalDate()
 
     private fun VisitorLogDto.hourIn(zone: ZoneId): Int =
-        parseIsoOrEpoch(createdAt).atZoneSameInstant(zone).hour
+        parseIsoOrEpoch(createdAt).atZone(zone).hour
 
     private fun CallLogDto.dateIn(zone: ZoneId): LocalDate =
-        parseIsoOrEpoch(startedAt).atZoneSameInstant(zone).toLocalDate()
+        parseIsoOrEpoch(startedAt).atZone(zone).toLocalDate()
 
     private fun CallLogDto.hourIn(zone: ZoneId): Int =
-        parseIsoOrEpoch(startedAt).atZoneSameInstant(zone).hour
+        parseIsoOrEpoch(startedAt).atZone(zone).hour
 
     private fun CallLogDto.isMissed(): Boolean =
         callStatus.contains("missed", ignoreCase = true) || callStatus.contains("declined", ignoreCase = true)
