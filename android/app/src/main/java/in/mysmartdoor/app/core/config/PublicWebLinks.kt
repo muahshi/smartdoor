@@ -50,4 +50,24 @@ object PublicWebLinks {
      * `vercel.json`). No new route, no new Edge Function.
      */
     fun visitorPage(qrSlug: String): String = "$BASE_URL/p/$qrSlug"
+
+    /**
+     * Phase 12E.10 — NATIVE QR SCANNER. The scanner only forwards a decoded
+     * code into the existing visitor web flow if it's actually one of this
+     * app's own QR codes — i.e. exactly the URL shape [visitorPage]
+     * produces (`$BASE_URL/p/:slug`). Returns the slug when it matches, or
+     * null for anything else (a stranger's QR code, some other site, plain
+     * text, etc.) — QrScannerViewModel treats a null result as an invalid
+     * scan. Pure string matching, no network call, no backend change.
+     */
+    fun matchVisitorSlug(scannedContent: String): String? {
+        val prefix = "$BASE_URL/p/"
+        if (!scannedContent.startsWith(prefix)) return null
+        val slug = scannedContent
+            .removePrefix(prefix)
+            .substringBefore('?')
+            .substringBefore('#')
+            .trim('/')
+        return slug.takeIf { it.isNotBlank() }
+    }
 }

@@ -15,6 +15,7 @@ import `in`.mysmartdoor.app.ui.screens.login.LoginScreen
 import `in`.mysmartdoor.app.ui.screens.messages.MessagesScreen
 import `in`.mysmartdoor.app.ui.screens.notifications.NotificationsScreen
 import `in`.mysmartdoor.app.ui.screens.publicweb.PublicHomeScreen
+import `in`.mysmartdoor.app.ui.screens.qrscanner.QrScannerScreen
 import `in`.mysmartdoor.app.ui.screens.settings.SettingsScreen
 import `in`.mysmartdoor.app.ui.screens.smartplate.QrPreviewScreen
 import `in`.mysmartdoor.app.ui.screens.smartplate.SmartPlateScreen
@@ -143,6 +144,16 @@ fun SmartDoorNavHost(
         // get_ai_receptionist_insights RPC — no new backend).
         composable(Routes.ANALYTICS) {
             AnalyticsScreen(navController)
+        }
+
+        // Phase 12E.10 — NATIVE QR SCANNER: real screen, backed by the new
+        // QrScannerViewModel. On a valid scan it reuses the existing public
+        // visitor web flow (PublicWebLinks.visitorPage — the exact URL the
+        // physical nameplate's printed QR already encodes) via
+        // rememberWebLinkLauncher, the same ACTION_VIEW pattern QrPreview/
+        // SmartPlate already use. No new backend, no new visitor screen.
+        composable(Routes.QR_SCANNER) {
+            QrScannerScreen(navController)
         }
     }
 }

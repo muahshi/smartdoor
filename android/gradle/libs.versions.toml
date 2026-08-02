@@ -32,6 +32,12 @@ hiltNavigationCompose = "1.2.0"
 coreSplashscreen = "1.0.1"
 zxingCore = "3.5.3"
 
+# Phase 12E.10 — NATIVE QR SCANNER. CameraX for the live preview + frame
+# analysis pipeline. Decoding itself does NOT add ML Kit — it reuses the
+# zxing-core dependency already declared above (MultiFormatReader against
+# each analyzed frame), so this phase only adds the camera plumbing.
+cameraX = "1.4.1"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -78,6 +84,12 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 # Phase 12E.2 — PREMIUM APP IDENTITY.
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
+
+# Phase 12E.10 — NATIVE QR SCANNER.
+androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraX" }
+androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraX" }
+androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraX" }
+androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

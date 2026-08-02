@@ -174,6 +174,16 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.zxing.core)
 
+    // Phase 12E.10 — NATIVE QR SCANNER. CameraX for the live preview +
+    // frame analysis pipeline; frame decoding reuses zxing-core above
+    // (MultiFormatReader) rather than adding ML Kit as a second barcode
+    // library for the same job. No Coil/Glide — QrScannerScreen's overlay
+    // is drawn with Compose Canvas, same convention as the rest of the app.
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

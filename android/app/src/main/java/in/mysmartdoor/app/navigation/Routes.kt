@@ -56,4 +56,13 @@ object Routes {
     // AnalyticsViewModel/AnalyticsRepository (existing tables/RPC only —
     // see AnalyticsRepository's doc comment).
     const val ANALYTICS = "analytics"
+
+    // Phase 12E.10 — NATIVE QR SCANNER. Registered in SmartDoorNavHost with
+    // the real QrScannerScreen, same convention as every route above. Not
+    // wired to a Dashboard Quick Action tile or a QR Preview/Smart Plate
+    // button in this phase — that trigger point was explicitly out of
+    // scope ("Do NOT touch Dashboard"). Reachable today via
+    // `navController.navigate(Routes.QR_SCANNER)`; a future phase adds the
+    // actual entry-point tap target once approved.
+    const val QR_SCANNER = "qr_scanner"
 }

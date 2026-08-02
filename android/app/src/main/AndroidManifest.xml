@@ -16,6 +16,18 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- Phase 12E.10 — NATIVE QR SCANNER. CAMERA is requested at runtime by
+         QrScannerScreen only (rememberLauncherForActivityResult, same
+         pattern QrPreviewScreen already uses for WRITE_EXTERNAL_STORAGE) —
+         nothing else in the app touches the camera. uses-feature is
+         required="false" so the app still installs on camera-less devices;
+         QrScannerScreen's own CameraUnavailable state handles that case at
+         runtime instead of Play Store filtering the app out. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
     <application
         android:name=".SmartDoorApplication"
         android:allowBackup="true"
