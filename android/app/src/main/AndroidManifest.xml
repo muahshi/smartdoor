@@ -7,6 +7,15 @@
          implement those features. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Phase 12E.8 — PREMIUM SMART PLATE ECOSYSTEM. Only needed on API
+         26-28 (pre-scoped-storage) for QrImageUtil.saveToGallery's
+         MediaStore insert; API 29+ needs no permission for that call.
+         QrPreviewScreen requests this at runtime before saving on those
+         older API levels. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
     <application
         android:name=".SmartDoorApplication"
         android:allowBackup="true"
@@ -24,6 +33,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Phase 12E.8 — PREMIUM SMART PLATE ECOSYSTEM. Backs
+             QrImageUtil.share's chooser Intent; exposes only the
+             shared_qr/ cache subfolder, see res/xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 
