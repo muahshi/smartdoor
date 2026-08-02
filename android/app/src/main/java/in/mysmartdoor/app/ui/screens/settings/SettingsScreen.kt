@@ -1,12 +1,15 @@
 package `in`.mysmartdoor.app.ui.screens.settings
 
+import `in`.mysmartdoor.app.BuildConfig
 import `in`.mysmartdoor.app.R
 import `in`.mysmartdoor.app.core.common.rememberWebLinkLauncher
 import `in`.mysmartdoor.app.core.config.PublicWebLinks
 import `in`.mysmartdoor.app.core.data.model.SettingsData
+import `in`.mysmartdoor.app.core.network.dto.PlateDto
+import `in`.mysmartdoor.app.ui.components.SDBadge
+import `in`.mysmartdoor.app.ui.components.SDBadgeStatus
 import `in`.mysmartdoor.app.ui.components.SDCard
 import `in`.mysmartdoor.app.ui.components.SDDialog
-import `in`.mysmartdoor.app.ui.components.SDSectionHeader
 import `in`.mysmartdoor.app.ui.components.SDTopBar
 import `in`.mysmartdoor.app.ui.components.SmartDoorButton
 import `in`.mysmartdoor.app.ui.components.SmartDoorButtonVariant
@@ -14,20 +17,26 @@ import `in`.mysmartdoor.app.ui.components.SmartDoorTextField
 import `in`.mysmartdoor.app.ui.screens.common.ErrorScreen
 import `in`.mysmartdoor.app.ui.screens.common.LoadingScreen
 import `in`.mysmartdoor.app.ui.theme.SmartDoorDanger
+import `in`.mysmartdoor.app.ui.theme.SmartDoorElevation
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -54,26 +63,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import `in`.mysmartdoor.app.navigation.Routes
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import kotlinx.coroutines.launch
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 /**
- * Settings (Phase 8 — SETTINGS, ACCOUNT & DEVICE MANAGEMENT). Toggles/
- * preferences only — identity/plate/subscription info lives on
- * [in.mysmartdoor.app.ui.screens.account.AccountScreen], reached
- * separately from Dashboard's own "Account" Quick Action.
+ * Settings (Phase 8 — SETTINGS, ACCOUNT & DEVICE MANAGEMENT; Phase 12E.7 —
+ * PREMIUM PROFILE ECOSYSTEM). Toggles/preferences plus a read-only
+ * identity/device glance — grouped into premium sections: General,
+ * Security, Notifications, Hardware, AI, Support, About.
  *
- * Every switch here writes through [SettingsViewModel] to the exact
+ * Every switch here still writes through [SettingsViewModel] to the exact
  * production tables the CTO audit confirmed already exist
- * (`security_rules`, `notification_preferences`) — no mock toggles.
- * Privacy Settings, Language, and Theme are intentionally omitted: no
- * backend/persistence exists for any of them (see audit), and a fake
- * toggle that doesn't actually do anything is worse than no toggle.
+ * (`security_rules`, `notification_preferences`) — no mock toggles, no
+ * ViewModel change this phase, only the grouping/visual treatment. The new
+ * Hardware section reads the exact same [PlateDto] fields
+ * [in.mysmartdoor.app.ui.screens.account.AccountScreen] already reads from
+ * the same [SettingsData] — no new query. Privacy Settings, Language, and
+ * Theme remain intentionally omitted: no backend/persistence exists for
+ * any of them (see audit), and a fake toggle that doesn't actually do
+ * anything is worse than no toggle.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,26 +236,21 @@ private fun SettingsContent(
         contentPadding = PaddingValues(SmartDoorSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.lg),
     ) {
+        // ────────── General ──────────
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "AI Receptionist")
-                SDCard {
-                    ToggleRow(
-                        label = "Auto-Reply",
-                        subtitle = "Let the AI Receptionist answer visitors automatically.",
-                        checked = data.securityRules?.autoReplyEnabled ?: true,
-                        saving = uiState.autoReplySaving,
-                        enabled = data.securityRules != null,
-                        onCheckedChange = viewModel::setAutoReplyEnabled,
-                    )
+            PremiumSection(title = "General", iconRes = R.drawable.ic_person) {
+                Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
+                    SettingsInfoRow(label = "Name", value = data.owner.fullName)
+                    SettingsInfoRow(label = "Plate ID", value = data.owner.plateId)
+                    SettingsInfoRow(label = "Phone", value = data.owner.phone)
                 }
             }
         }
 
+        // ────────── Security ──────────
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Masked Calling")
-                SDCard {
+            PremiumSection(title = "Security", iconRes = R.drawable.ic_pin) {
+                Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
                     ToggleRow(
                         label = "Call Forwarding",
                         subtitle = "Forward visitor calls to your masked number when you're away.",
@@ -249,72 +259,226 @@ private fun SettingsContent(
                         enabled = data.securityRules != null,
                         onCheckedChange = viewModel::setCallForwarding,
                     )
+                    SettingsDivider()
+                    SettingsActionRow(label = "Change PIN", onClick = viewModel::openChangePin)
+                    SettingsActionRow(label = "Log Out", isDanger = true, onClick = viewModel::requestLogout)
                 }
             }
         }
 
+        // ────────── Notifications ──────────
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Notification Preferences")
-                SDCard {
-                    Column {
-                        ToggleRow(
-                            label = "Sound",
-                            subtitle = "Play a sound for new visitor/call/message notifications.",
-                            checked = data.notificationPreferences.soundEnabled,
-                            saving = uiState.notificationPrefsSaving,
-                            onCheckedChange = viewModel::setSoundEnabled,
-                        )
-                        ToggleRow(
-                            label = "Quiet Hours",
-                            subtitle = "${data.notificationPreferences.quietHoursStart.take(5)} – " +
-                                data.notificationPreferences.quietHoursEnd.take(5),
-                            checked = data.notificationPreferences.quietHoursEnabled,
-                            saving = uiState.notificationPrefsSaving,
-                            onCheckedChange = viewModel::setQuietHoursEnabled,
-                        )
-                    }
+            PremiumSection(title = "Notifications", iconRes = R.drawable.ic_bell) {
+                Column {
+                    ToggleRow(
+                        label = "Sound",
+                        subtitle = "Play a sound for new visitor/call/message notifications.",
+                        checked = data.notificationPreferences.soundEnabled,
+                        saving = uiState.notificationPrefsSaving,
+                        onCheckedChange = viewModel::setSoundEnabled,
+                    )
+                    ToggleRow(
+                        label = "Quiet Hours",
+                        subtitle = "${data.notificationPreferences.quietHoursStart.take(5)} – " +
+                            data.notificationPreferences.quietHoursEnd.take(5),
+                        checked = data.notificationPreferences.quietHoursEnabled,
+                        saving = uiState.notificationPrefsSaving,
+                        onCheckedChange = viewModel::setQuietHoursEnabled,
+                    )
                 }
             }
         }
 
+        // ────────── Hardware ──────────
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Security")
-                SDCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                        SettingsActionRow(label = "Change PIN", onClick = viewModel::openChangePin)
-                        SettingsActionRow(label = "Log Out", isDanger = true, onClick = viewModel::requestLogout)
-                    }
+            PremiumSection(title = "Hardware", iconRes = R.drawable.ic_plug) {
+                HardwareSectionContent(plate = data.plate)
+            }
+        }
+
+        // ────────── AI ──────────
+        item {
+            PremiumSection(title = "AI", iconRes = R.drawable.ic_bot) {
+                ToggleRow(
+                    label = "Auto-Reply",
+                    subtitle = "Let the AI Receptionist answer visitors automatically.",
+                    checked = data.securityRules?.autoReplyEnabled ?: true,
+                    saving = uiState.autoReplySaving,
+                    enabled = data.securityRules != null,
+                    onCheckedChange = viewModel::setAutoReplyEnabled,
+                )
+            }
+        }
+
+        // ────────── Support ──────────
+        item {
+            PremiumSection(title = "Support", iconRes = R.drawable.ic_help) {
+                Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
+                    SettingsActionRow(label = "FAQ", onClick = onOpenFaq)
+                    SettingsActionRow(label = "Email Support", onClick = onEmailSupport)
                 }
             }
         }
 
+        // ────────── About ──────────
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "Help & Support")
-                SDCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                        SettingsActionRow(label = "FAQ", onClick = onOpenFaq)
-                        SettingsActionRow(label = "Email Support", onClick = onEmailSupport)
-                    }
-                }
-            }
-        }
-
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                SDSectionHeader(title = "About")
-                SDCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
-                        SettingsActionRow(label = "Terms of Service", onClick = onOpenTerms)
-                        SettingsActionRow(label = "Privacy Policy", onClick = onOpenPrivacyPolicy)
-                    }
+            PremiumSection(title = "About", iconRes = R.drawable.ic_shield) {
+                Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
+                    SettingsActionRow(label = "Terms of Service", onClick = onOpenTerms)
+                    SettingsActionRow(label = "Privacy Policy", onClick = onOpenPrivacyPolicy)
+                    SettingsDivider()
+                    SettingsInfoRow(label = "App Version", value = BuildConfig.VERSION_NAME)
                 }
             }
         }
     }
 }
+
+/**
+ * Standard premium section wrapper — a small gold icon chip + title above
+ * an [SDCard] group, replacing the old bare [in.mysmartdoor.app.ui.components.SDSectionHeader]
+ * + [SDCard] pairing with a consistent, slightly larger-radius premium
+ * treatment used by every group on this screen.
+ */
+@Composable
+private fun PremiumSection(title: String, iconRes: Int, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(SmartDoorSecondaryDark.copy(alpha = 0.14f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = SmartDoorSecondaryDark,
+                )
+            }
+            Spacer(modifier = Modifier.size(SmartDoorSpacing.xs))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        SDCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            elevation = SmartDoorElevation.level1,
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun SettingsDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = SmartDoorSpacing.xxs)
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+    )
+}
+
+@Composable
+private fun SettingsInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.size(SmartDoorSpacing.sm))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+    }
+}
+
+/**
+ * "Hardware" reads the exact same [PlateDto] fields
+ * [in.mysmartdoor.app.ui.screens.account.AccountScreen]'s Hardware row
+ * already reads from the same [SettingsData.plate] — plate ID, status,
+ * last-sync timestamp (`updated_at`), and QR provisioning state. There is
+ * no separate device/battery/firmware table in production (see CTO
+ * audit), so those fields are correctly never shown here rather than
+ * invented.
+ */
+@Composable
+private fun HardwareSectionContent(plate: PlateDto?) {
+    if (plate == null) {
+        Text(
+            text = "No device linked yet.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(SmartDoorSpacing.xxs)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Status",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SDBadge(text = plate.status, status = plateStatusBadge(plate.status))
+        }
+        SettingsInfoRow(label = "Plate ID", value = plate.plateId)
+        plate.productType?.let { SettingsInfoRow(label = "Product Type", value = it) }
+        plate.expiryDate?.let { SettingsInfoRow(label = "Expires", value = formatSettingsDate(it)) }
+        plate.updatedAt?.let { SettingsInfoRow(label = "Last Sync", value = formatSettingsDate(it)) }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = SmartDoorSpacing.xxs),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "QR Status",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val qrProvisioned = plate.qrSlug.isNotBlank()
+            SDBadge(
+                text = if (qrProvisioned) "Active" else "Not Provisioned",
+                status = if (qrProvisioned) SDBadgeStatus.Success else SDBadgeStatus.Warning,
+            )
+        }
+    }
+}
+
+private fun plateStatusBadge(status: String): SDBadgeStatus = when (status.lowercase()) {
+    "active" -> SDBadgeStatus.Success
+    "inactive", "expired" -> SDBadgeStatus.Danger
+    "pending" -> SDBadgeStatus.Warning
+    else -> SDBadgeStatus.Neutral
+}
+
+private fun formatSettingsDate(isoString: String): String =
+    try {
+        OffsetDateTime.parse(isoString).format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+    } catch (e: Exception) {
+        isoString
+    }
 
 @Composable
 private fun ToggleRow(
