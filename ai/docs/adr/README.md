@@ -26,6 +26,8 @@ rebuild) a prior finding.
 | `ADR-0002-Executive-Model.md` | Executive Model | The decision to model SDOS as six named executive roles (CTO/COO/CFO/CMO/CPO/CEO) built from a shared standards skeleton, rather than one monolithic agent (Phases 2–9) |
 | `ADR-0003-Runtime-Foundation.md` | Runtime Foundation | The decision to fully specify a nine-part runtime architecture (registry, context, events, tasks, session, permissions, router, runtime, standards) as documentation before any executive gains execution authority (Phase 9) |
 | `ADR-0004-Integration-Layer.md` | Integration Layer | The decision to document eight future integrations and their read-only gate before writing any integration code (Phase 10) |
+| `ADR-0005-Agent-Runtime-Contracts.md` | Agent Runtime Contracts | The decision to specify implementation-ready contracts under `ai/core/contracts/`, split into pointers (for concepts Phase 9 already specifies) and genuinely new documents (messaging, memory, prompts, tools, execution pipeline, approvals, observability, audit, versioning) (Phase 11) |
+| `ADR-0006-Agent-Communication.md` | Agent Communication | The decision to model inter-agent communication as two separate documents — a message schema and a protocol — kept subordinate to the existing task-routing ownership table (Phase 11) |
 
 ## How to Read an ADR
 
@@ -65,3 +67,7 @@ earlier ones where a decision built directly on a prior one.
 - `ADR-0004-Integration-Layer.md` in particular should be read alongside
   `ai/integrations/INTEGRATION_REGISTRY.md`, `READONLY_POLICY.md`, and
   `SECURITY_GUIDELINES.md` for the full Phase 10 picture.
+- `ADR-0005` and `ADR-0006` should be read alongside
+  `ai/core/contracts/README.md` and
+  `ai/docs/IMPLEMENTATION_READINESS_REPORT.md` for the full Phase 11
+  picture.

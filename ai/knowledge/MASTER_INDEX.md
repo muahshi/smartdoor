@@ -181,6 +181,29 @@ once a future phase implements it. Phase 10 also introduces
 `ai/docs/adr/` — Architecture Decision Records for the significant
 decisions made across Phases 0–10. See `ai/docs/adr/README.md`.
 
+## SDOS Agent Runtime Contracts (SDOS Phase 11)
+
+As of Phase 11, `ai/core/contracts/` specifies the layer above Phase
+9's runtime foundation that a future agent runtime's reasoning step
+actually needs: inter-agent messaging (`MESSAGE_SCHEMA.md`,
+`INTER_AGENT_PROTOCOL.md`), memory persistence (`MEMORY_SCHEMA.md`),
+the assembled-context object shape (`CONTEXT_SCHEMA.md`), a prompt
+registry (`PROMPT_REGISTRY.md`), a tool registry (`TOOL_REGISTRY.md`),
+the internals of the runtime's reasoning step
+(`EXECUTION_PIPELINE.md`), the end-to-end founder-approval workflow
+(`APPROVAL_WORKFLOW.md`, `FOUNDER_APPROVAL_FLOW.md`), founder-facing
+observability content (`OBSERVABILITY.md`), a durable audit trail
+(`AUDIT_TRAIL.md`), and a content-versioning scheme
+(`VERSIONING.md`). Five further files in that folder
+(`AGENT_REGISTRATION.md`, `AGENT_LIFECYCLE.md`,
+`AGENT_STATE_MACHINE.md`, `EVENT_SCHEMA.md`, `TASK_SCHEMA.md`,
+`ERROR_HANDLING.md`) are deliberate pointers to Phase 9's existing
+specifications, not restatements. See `ai/core/contracts/README.md`
+for the full index and `ai/docs/IMPLEMENTATION_READINESS_REPORT.md`
+for what a future implementation phase would still need to build.
+Documentation and contracts only — no orchestration code, agent
+runtime, or automation exists as of this phase.
+
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
 - SmartDoor's actual codebase and Supabase database are always the

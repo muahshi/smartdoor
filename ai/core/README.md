@@ -39,10 +39,19 @@ don't silently resolve — applied to this file's own status line).
 | `permissions/` | Is this executive allowed to do this, right now? | `PERMISSION_MODEL.md`, `SECURITY_MODEL.md`, `READONLY_INTEGRATION_POLICY.md` |
 | `router/` | Which executive should handle this? | `TASK_ROUTING.md` |
 | `standards/` | Where does the Phase 5 shared standards library actually live? | `README.md` (resolution note — see below) |
+| `contracts/` | What does a future agent runtime's reasoning step, messaging, memory, prompts, tools, and founder-approval flow actually look like? (SDOS Phase 11) | `README.md` (full index — pointers to this table's own files plus genuinely new contracts) |
 
 See `runtime/RUNTIME_ARCHITECTURE.md` for how these nine pieces fit
 together into one coherent architecture, including a full single-turn
 walkthrough.
+
+As of SDOS Phase 11, `contracts/` adds the layer above these nine
+pieces that a future agent runtime's actual reasoning step needs —
+inter-agent messaging, memory persistence, a prompt registry, a tool
+registry, the execution pipeline's internals, and the founder-approval
+workflow. See `contracts/README.md` for its full index, including
+which of its files are pointers to this folder's own existing
+specifications versus genuinely new content.
 
 ## A Real Gap Found and Corrected During This Phase
 
