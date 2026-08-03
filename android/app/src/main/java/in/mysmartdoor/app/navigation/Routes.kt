@@ -65,4 +65,16 @@ object Routes {
     // `navController.navigate(Routes.QR_SCANNER)`; a future phase adds the
     // actual entry-point tap target once approved.
     const val QR_SCANNER = "qr_scanner"
+
+    // Phase 12E.11 — NATIVE CALLING EXPERIENCE. A single route for every
+    // call phase (Incoming/Outgoing/Ringing/Connecting/Connected/Ended) —
+    // in.mysmartdoor.app.ui.screens.call.CallScreen switches its content
+    // off CallViewModel's state machine rather than each phase being its
+    // own nav destination, so there is nothing to duplicate in the back
+    // stack. Not wired to a Dashboard Quick Action tile or bottom-nav item
+    // this phase (an incoming call is expected to be reached via a ring
+    // listener / push-triggered full-screen intent, both out of scope —
+    // see the CTO report) — reachable today via
+    // `navController.navigate(Routes.CALL)`.
+    const val CALL = "call"
 }

@@ -8,6 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import `in`.mysmartdoor.app.ui.screens.account.AccountScreen
 import `in`.mysmartdoor.app.ui.screens.aireceptionist.AiReceptionistScreen
 import `in`.mysmartdoor.app.ui.screens.analytics.AnalyticsScreen
+import `in`.mysmartdoor.app.ui.screens.call.CallScreen
 import `in`.mysmartdoor.app.ui.screens.callhistory.CallHistoryScreen
 import `in`.mysmartdoor.app.ui.screens.dashboard.DashboardScreen
 import `in`.mysmartdoor.app.ui.screens.liveactivity.LiveActivityScreen
@@ -154,6 +155,16 @@ fun SmartDoorNavHost(
         // SmartPlate already use. No new backend, no new visitor screen.
         composable(Routes.QR_SCANNER) {
             QrScannerScreen(navController)
+        }
+
+        // Phase 12E.11 — NATIVE CALLING EXPERIENCE: real screen, backed by
+        // the new CallViewModel/CallRepository (reuses the existing
+        // Supabase Realtime broadcast signaling contract
+        // services/webrtcOwnerCall.js already uses — see CallRepository's
+        // doc comment). The peer-connection/media layer is an approved
+        // no-op stub (RtcMediaEngine) pending native WebRTC SDK sign-off.
+        composable(Routes.CALL) {
+            CallScreen(navController)
         }
     }
 }
