@@ -204,6 +204,32 @@ for what a future implementation phase would still need to build.
 Documentation and contracts only — no orchestration code, agent
 runtime, or automation exists as of this phase.
 
+## Groq Runtime Foundation (SDOS Phase 12)
+
+As of Phase 12, `ai/runtime/` specifies how a future SDOS agent runtime
+would fill `ai/core/contracts/EXECUTION_PIPELINE.md` step 2 (model
+invocation) by reusing SmartDoor's existing, production Groq
+integration (`js/groq.js`, `supabase/functions/groq-proxy/`,
+`ai-session-token/`) as an architectural pattern: provider/executive
+routing (`AI_ROUTER.md`, `EXECUTIVE_ROUTER.md`), prompt/context/memory
+assembly (`PROMPT_LOADER.md`, `CONTEXT_BUILDER.md`, `MEMORY_LOADER.md`),
+tool selection (`TOOL_SELECTION.md`), model/token configuration
+(`MODEL_CONFIGURATION.md`, `TOKEN_BUDGETING.md`), request/response
+handling (`REQUEST_PIPELINE.md`, `RESPONSE_PIPELINE.md`,
+`EXECUTION_FLOW.md`), and operational concerns
+(`FAILOVER_STRATEGY.md`, `RATE_LIMITING.md`, `CACHE_STRATEGY.md`,
+`PERFORMANCE_STRATEGY.md`, `ERROR_RECOVERY.md`, `OBSERVABILITY.md`).
+See `ai/runtime/README.md` for the full index. This phase explicitly
+does **not** approve SDOS invoking Groq for its own reasoning — it
+specifies the shape that capability would take if a founder approves
+it, and keeps it strictly separate (endpoint, credential, rate-limit
+budget) from production's existing `groq-proxy`. See
+`ai/docs/GROQ_RUNTIME_READINESS.md` for the readiness assessment and
+`ai/docs/adr/ADR-0007-Groq-Runtime.md` (proposed, not yet accepted) and
+`ADR-0008-Prompt-Routing.md` (accepted) for the two decisions this
+phase records. Documentation and contracts only — no code, client,
+Edge Function, or credential exists as of this phase.
+
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
 - SmartDoor's actual codebase and Supabase database are always the

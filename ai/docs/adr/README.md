@@ -28,6 +28,8 @@ rebuild) a prior finding.
 | `ADR-0004-Integration-Layer.md` | Integration Layer | The decision to document eight future integrations and their read-only gate before writing any integration code (Phase 10) |
 | `ADR-0005-Agent-Runtime-Contracts.md` | Agent Runtime Contracts | The decision to specify implementation-ready contracts under `ai/core/contracts/`, split into pointers (for concepts Phase 9 already specifies) and genuinely new documents (messaging, memory, prompts, tools, execution pipeline, approvals, observability, audit, versioning) (Phase 11) |
 | `ADR-0006-Agent-Communication.md` | Agent Communication | The decision to model inter-agent communication as two separate documents — a message schema and a protocol — kept subordinate to the existing task-routing ownership table (Phase 11) |
+| `ADR-0007-Groq-Runtime.md` | Groq Runtime | Proposed (not yet founder-accepted): if SDOS ever invokes Groq for its own executive reasoning, it must use a new, separately-scoped Edge Function and credential, never production's `groq-proxy` (Phase 12) |
+| `ADR-0008-Prompt-Routing.md` | Prompt Routing | The decision to split provider-level and executive-level Groq routing into two narrow documents (`AI_ROUTER.md`, `EXECUTIVE_ROUTER.md`), both subordinate to the existing `TASK_ROUTING.md` and `PROMPT_REGISTRY.md` (Phase 12) |
 
 ## How to Read an ADR
 
@@ -71,3 +73,7 @@ earlier ones where a decision built directly on a prior one.
   `ai/core/contracts/README.md` and
   `ai/docs/IMPLEMENTATION_READINESS_REPORT.md` for the full Phase 11
   picture.
+- `ADR-0007` and `ADR-0008` should be read alongside `ai/runtime/README.md`
+  and `ai/docs/GROQ_RUNTIME_READINESS.md` for the full Phase 12
+  picture. `ADR-0007` is the one ADR in this folder currently
+  `Proposed` rather than `Accepted` — see its own Status line.
