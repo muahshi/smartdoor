@@ -170,12 +170,34 @@ class CallRepository @Inject constructor(
      * Declines the call. [reason] should be one of
      * [in.mysmartdoor.app.core.network.dto.RejectReason]'s constants —
      * mirrors `services/webrtcOwnerCall.js`'s reject call sites exactly.
+     *
+     * BUGFIX (12E.12): the two real call sites for this method
+     * ([CallViewModel.rejectCall] and the ring listener's auto-decline on
+     * `owner_busy`) both reject BEFORE [openCallChannel] is ever called, so
+     * the `activeCallChannel?.takeIf { activeCallId == callId }` branch
+     * never matched in practice — every reject silently opened a brand-new
+     * ad-hoc [RealtimeChannel], subscribed it, and then leaked it (never
+     * unsubscribed, never tracked), leaking one Realtime socket
+     * subscription per declined/busy call for the life of the process.
+     * Only the pre-existing [activeCallChannel] (already owned/unsubscribed
+     * elsewhere in this class) is left open here; an ad-hoc channel opened
+     * just for this one broadcast is now always unsubscribed afterwards.
      */
     suspend fun sendReject(callId: String, reason: String): Result<Unit> = safeApiCall {
-        val channel = activeCallChannel?.takeIf { activeCallId == callId }
-            ?: supabaseClientProvider.client.channel(callChannelName(callId)) { isPrivate = true }
-                .also { it.subscribe(blockUntilSubscribed = true) }
-        channel.broadcast(event = EVENT_REJECT, message = RejectPayload(reason = reason))
+        val trackedChannel = activeCallChannel?.takeIf { activeCallId == callId }
+        if (trackedChannel != null) {
+            trackedChannel.broadcast(event = EVENT_REJECT, message = RejectPayload(reason = reason))
+            return@safeApiCall
+        }
+
+        val adHocChannel = supabaseClientProvider.client.channel(callChannelName(callId)) { isPrivate = true }
+        try {
+            adHocChannel.subscribe(blockUntilSubscribed = true)
+            adHocChannel.broadcast(event = EVENT_REJECT, message = RejectPayload(reason = reason))
+        } finally {
+            runCatching { adHocChannel.unsubscribe() }
+                .onFailure { Logger.w(message = "[CallRepository] ad-hoc reject channel unsubscribe failed", throwable = it) }
+        }
     }
 
     /** Ends an in-progress call. `from` is always `"owner"` here. */

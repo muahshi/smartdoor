@@ -14,9 +14,15 @@ import `in`.mysmartdoor.app.ui.theme.SmartDoorSecondaryDark
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSpacing
 import `in`.mysmartdoor.app.ui.theme.SmartDoorSuccess
 import android.Manifest
+import android.app.Activity
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.core.app.ActivityCompat
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -119,10 +125,26 @@ fun QrScannerScreen(
                 PackageManager.PERMISSION_GRANTED,
         )
     }
+    // BUGFIX (12E.12) — PERMISSION RECOVERY: previously this screen always
+    // relaunched the system permission dialog, but Android silently
+    // no-ops that request (returns denied with no dialog shown at all)
+    // once the user has picked "Don't ask again" / permanently denied it
+    // from Settings — leaving the user stuck on this screen with a button
+    // that does nothing. `shouldShowRequestPermissionRationale` reliably
+    // distinguishes "denied, can ask again" from "permanently denied" only
+    // *after* at least one real system-dialog response, which is exactly
+    // when this launcher callback fires, so it's checked here rather than
+    // on first composition.
+    var permissionPermanentlyDenied by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasCameraPermission = granted
+        if (!granted) {
+            val activity = context.findActivity()
+            permissionPermanentlyDenied = activity != null &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
+        }
     }
 
     // Haptic tick the moment a code is found (transition into Loading),
@@ -146,7 +168,20 @@ fun QrScannerScreen(
             !hasCameraHardware -> QrScannerUnavailableState(onBack = { navController.popBackStack() })
             !hasCameraPermission -> QrScannerPermissionState(
                 onBack = { navController.popBackStack() },
+                permanentlyDenied = permissionPermanentlyDenied,
                 onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                onOpenSettings = {
+                    val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData(Uri.fromParts("package", context.packageName, null))
+                    if (context.findActivity() == null) {
+                        // Only needed when launching from a non-Activity Context;
+                        // set unconditionally would fall back to a new task even
+                        // when we're already in one, which is harmless but
+                        // unnecessary here since LocalContext.current is the Activity.
+                        settingsIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(settingsIntent)
+                },
             )
             else -> QrScannerCameraContent(
                 scanResult = scanResult,
@@ -176,20 +211,47 @@ private fun QrScannerUnavailableState(onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QrScannerPermissionState(onBack: () -> Unit, onRequestPermission: () -> Unit) {
+private fun QrScannerPermissionState(
+    onBack: () -> Unit,
+    permanentlyDenied: Boolean,
+    onRequestPermission: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     Scaffold(
         topBar = {
             SDTopBar(title = "Scan QR Code", onBackClick = onBack, backIconRes = R.drawable.ic_back)
         },
     ) { padding ->
-        EmptyStateScreen(
-            modifier = Modifier.padding(padding),
-            title = "Camera permission needed",
-            subtitle = "Allow camera access to scan a My Smart Door QR code.",
-            actionLabel = "Grant Camera Permission",
-            onAction = onRequestPermission,
-        )
+        // BUGFIX (12E.12) — PERMISSION RECOVERY: once camera permission is
+        // permanently denied, re-launching the system dialog (previous
+        // behavior for every case here) is a dead end — Android denies it
+        // instantly with no UI. Route to the app's Settings page instead so
+        // the user has an actual way to recover from this state.
+        if (permanentlyDenied) {
+            EmptyStateScreen(
+                modifier = Modifier.padding(padding),
+                title = "Camera permission needed",
+                subtitle = "Camera access is turned off for My Smart Door. Enable it in Settings to scan a QR code.",
+                actionLabel = "Open App Settings",
+                onAction = onOpenSettings,
+            )
+        } else {
+            EmptyStateScreen(
+                modifier = Modifier.padding(padding),
+                title = "Camera permission needed",
+                subtitle = "Allow camera access to scan a My Smart Door QR code.",
+                actionLabel = "Grant Camera Permission",
+                onAction = onRequestPermission,
+            )
+        }
     }
+}
+
+/** Unwraps a Compose [android.content.Context] (often a `ContextWrapper`) down to its underlying [Activity], or null if there isn't one (e.g. an Application context). */
+private tailrec fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 /**
