@@ -68,4 +68,15 @@
     <string name="splash_subscription_label">Subscription: %1$s</string>
     <string name="splash_ai_active">AI Receptionist Active</string>
     <string name="splash_ai_inactive">AI Receptionist Off</string>
+
+    <!-- Phase 12E.13 — NATIVE CALLING EXPERIENCE: Foreground Ringing &
+         Notifications. Used only by CallNotificationManager /
+         CallRingForegroundService — not shown anywhere in CallScreen
+         itself (that screen already has its own "Incoming Call" label). -->
+    <string name="call_notification_channel_name">Incoming Calls</string>
+    <string name="call_notification_channel_description">Alerts for visitor calls at your Smart Door</string>
+    <string name="call_notification_title">Incoming Call</string>
+    <string name="call_notification_default_caller">Visitor</string>
+    <string name="call_notification_accept">Accept</string>
+    <string name="call_notification_reject">Decline</string>
 </resources>

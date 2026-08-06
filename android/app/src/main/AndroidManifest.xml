@@ -28,6 +28,21 @@
         android:name="android.hardware.camera.any"
         android:required="false" />
 
+    <!-- Phase 12E.13 — NATIVE CALLING EXPERIENCE: Foreground Ringing &
+         Notifications. POST_NOTIFICATIONS is the API 33+ runtime
+         notification permission (requested by MainActivity); the two
+         FOREGROUND_SERVICE permissions back CallRingForegroundService
+         (declared with android:foregroundServiceType="phoneCall" below —
+         FOREGROUND_SERVICE_PHONE_CALL is required for that type on API
+         34+, install-time granted). USE_FULL_SCREEN_INTENT lets the
+         incoming-call notification launch IncomingCallActivity over the
+         lock screen; VIBRATE backs the ring vibration pattern. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <application
         android:name=".SmartDoorApplication"
         android:allowBackup="true"
@@ -45,6 +60,40 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Phase 12E.13 — NATIVE CALLING EXPERIENCE: Foreground Ringing &
+             Notifications. Full-screen incoming-call UI, launched by
+             CallNotificationManager's full-screen intent (over the lock
+             screen) or by CallActionReceiver's Accept action. Not
+             exported — only this app's own PendingIntents launch it.
+             showWhenLocked/turnScreenOn are the API 27+ manifest
+             equivalents of the runtime calls IncomingCallActivity also
+             makes for API 26 devices (minSdk). -->
+        <activity
+            android:name=".ui.incomingcall.IncomingCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.SmartDoor" />
+
+        <!-- Phase 12E.13 — keeps the incoming-call notification alive and
+             plays the ring/vibration while a call is in
+             CallPhase.INCOMING. Type "phoneCall" matches the actual
+             foreground work being done (see CallRingForegroundService's
+             doc comment). Never bound, only started. -->
+        <service
+            android:name=".service.CallRingForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
+
+        <!-- Phase 12E.13 — handles the Accept/Reject action buttons on the
+             incoming-call notification. Not exported — only this app's
+             own PendingIntents broadcast to it. -->
+        <receiver
+            android:name=".core.call.CallActionReceiver"
+            android:exported="false" />
 
         <!-- Phase 12E.8 — PREMIUM SMART PLATE ECOSYSTEM. Backs
              QrImageUtil.share's chooser Intent; exposes only the

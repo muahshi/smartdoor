@@ -4,7 +4,9 @@ import `in`.mysmartdoor.app.core.common.Logger
 import `in`.mysmartdoor.app.core.common.Result
 import `in`.mysmartdoor.app.core.network.SupabaseClientProvider
 import `in`.mysmartdoor.app.core.network.dto.CallAnswerPayload
+import `in`.mysmartdoor.app.core.network.dto.CallClaimedPayload
 import `in`.mysmartdoor.app.core.network.dto.EVENT_ANSWER
+import `in`.mysmartdoor.app.core.network.dto.EVENT_CALL_CLAIMED
 import `in`.mysmartdoor.app.core.network.dto.EVENT_HANGUP
 import `in`.mysmartdoor.app.core.network.dto.EVENT_ICE_CANDIDATE
 import `in`.mysmartdoor.app.core.network.dto.EVENT_INCOMING_CALL
@@ -23,6 +25,8 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,6 +67,20 @@ class CallRepository @Inject constructor(
 
     private var activeCallChannel: RealtimeChannel? = null
     private var activeCallId: String? = null
+
+    /**
+     * BUGFIX (12E.13): [IncomingCallController] can call [openCallChannel]
+     * from two different coroutines for the same `callId` in quick
+     * succession — once to passively watch for [EVENT_CALL_CLAIMED] the
+     * instant an offer arrives, and again (idempotently, per the guard in
+     * [openCallChannel]) when the owner accepts. Without serializing
+     * access to [activeCallChannel]/[activeCallId], those two calls could
+     * interleave and both create+subscribe a channel before either
+     * assignment lands, leaking one subscription. Every method that reads
+     * or mutates [activeCallChannel]/[activeCallId] now does so inside
+     * this [channelMutex].
+     */
+    private val channelMutex = Mutex()
 
     /**
      * Long-lived listener on `rtc:ring:{ownerId}` for [EVENT_INCOMING_CALL]
@@ -110,15 +128,29 @@ class CallRepository @Inject constructor(
      * attempt and subscribes to it. Must be followed by [closeCallChannel]
      * once the call ends (accepted-then-hangup, rejected, or missed) —
      * mirrors the web app's per-attempt channel teardown.
+     *
+     * BUGFIX (12E.13): [IncomingCallController] now opens this channel
+     * *passively* the moment an incoming-call offer arrives (to observe
+     * [EVENT_CALL_CLAIMED] for multi-device sync) and then calls this same
+     * method again on accept. Without the `activeCallId == callId` guard
+     * below, that second call would unsubscribe and re-subscribe the exact
+     * same channel for no reason — a redundant Realtime round-trip and a
+     * momentary window where a call-claimed/hangup broadcast could be
+     * missed. Re-entrant calls for the same [callId] are now a no-op.
      */
     suspend fun openCallChannel(callId: String): Result<Unit> = safeApiCall {
-        activeCallChannel?.let { runCatching { it.unsubscribe() } }
-        val channel = supabaseClientProvider.client.channel(callChannelName(callId)) {
-            isPrivate = true
+        channelMutex.withLock {
+            if (activeCallId == callId && activeCallChannel != null) {
+                return@safeApiCall
+            }
+            activeCallChannel?.let { runCatching { it.unsubscribe() } }
+            val channel = supabaseClientProvider.client.channel(callChannelName(callId)) {
+                isPrivate = true
+            }
+            channel.subscribe(blockUntilSubscribed = true)
+            activeCallChannel = channel
+            activeCallId = callId
         }
-        channel.subscribe(blockUntilSubscribed = true)
-        activeCallChannel = channel
-        activeCallId = callId
     }
 
     /** ICE candidates broadcast by the visitor on the currently-open call channel. */
@@ -206,12 +238,59 @@ class CallRepository @Inject constructor(
         channel.broadcast(event = EVENT_HANGUP, message = HangupPayload(from = "owner"))
     }
 
+    /**
+     * `call-claimed` broadcasts on the currently-open call channel —
+     * emitted by whichever owner device accepts first so sibling
+     * devices/tabs can dismiss their own incoming-call UI. Every device
+     * that receives the original [EVENT_INCOMING_CALL] offer opens this
+     * same channel passively (see [IncomingCallController]) so this flow
+     * is observable *before* any device has accepted.
+     */
+    fun observeCallClaimed(): Flow<CallClaimedPayload> = callbackFlow {
+        val channel = activeCallChannel
+        if (channel == null) {
+            close()
+            awaitClose { }
+            return@callbackFlow
+        }
+        val job = launch {
+            channel.broadcastFlow<CallClaimedPayload>(event = EVENT_CALL_CLAIMED).collect { payload -> trySend(payload) }
+        }
+        awaitClose { job.cancel() }
+    }
+
+    /**
+     * Broadcasts [EVENT_CALL_CLAIMED] so sibling owner devices dismiss
+     * their own incoming-call UI for this [callId]. [deviceId] identifies
+     * the claiming device so a device never dismisses itself. Follows the
+     * exact same tracked-channel-first / ad-hoc-fallback pattern
+     * [sendReject] documents above.
+     */
+    suspend fun sendCallClaimed(callId: String, deviceId: String): Result<Unit> = safeApiCall {
+        val trackedChannel = activeCallChannel?.takeIf { activeCallId == callId }
+        if (trackedChannel != null) {
+            trackedChannel.broadcast(event = EVENT_CALL_CLAIMED, message = CallClaimedPayload(callId = callId, deviceId = deviceId))
+            return@safeApiCall
+        }
+
+        val adHocChannel = supabaseClientProvider.client.channel(callChannelName(callId)) { isPrivate = true }
+        try {
+            adHocChannel.subscribe(blockUntilSubscribed = true)
+            adHocChannel.broadcast(event = EVENT_CALL_CLAIMED, message = CallClaimedPayload(callId = callId, deviceId = deviceId))
+        } finally {
+            runCatching { adHocChannel.unsubscribe() }
+                .onFailure { Logger.w(message = "[CallRepository] ad-hoc call-claimed channel unsubscribe failed", throwable = it) }
+        }
+    }
+
     /** Unsubscribes and releases the current call channel. Safe to call when none is open. */
     suspend fun closeCallChannel() {
-        val channel = activeCallChannel ?: return
-        runCatching { channel.unsubscribe() }
-            .onFailure { Logger.e(message = "[CallRepository] call channel unsubscribe failed", throwable = it) }
-        activeCallChannel = null
-        activeCallId = null
+        channelMutex.withLock {
+            val channel = activeCallChannel ?: return
+            runCatching { channel.unsubscribe() }
+                .onFailure { Logger.e(message = "[CallRepository] call channel unsubscribe failed", throwable = it) }
+            activeCallChannel = null
+            activeCallId = null
+        }
     }
 }
