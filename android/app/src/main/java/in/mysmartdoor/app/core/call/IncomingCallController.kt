@@ -6,6 +6,7 @@ import `in`.mysmartdoor.app.core.data.CallRepository
 import `in`.mysmartdoor.app.core.data.model.CallEndReason
 import `in`.mysmartdoor.app.core.data.model.CallPhase
 import `in`.mysmartdoor.app.core.data.model.CallSession
+import `in`.mysmartdoor.app.core.network.SupabaseClientProvider
 import `in`.mysmartdoor.app.core.network.dto.IncomingCallPayload
 import `in`.mysmartdoor.app.core.network.dto.RejectReason
 import `in`.mysmartdoor.app.core.session.SecureSessionManager
@@ -15,6 +16,8 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -23,7 +26,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
@@ -69,6 +74,44 @@ private const val RING_TIMEOUT_MS = 30_000L
  * On accept, this device broadcasts that same event via
  * [CallRepository.sendCallClaimed] before proceeding, using [deviceId] (a
  * stable per-install identifier) so a device never dismisses itself.
+ *
+ * BUGFIX (12E.14): [startListening] used to take only the *first*
+ * emission of [SecureSessionManager.userIdFlow] and subscribe
+ * immediately. That broke the ring pipeline in two separate,
+ * previously-unverified ways:
+ *  1. On a fresh login (no owner ever previously persisted on this
+ *     install), that first emission is `null` — the coroutine bailed and
+ *     reset [startedGuard], but nothing else in the app ever calls
+ *     [startListening] again, so the ring listener never started for the
+ *     rest of that process's life. The owner would receive zero incoming
+ *     calls until they force-killed and relaunched the app.
+ *  2. On a warm process restart for an *already* logged-in owner,
+ *     [SecureSessionManager.userIdFlow] is backed by on-disk DataStore and
+ *     resolves near-instantly — well before
+ *     [in.mysmartdoor.app.core.data.AuthRepository.restoreSession] (kicked
+ *     off separately from [in.mysmartdoor.app.ui.screens.splash.SplashViewModel]
+ *     once Hilt/Compose reach the Splash screen) has re-imported a real
+ *     Supabase `Auth` session into [SupabaseClientProvider.client]. Both
+ *     RING and CALL channels are opened with `isPrivate = true`, so
+ *     Realtime's server-side Authorization check needs a real JWT at
+ *     `subscribe()` time; subscribing before that import lands throws,
+ *     [CallRepository.listenForIncomingCalls] only logs the failure, and
+ *     the channel is left never-actually-joined — every future
+ *     `incoming-call` broadcast is silently dropped with no crash, no
+ *     visible error, and no retry.
+ *
+ * Fix: [startListening] now *continuously* combines
+ * [SecureSessionManager.userIdFlow] with [SupabaseClientProvider.client]'s
+ * `auth.sessionStatus`, and (re)starts
+ * [CallRepository.listenForIncomingCalls] only once both an owner id AND
+ * an [SessionStatus.Authenticated] session are present — covering the
+ * fresh-login case (which previously never started at all) and the
+ * warm-restart race (which previously subscribed too early) with the
+ * exact same, already-existing [CallRepository] method. If the session is
+ * ever lost (logout, refresh failure) the inner collection is cancelled,
+ * which cleanly unsubscribes the RING channel via
+ * [CallRepository.listenForIncomingCalls]'s own `awaitClose` — no new
+ * teardown path, no duplicate listener.
  */
 @Singleton
 class IncomingCallController @Inject constructor(
@@ -76,6 +119,7 @@ class IncomingCallController @Inject constructor(
     private val callRepository: CallRepository,
     private val rtcMediaEngine: RtcMediaEngine,
     private val secureSessionManager: SecureSessionManager,
+    private val supabaseClientProvider: SupabaseClientProvider,
 ) {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -101,9 +145,11 @@ class IncomingCallController @Inject constructor(
     /**
      * Starts the single, app-wide ring-channel listener. Idempotent — a
      * second call while already started/starting is a no-op (see class
-     * doc). Safe to call before the owner is logged in: it suspends on the
-     * first non-null [SecureSessionManager.userIdFlow] value before
-     * subscribing.
+     * doc). Safe to call before the owner is logged in, and safe across
+     * process-restart auth-restore races: the RING channel subscription is
+     * (re)established only once both an owner id and an authenticated
+     * Supabase session are simultaneously present, and is torn down
+     * automatically if either drops (see BUGFIX 12E.14 above).
      */
     fun startListening() {
         if (!startedGuard.compareAndSet(false, true)) {
@@ -111,14 +157,25 @@ class IncomingCallController @Inject constructor(
             return
         }
         ringListenJob = applicationScope.launch {
-            val ownerId = secureSessionManager.userIdFlow.first() ?: run {
-                Logger.w(message = "[IncomingCallController] no owner session — cannot listen for incoming calls")
-                startedGuard.set(false)
-                return@launch
-            }
-            callRepository.listenForIncomingCalls(ownerId).collect { offer ->
-                handleIncomingOffer(offer)
-            }
+            combine(
+                secureSessionManager.userIdFlow,
+                supabaseClientProvider.client.auth.sessionStatus,
+            ) { ownerId, status -> ownerId to status }
+                .distinctUntilChanged()
+                .collectLatest { (ownerId, status) ->
+                    if (ownerId == null || status !is SessionStatus.Authenticated) {
+                        Logger.d(
+                            message = "[IncomingCallController] not ready to listen for incoming calls " +
+                                "(ownerId=${ownerId != null}, authenticated=${status is SessionStatus.Authenticated}) — " +
+                                "ring listener inactive until both are true",
+                        )
+                        return@collectLatest
+                    }
+                    Logger.d(message = "[IncomingCallController] owner session ready — subscribing to ring channel")
+                    callRepository.listenForIncomingCalls(ownerId).collect { offer ->
+                        handleIncomingOffer(offer)
+                    }
+                }
         }
     }
 
