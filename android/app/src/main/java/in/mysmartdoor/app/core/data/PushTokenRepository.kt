@@ -28,14 +28,14 @@ import javax.inject.Singleton
  * rotate and there is no local persistence here to compare against.
  *
  * ══════════════════════════════════════════════════════════════════════
- * VERIFICATION NOTE: `.upsert(value, onConflict = ...)` below matches the
- * supabase-kt 3.x Postgrest API as documented, following the same
- * `client.postgrest.from(...).upsert(...)` pattern already live in
- * [SettingsRepository.saveNotificationPreferences]. Per the CTO brief this
- * has NOT been run through an actual Gradle build in this environment
- * (network/build tooling unavailable here) — run a real compile before
- * merging, same caveat [CallRepository] already carries for its own
- * Realtime calls.
+ * PHASE 12E.15 COMPILE FIX: `onConflict` is not a named parameter of
+ * `upsert()` on this project's installed supabase-kt 3.1.4 — it's a
+ * property of the trailing `PostgrestRequestBuilder` lambda, the same
+ * lambda-based request DSL [SettingsRepository.updateSecurityRulesColumn]
+ * and [SettingsRepository.updateOwnerName] already use for `.update(value)
+ * { filter { ... } }`. Setting `onConflict` inside that lambda (instead of
+ * passing it as a function argument) is the fix for all 3 compile errors
+ * below.
  * ══════════════════════════════════════════════════════════════════════
  */
 @Singleton
@@ -62,8 +62,9 @@ class PushTokenRepository @Inject constructor(
         return safeApiCall {
             client.postgrest.from("push_subscriptions").upsert(
                 PushSubscriptionUpsertDto(ownerId = ownerId, fcmToken = token),
-                onConflict = "owner_id,fcm_token",
-            )
+            ) {
+                onConflict = "owner_id,fcm_token"
+            }
         }
     }
 }
