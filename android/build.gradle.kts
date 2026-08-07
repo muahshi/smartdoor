@@ -29,4 +29,9 @@ plugins {
     alias(libs.plugins.hilt.android) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    // Phase 12E.15 — declared here (version only, not applied to any
+    // project) so :app can `alias` it. Actually APPLYING it happens
+    // conditionally in app/build.gradle.kts, guarded on
+    // app/google-services.json existing — see that file's comment.
+    alias(libs.plugins.google.services) apply false
 }

@@ -95,6 +95,22 @@
             android:name=".core.call.CallActionReceiver"
             android:exported="false" />
 
+        <!-- Phase 12E.15 — MASKED CALL → NATIVE ANDROID FCM NOTIFICATION.
+             Receives FCM data messages (masked-call offers) even when the
+             app process was previously killed. Not exported — the OS
+             delivers to this via the Firebase Messaging SDK only; nothing
+             else should bind to it. Requires app/google-services.json to
+             actually initialize FirebaseApp at runtime (see
+             app/build.gradle.kts's conditional plugin application) —
+             the class itself compiles and installs regardless. -->
+        <service
+            android:name=".core.notification.SmartDoorFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Phase 12E.8 — PREMIUM SMART PLATE ECOSYSTEM. Backs
              QrImageUtil.share's chooser Intent; exposes only the
              shared_qr/ cache subfolder, see res/xml/file_paths.xml. -->

@@ -20,6 +20,32 @@ import { notifyCallRequest, triggerEmergencyBroadcast } from './notifications.js
 import * as exotel from './exotel.js';
 import * as twilio from './twilio.js';
 
+// FIX (Phase 12E.15 — masked-call push bridge): notifyCallRequest() below
+// only writes the in_app notification row + hits services/notifications.js's
+// CHANNELS.push, which is a deliberate, documented no-op (see that file's
+// comment — real background push for every OTHER event type is triggered
+// directly from the write-site, not through that shared dispatcher, to
+// avoid double-notifying inbox_message). 'call' was the one event type that
+// never got its own direct trigger, so a masked-call request has never
+// reached supabase/functions/send-push. This mirrors visitor.html's own
+// _triggerPush() verbatim (same config keys, same headers, same fire-and-
+// forget/no-throw contract) since that helper is local to visitor.html and
+// not exported for reuse across modules.
+function _triggerCallPush(ownerId, plateId, callId) {
+  try {
+    const supabaseUrl = (typeof window !== 'undefined' && window.__SD_CONFIG__?.supabaseUrl) || '';
+    const anonKey = (typeof window !== 'undefined' && window.__SD_CONFIG__?.supabaseAnon) || '';
+    if (!supabaseUrl || !anonKey || !callId) return;
+    fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${anonKey}` },
+      body: JSON.stringify({ ownerId, plateId, type: 'call', rowId: callId }),
+    }).catch(() => {});
+  } catch (_) {
+    // Never let a push-trigger failure affect the call flow itself.
+  }
+}
+
 // Provider order: primary first, fallback after. Future providers just get
 // appended here — nothing else in this file needs to change.
 const PROVIDERS = [exotel, twilio];
@@ -71,6 +97,10 @@ export async function initiateMaskedCall({ plateId, ownerId, visitorPhone = null
     if (result.success) {
       await _audit(ownerId, 'call_started', { plateId, provider: provider.PROVIDER_NAME, callId: result.callId });
       notifyCallRequest(ownerId, plateId, result.callId).catch(() => {});
+      // Real background push (FCM) — see _triggerCallPush's comment above.
+      // notifyCallRequest() alone does not reach the owner's device if
+      // their dashboard/PWA tab or native app is closed.
+      _triggerCallPush(ownerId, plateId, result.callId);
       return { success: true, callId: result.callId, status: result.status, provider: provider.PROVIDER_NAME };
     }
     lastError = result.error;

@@ -18,7 +18,7 @@
  * needed, no new Postgres extension).
  *
  * Body: { ownerId, plateId, type, rowId, conversationId?, daysLeft?, expired? }
- *   type: 'qr_scan' | 'bell_ring' | 'voice' | 'text' | 'sos' | 'ai_escalation' | 'status_reminder'
+ *   type: 'qr_scan' | 'bell_ring' | 'voice' | 'text' | 'sos' | 'ai_escalation' | 'status_reminder' | 'call'
  *   rowId: the visitor_logs/messages/subscriptions row's own uuid — reused
  *          as the OS notification tag's uniqueness key. EXCEPTION: for the
  *          "collapsible" types (bell_ring, qr_scan) the tag is keyed on
@@ -69,6 +69,13 @@ const EVENT_CONFIG: Record<string, { title: string; body: string; requireInterac
   voice:           { title: '🎤 New voice message', body: 'A visitor left a voice message.', requireInteraction: true },
   text:            { title: '💬 New message from a visitor', body: 'A visitor sent you a text message.', requireInteraction: false },
   sos:             { title: '🚨 EMERGENCY — SOS Triggered', body: 'A visitor pressed the SOS button. Respond immediately.', requireInteraction: true },
+  // Phase 12E.15 — masked-call push bridge. Each call attempt gets its own
+  // row/tag (see COLLAPSIBLE_TYPES below — 'call' is deliberately NOT in
+  // that set, same as voice/text/sos: a second call attempt must show as
+  // its own notification, never silently replace a still-ringing one).
+  // Body intentionally stays generic — no visitor identity, no phone
+  // number, no call/provider credentials ever go in a push payload.
+  call:            { title: '📞 Incoming secure call', body: 'A visitor is requesting a secure call.', requireInteraction: true },
   ai_escalation:   { title: '🙋 Visitor needs your attention', body: "Priya (AI) couldn't fully help this visitor — your personal reply may be needed.", requireInteraction: true },
   // status_reminder's body is recomputed from daysLeft/expired below —
   // this default is only the fallback if those fields are ever missing.

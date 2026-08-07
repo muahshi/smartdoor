@@ -38,6 +38,19 @@ zxingCore = "3.5.3"
 # each analyzed frame), so this phase only adds the camera plumbing.
 cameraX = "1.4.1"
 
+# Phase 12E.15 — MASKED CALL → NATIVE ANDROID FCM NOTIFICATION. Firebase
+# BOM pins firebase-messaging's transitive versions; the Google Services
+# Gradle plugin reads app/google-services.json (NOT present in this repo —
+# see android/app/build.gradle.kts's conditional apply) to inject the
+# Firebase project identity at build time. kotlinxCoroutinesPlayServices
+# is only for the `Task<T>.await()` extension used once, in
+# core/notification/PushTokenSync.kt, to bridge
+# FirebaseMessaging.getInstance().token (a Play Services Task, not a
+# suspend fun) into a coroutine.
+firebaseBom = "33.7.0"
+googleServices = "4.4.2"
+kotlinxCoroutinesPlayServices = "1.9.0"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -91,6 +104,11 @@ androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", 
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraX" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraX" }
 
+# Phase 12E.15 — MASKED CALL → NATIVE ANDROID FCM NOTIFICATION.
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
@@ -98,3 +116,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinSerializationPlugin" }
+# Phase 12E.15 — applied conditionally in android/app/build.gradle.kts
+# (only if google-services.json is present) so the build does not hard-fail
+# for anyone building this repo before that file is supplied.
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

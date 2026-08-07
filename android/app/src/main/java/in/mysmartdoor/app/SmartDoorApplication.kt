@@ -1,6 +1,7 @@
 package `in`.mysmartdoor.app
 
 import `in`.mysmartdoor.app.core.call.IncomingCallController
+import `in`.mysmartdoor.app.core.notification.PushTokenSync
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -18,6 +19,10 @@ import javax.inject.Inject
  * exactly once here — the single app-wide entry point for the app's one
  * ring-channel subscription (see that class's doc comment for the
  * duplicate-subscription bug this replaces).
+ *
+ * Phase 12E.15 — MASKED CALL → NATIVE ANDROID FCM NOTIFICATION.
+ * [PushTokenSync.start] is kicked off the same way, for the same reason —
+ * one app-wide entry point, not something a screen/ViewModel triggers.
  */
 @HiltAndroidApp
 class SmartDoorApplication : Application() {
@@ -25,8 +30,12 @@ class SmartDoorApplication : Application() {
     @Inject
     lateinit var incomingCallController: IncomingCallController
 
+    @Inject
+    lateinit var pushTokenSync: PushTokenSync
+
     override fun onCreate() {
         super.onCreate()
         incomingCallController.startListening()
+        pushTokenSync.start()
     }
 }

@@ -29,6 +29,32 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Phase 12E.15 — MASKED CALL → NATIVE ANDROID FCM NOTIFICATION.
+//
+// The Google Services Gradle plugin FAILS THE BUILD outright if applied
+// without an app/google-services.json present (it errors during
+// evaluation, before any task runs) — so it is applied conditionally here
+// rather than via the plugins{} block above (which cannot be conditional).
+// This is the file this repo's owner must supply — see this project's
+// FCM verification report for exactly what's blocked without it. Every
+// other part of this phase (Firebase Messaging dependency, the
+// FirebaseMessagingService subclass, manifest registration, token
+// registration plumbing) compiles and links fine without this file; only
+// runtime FCM delivery (and, per the plugin's own behavior, initializing
+// FirebaseApp with real project identity) needs it.
+val googleServicesJson = file("google-services.json")
+if (googleServicesJson.exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn(
+        "[SmartDoor] android/app/google-services.json not found — skipping the " +
+            "Google Services Gradle plugin. The app will build, but native FCM " +
+            "push (masked-call notifications when the app is backgrounded/killed) " +
+            "will not initialize at runtime until this file is added. " +
+            "See FCM_INTEGRATION_VERIFICATION_REPORT.md."
+    )
+}
+
 android {
     namespace = "in.mysmartdoor.app"
     compileSdk = 35
@@ -183,6 +209,14 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+
+    // Phase 12E.15 — MASKED CALL → NATIVE ANDROID FCM NOTIFICATION.
+    // These resolve from Maven regardless of google-services.json — only
+    // FirebaseApp's runtime initialization (via the conditionally-applied
+    // plugin above) needs that file, not compilation.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
