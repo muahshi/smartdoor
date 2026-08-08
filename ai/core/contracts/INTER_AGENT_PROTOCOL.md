@@ -110,6 +110,110 @@ chosen in this phase, for the same reason `EVENT_BUS.md` and
 choices — deciding before any consuming component exists risks
 designing around the wrong constraints.
 
+## Ordering, Deduplication, and Traceability (SDOS Phase 13A Extension)
+
+**Status:** Phase 13A. Additive. Every rule above (1–5) and every
+validation/failure mode already specified remains unchanged and
+authoritative. This section only closes a gap the original Phase 11
+specification left open: it never defined how a `Message` is identified
+across retries, out-of-order delivery, or a multi-hop CEO → executive →
+response chain. Architecture and contract only — no message has ever
+been exchanged, so nothing below has ever executed.
+
+### Identifiers Every Message Carries
+
+Extends `MESSAGE_SCHEMA.md`'s object shape (this section does not
+restate or redefine that schema's existing fields — it adds the
+following, all required):
+
+```
+conversation_id:  string   # stable for the life of one founder-initiated
+                            # or CEO-initiated exchange; shared by every
+                            # Message and RESPONSE within it
+task_id:          string | null   # set only if this exchange exists to
+                                   # support a TASK_MODEL.md task; null
+                                   # for a standalone consultation
+event_id:         string | null   # set only if this exchange was
+                                   # triggered by an EVENT_BUS.md event
+correlation_id:   string   # reuses EVENT_BUS.md's existing field
+                            # meaning: ties this Message to every event
+                            # and message in the same causal chain
+sequence_number:  integer  # monotonically increasing per conversation_id,
+                            # assigned by the sender at send time
+idempotency_key:  string   # deterministic from (conversation_id,
+                            # sequence_number, sender); a resend of the
+                            # same logical message reuses the same key
+```
+
+### Duplicate Detection and Duplicate Delivery
+
+1. A receiving executive that observes a `Message` whose
+   `idempotency_key` matches one it has already processed within the
+   same `conversation_id` treats it as a duplicate delivery, not a new
+   message — it re-emits its original `RESPONSE` (if one exists) rather
+   than reprocessing.
+2. Duplicate detection is scoped to `conversation_id`, never global —
+   this mirrors `MEMORY_SCHEMA.md`'s existing session-scoping discipline
+   rather than inventing a new scope.
+
+### Out-of-Order and Stale Messages
+
+3. A `Message` arriving with a `sequence_number` lower than one already
+   processed for that `conversation_id` is stale. It is not silently
+   discarded — per Rule 3 of the failure modes already established
+   below, it is logged as a non-fatal ordering anomaly and answered only
+   if still actionable; otherwise it is answered with a pointer to the
+   conversation's current state.
+4. `EVENT_BUS.md`'s existing ordering guarantee ("ordered within a
+   `correlation_id`") is the model this rule follows for messages —
+   this section does not invent a second ordering scheme, it applies
+   the same discipline to `Message` that `EVENT_BUS.md` already applies
+   to `Event`.
+
+### Expiration and Replay Protection
+
+5. Every `Message` carries the `timeout` value already required by
+   Protocol Rule 2 above. A `Message` received after its own `timeout`
+   has elapsed (relative to its `timestamp`) is expired — the receiver
+   must not process it as if newly sent; it raises `error.raised`
+   (`EVENT_BUS.md`) with an `expired_message` reason, same as an
+   unanswered `REQUEST` past timeout already does under the existing
+   Failure Modes section above.
+6. A resent `Message` (same `idempotency_key`) after its original has
+   already expired is not automatically revived — the sender must issue
+   a new `Message` with a new `sequence_number` and `idempotency_key`,
+   making replay of a stale message indistinguishable from sending a
+   genuinely new one, which closes the replay vector without adding a
+   new authorization mechanism.
+
+### Retry Behavior
+
+7. A sender may retry an unanswered `REQUEST` before its `timeout`
+   elapses, but a retry reuses the same `idempotency_key` and
+   `sequence_number` as the original — it is the same logical message,
+   not a new one, so Rule 1 above (duplicate detection) applies at the
+   receiver regardless of how many times the network layer redelivered
+   it. This section does not fix a specific retry count or backoff
+   curve, for the same reason `INTER_AGENT_PROTOCOL.md`'s own "Future
+   Implementation Notes" already defers timeout duration.
+
+### Traceability Across CEO → Executive → Response Chains
+
+8. Every `Message` in a CEO-orchestrated exchange (`EXECUTIVE_ORCHESTRATION.md`)
+   shares one `conversation_id` for the full chain, even when it spans
+   more than one executive (e.g. CEO → CTO, then CTO → CFO for a
+   sub-question, then CFO → CTO's `RESPONSE`, then CTO → CEO's final
+   `RESPONSE`). The `correlation_id` ties this chain to any `Event` that
+   triggered it; the `conversation_id` ties every `Message` and
+   `RESPONSE` within the chain to each other. Neither identifier grants
+   any additional authority — this restates, and does not loosen,
+   Protocol Rule 3's existing prohibition on messages substituting for
+   `TASK_ROUTING.md` ownership.
+9. `AUDIT_TRAIL.md` remains the durable record of the decisions this
+   traceability supports; this section adds the identifiers `AUDIT_TRAIL.md`
+   needs to reconstruct a full chain, it does not duplicate that file's
+   own retention or founder-review rules.
+
 ## Relationship to the Rest of SDOS
 
 - Sits directly on top of `MESSAGE_SCHEMA.md`.

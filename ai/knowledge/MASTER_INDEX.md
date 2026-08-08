@@ -230,6 +230,33 @@ budget) from production's existing `groq-proxy`. See
 phase records. Documentation and contracts only — no code, client,
 Edge Function, or credential exists as of this phase.
 
+## Communication Extensions (SDOS Phase 13A)
+
+As of Phase 13A, four genuine gaps in the Phase 11–12 communication
+architecture were closed by extending existing documents in place,
+rather than by adding a new communication layer. A full audit found
+that `ai/core/contracts/MESSAGE_SCHEMA.md`, `INTER_AGENT_PROTOCOL.md`,
+`TASK_ROUTING.md`, `EVENT_BUS.md`, `FOUNDER_APPROVAL_FLOW.md`,
+`APPROVAL_WORKFLOW.md`, `SECURITY_BOUNDARIES.md`, and each executive's
+own communication documentation already covered the bulk of what a
+"multi-agent communication framework" would need; only four things were
+missing. `INTER_AGENT_PROTOCOL.md` gained a new section on message
+ordering, deduplication, idempotency, and traceability.
+`ai/core/events/EVENT_CATALOG.md` (new) gives `EVENT_BUS.md`'s
+envelope a concrete business-event taxonomy (commerce, support,
+operations, product, marketing/revenue, security). `ai/executives/ceo/
+MULTI_PARTY_CONFLICT.md` (new) extends `DECISION_FRAMEWORK.md` to
+three-or-more-executive disagreements, with an explicit rule that the
+CEO must never manufacture consensus or silently drop a minority
+position. `ai/runtime/EXECUTION_FLOW.md` gained a section connecting
+`EXECUTION_PIPELINE.md`'s inter-agent message sub-loop to the existing
+Groq reasoning sequence. See
+`ai/docs/adr/ADR-0009-Communication-Extensions.md` for why a
+fifteen-file duplicate communication folder was rejected in favor of
+these four targeted extensions, and why `ADR-0006` remains authoritative
+for the base message architecture. Documentation and contracts only —
+no runtime, message bus, or event bus exists as of this phase.
+
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
 - SmartDoor's actual codebase and Supabase database are always the

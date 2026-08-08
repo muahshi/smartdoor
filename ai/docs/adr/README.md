@@ -30,6 +30,7 @@ rebuild) a prior finding.
 | `ADR-0006-Agent-Communication.md` | Agent Communication | The decision to model inter-agent communication as two separate documents — a message schema and a protocol — kept subordinate to the existing task-routing ownership table (Phase 11) |
 | `ADR-0007-Groq-Runtime.md` | Groq Runtime | Proposed (not yet founder-accepted): if SDOS ever invokes Groq for its own executive reasoning, it must use a new, separately-scoped Edge Function and credential, never production's `groq-proxy` (Phase 12) |
 | `ADR-0008-Prompt-Routing.md` | Prompt Routing | The decision to split provider-level and executive-level Groq routing into two narrow documents (`AI_ROUTER.md`, `EXECUTIVE_ROUTER.md`), both subordinate to the existing `TASK_ROUTING.md` and `PROMPT_REGISTRY.md` (Phase 12) |
+| `ADR-0009-Communication-Extensions.md` | Communication Extensions | The decision to reject a duplicative fifteen-file communication folder and instead extend four existing documents in place (ordering/dedup, event taxonomy, multi-party conflict, message-triggered reasoning), keeping `ADR-0006` authoritative (Phase 13A) |
 
 ## How to Read an ADR
 
@@ -75,5 +76,12 @@ earlier ones where a decision built directly on a prior one.
   picture.
 - `ADR-0007` and `ADR-0008` should be read alongside `ai/runtime/README.md`
   and `ai/docs/GROQ_RUNTIME_READINESS.md` for the full Phase 12
-  picture. `ADR-0007` is the one ADR in this folder currently
+  picture.
+- `ADR-0009` should be read alongside the Phase 13A extension sections
+  inside `ai/core/contracts/INTER_AGENT_PROTOCOL.md` and
+  `ai/runtime/EXECUTION_FLOW.md`, plus the two new files
+  `ai/core/events/EVENT_CATALOG.md` and
+  `ai/executives/ceo/MULTI_PARTY_CONFLICT.md` — it explicitly does not
+  supersede `ADR-0006`, which remains authoritative for the base
+  message architecture. `ADR-0007` is the one ADR in this folder currently
   `Proposed` rather than `Accepted` — see its own Status line.
