@@ -257,6 +257,22 @@ these four targeted extensions, and why `ADR-0006` remains authoritative
 for the base message architecture. Documentation and contracts only —
 no runtime, message bus, or event bus exists as of this phase.
 
+## Communication Implementation Plan (SDOS Phase 13B)
+
+As of Phase 13B, the implementation-technology questions Phase 11 and
+13A deliberately deferred (event bus transport, message lifecycle,
+deduplication/ordering enforcement, traceability, production
+boundary, test strategy, rollback strategy, observability, security
+implementation) were resolved on paper, against direct repository
+evidence, under `ai/docs/implementation/`. The event bus
+recommendation is a dedicated append-only Postgres table with a
+Supabase Realtime channel layered on top — the same table+Realtime
+composition already used in production for notifications and
+activity-center events. See
+`ai/docs/adr/ADR-0010-Communication-Implementation-Plan.md` for the
+decision record. Planning only — no runtime, SQL, Supabase function,
+or Groq configuration changed as a result of this phase.
+
 ## Ground Rules (see `ai/docs/COMPANY_BRAIN.md` for full detail)
 
 - SmartDoor's actual codebase and Supabase database are always the
