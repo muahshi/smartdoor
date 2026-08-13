@@ -100,3 +100,18 @@ now") rather than relying solely on the Company Brain's periodic
 snapshots. This is explicitly **not** built in Phase 10 — see
 `ai/core/context/CONTEXT_LOADING.md` step 5 for how a future live read
 would rank against Company Brain context once it exists.
+
+## Addendum — SDOS Phase 14A: a second, narrower, write-capable client
+
+The read-only posture above governs any future SDOS read of *SmartDoor
+production* data and remains unchanged. Phase 14A adds one distinct,
+much narrower capability that this section documents so the two are
+never confused: `sdosEventsStore.js` (this folder) writes to exactly
+two SDOS-owned tables — `sdos_events` and `sdos_event_lifecycle`
+(`sql/72_sdos_event_bus_foundation.sql`) — and nothing else. It uses
+`service_role` (unlike the read-only client described above, which
+explicitly never does), because those two tables are not SmartDoor
+production data; see `ai/docs/implementation/SECURITY_IMPLEMENTATION_PLAN.md`
+"Write Operations" for why this is scoped and why a narrower,
+purpose-built DB role remains a documented Phase 14B improvement over
+reusing `service_role`.
