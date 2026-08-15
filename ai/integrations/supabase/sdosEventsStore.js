@@ -43,8 +43,28 @@
  * authenticate — because completing the cutover requires a manually
  * issued credential/JWT outside repository SQL (see migration 73's
  * "MANUAL DEPLOYMENT STEPS" and ai/adr/ADR-0011-Event-Bus-Hardening.md
- * for why that step cannot be done from this file alone). This module
- * still authenticates as service_role today; that has not changed.
+ * for why that step cannot be done from this file alone).
+ *
+ * PHASE 14E UPDATE: the manual cutover (migration 73's steps 1-2) is
+ * complete — sdos_service now has LOGIN and SDOS_DB_URL exists as an
+ * Edge Function secret. insertEvent(), appendLifecycleStage(), and
+ * isEventBusEnabled() (the DB-credential path per ADR-0012) now use a
+ * direct Postgres connection via getDbClient() when SDOS_DB_URL is
+ * present, bypassing PostgREST's JWT-role resolution — the only way
+ * sdos_service (not exposed via SUPABASE_SERVICE_ROLE_KEY's JWT) can
+ * ever be reached, exactly as migration 73's "MANUAL DEPLOYMENT STEPS"
+ * §3 specified. broadcastEvent() is UNCHANGED — it still authenticates
+ * as service_role via getClient() below, because it needs a Supabase
+ * Realtime JWT, not a bare Postgres role (ADR-0012 §2). If SDOS_DB_URL
+ * is absent, the DB-credential functions fall back to this same
+ * getClient()/service_role path, matching migration 73's documented
+ * fallback design and keeping any environment that hasn't completed
+ * cutover (e.g. a second project, a future rollback) working exactly
+ * as before. If SDOS_DB_URL IS present but the direct connection or
+ * query fails, they do NOT fall back to service_role — they fail
+ * closed (Phase 14E brief, Step 4): a narrower credential that can
+ * silently degrade to a broader one on any hiccup is not a narrower
+ * credential.
  *
  * Never imported by any SmartDoor production file — one-way dependency
  * (SECURITY_MODEL.md constraint 2). Never holds a Razorpay, Twilio,
@@ -96,6 +116,59 @@ export function _resetClientForTests(fakeClient) {
   _client = fakeClient || null;
 }
 
+// ── Phase 14E: direct-Postgres path for sdos_service ─────────────────────
+//
+// Used ONLY by insertEvent(), appendLifecycleStage(), and
+// isEventBusEnabled() — the three DB-credential operations ADR-0012 §2
+// scopes to sdos_service. broadcastEvent() never calls this; it stays
+// on getClient()/service_role for Realtime, unconditionally.
+//
+// Scope is structural, not just convention: the three queries below are
+// the ONLY SQL this module ever issues over this connection, and they
+// touch exactly sdos_events, sdos_event_lifecycle, and a single-row
+// read of feature_flags — the same three-table surface sdos_service's
+// own grants (migration 73) and RLS policies (migrations 73 + 74)
+// enforce server-side. No other table name appears in this file.
+let _dbClient = null;
+
+/** Test-only seam, mirrors _resetClientForTests above. */
+export function _resetDbClientForTests(fakeDbClient) {
+  _dbClient = fakeDbClient || null;
+}
+
+/**
+ * Lazy singleton direct-Postgres client, scoped to SDOS_DB_URL only.
+ * Returns null (not a throw) when SDOS_DB_URL is absent — callers use
+ * that to fall back to the existing service_role path, matching
+ * migration 73's documented fallback design. Once SDOS_DB_URL IS
+ * present, any failure to construct/connect the client throws, and
+ * callers must NOT catch-and-fall-back-to-service_role — they fail
+ * closed and report INTEGRATION_ERROR (Step 4).
+ *
+ * `postgres` (postgres.js) is loaded the same way @supabase/supabase-js
+ * already is above — a lazy esm.sh import, not a package.json
+ * dependency — because this file's only proven runtime is Deno Edge
+ * Functions (see the comment on `_client` above); Deno resolves the
+ * remote specifier natively, and the import is never reached in the
+ * Node-based test suite since tests always inject deps.client/deps.db.
+ * `max: 1` matches the one-connection-per-invocation shape correct for
+ * a serverless/edge function; short timeouts avoid a hung invocation
+ * blocking on a bad credential instead of failing closed quickly.
+ */
+async function getDbClient(env = (typeof Deno !== 'undefined' ? Deno.env.toObject() : process.env)) {
+  const dbUrl = env.SDOS_DB_URL;
+  if (!dbUrl) return null;
+  if (_dbClient) return _dbClient;
+  const { default: postgres } = await import('https://esm.sh/postgres@3');
+  _dbClient = postgres(dbUrl, {
+    max: 1,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+  });
+  return _dbClient;
+}
+
 /**
  * Inserts one row into sdos_events. Returns { outcome, data?, error? }
  * — an IntegrationWriteResult, the write-path counterpart to
@@ -108,6 +181,39 @@ export function _resetClientForTests(fakeClient) {
  * outcome DUPLICATE, never a second row and never a thrown error.
  */
 export async function insertEvent(event, deps = {}) {
+  if (!deps.client) {
+    const db = deps.db || await getDbClient();
+    if (db) {
+      try {
+        const rows = await db`
+          INSERT INTO sdos_events
+            (event_id, event_type, source, session_id, correlation_id, priority, payload)
+          VALUES (
+            ${event.event_id}, ${event.event_type}, ${event.source},
+            ${event.session_id ?? null}, ${event.correlation_id ?? null},
+            ${event.priority}, ${db.json(event.payload)}
+          )
+          RETURNING *
+        `;
+        return { outcome: 'OK', data: rows[0], source: 'sdos_service', fetched_at: new Date().toISOString() };
+      } catch (error) {
+        // Postgres unique_violation on the event_id primary key = duplicate.
+        if (error.code === '23505') {
+          try {
+            const existing = await db`SELECT * FROM sdos_events WHERE event_id = ${event.event_id}`;
+            if (existing[0]) {
+              return { outcome: 'DUPLICATE', data: existing[0], source: 'sdos_service', fetched_at: new Date().toISOString() };
+            }
+          } catch (_) { /* fall through to fail-closed error below */ }
+        }
+        // Fail closed (Step 4): never fall back to service_role here.
+        return { outcome: 'INTEGRATION_ERROR', error: error.message, source: 'sdos_service', fetched_at: new Date().toISOString() };
+      }
+    }
+  }
+
+  // No SDOS_DB_URL configured (or a test-injected deps.client) —
+  // existing service_role path, unchanged from Phase 14A/14B.
   const client = deps.client || await getClient();
   const { data, error } = await client
     .from('sdos_events')
@@ -151,6 +257,25 @@ export async function insertEvent(event, deps = {}) {
  * this module only reports.
  */
 export async function appendLifecycleStage({ event_id, stage, detail, correlation_id }, deps = {}) {
+  if (!deps.client) {
+    const db = deps.db || await getDbClient();
+    if (db) {
+      try {
+        const rows = await db`
+          INSERT INTO sdos_event_lifecycle (event_id, stage, detail, correlation_id)
+          VALUES (${event_id}, ${stage}, ${detail ?? null}, ${correlation_id ?? null})
+          RETURNING *
+        `;
+        return { outcome: 'OK', data: rows[0], source: 'sdos_service', fetched_at: new Date().toISOString() };
+      } catch (error) {
+        // Fail closed (Step 4): never fall back to service_role here.
+        return { outcome: 'INTEGRATION_ERROR', error: error.message, source: 'sdos_service', fetched_at: new Date().toISOString() };
+      }
+    }
+  }
+
+  // No SDOS_DB_URL configured (or a test-injected deps.client) —
+  // existing service_role path, unchanged from Phase 14A/14B.
   const client = deps.client || await getClient();
   const { data, error } = await client
     .from('sdos_event_lifecycle')
@@ -223,6 +348,25 @@ export async function broadcastEvent(event, deps = {}) {
  * it does not duplicate the rest of services/featureFlags.js.
  */
 export async function isEventBusEnabled(deps = {}) {
+  if (!deps.client) {
+    try {
+      const db = deps.db || await getDbClient();
+      if (db) {
+        const rows = await db`SELECT enabled FROM feature_flags WHERE key = 'sdos_event_bus_enabled' LIMIT 1`;
+        // Fail-safe by design, same convention as the service_role path
+        // below: missing row or non-true value → false. A query/connection
+        // error here throws and is caught by the outer try/catch, which
+        // also resolves to false — this function's contract is that it
+        // NEVER throws, whichever credential path answered it.
+        return rows[0]?.enabled === true;
+      }
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // No SDOS_DB_URL configured (or a test-injected deps.client) —
+  // existing service_role path, unchanged from Phase 14A/14B.
   const client = deps.client || await getClient();
   try {
     const { data, error } = await client
@@ -237,4 +381,4 @@ export async function isEventBusEnabled(deps = {}) {
   }
 }
 
-export default { insertEvent, appendLifecycleStage, broadcastEvent, isEventBusEnabled, _resetClientForTests };
+export default { insertEvent, appendLifecycleStage, broadcastEvent, isEventBusEnabled, _resetClientForTests, _resetDbClientForTests };
