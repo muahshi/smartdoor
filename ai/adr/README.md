@@ -32,6 +32,7 @@ rebuild) a prior finding.
 | `ADR-0008-Prompt-Routing.md` | Prompt Routing | The decision to split provider-level and executive-level Groq routing into two narrow documents (`AI_ROUTER.md`, `EXECUTIVE_ROUTER.md`), both subordinate to the existing `TASK_ROUTING.md` and `PROMPT_REGISTRY.md` (Phase 12) |
 | `ADR-0009-Communication-Extensions.md` | Communication Extensions | The decision to reject a duplicative fifteen-file communication folder and instead extend four existing documents in place (ordering/dedup, event taxonomy, multi-party conflict, message-triggered reasoning), keeping `ADR-0006` authoritative (Phase 13A) |
 | `ADR-0010-Communication-Implementation-Plan.md` | Communication Implementation Plan | The decision to resolve, on paper only, the transport/lifecycle/dedup/ordering/traceability/security/test/rollback/observability implementation questions Phase 11 and 13A deferred — recommending a table+Realtime event bus — without writing runtime code or revising `ADR-0006`/`ADR-0009` (Phase 13B) |
+| `ADR-0011-Event-Bus-Hardening.md` | Event Bus Hardening | The decision to scaffold (not complete) a narrower SDOS-only DB credential, narrow `feature_flags`' client-readable policy to exclude `sdos_%` keys, declare explicit Realtime broadcast the one canonical event-delivery mechanism, and add the first controlled runtime caller of `emitEvent()` (Phase 14B) |
 
 ## How to Read an ADR
 
@@ -91,3 +92,9 @@ earlier ones where a decision built directly on a prior one.
   documents in detail. It explicitly does not supersede `ADR-0006` or
   `ADR-0009`, and it authorizes no runtime code, SQL, or Supabase
   function change.
+- `ADR-0011` should be read alongside `ai/core/events/eventBus.js`,
+  `ai/integrations/supabase/sdosEventsStore.js`,
+  `sql/72_sdos_event_bus_foundation.sql`, and
+  `sql/73_sdos_credential_and_flag_hardening.sql` — it hardens Phase
+  14A's implementation of `ADR-0010`'s recommendation; it does not
+  rebuild or replace it.
