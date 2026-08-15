@@ -21,6 +21,7 @@
  */
 
 import { emitEvent, validateEvent, authorizeEvent, ALLOWED_SOURCES } from '../ai/core/events/eventBus.js';
+import { invoke as invokeRuntimeCaller, buildVerificationEvent } from '../ai/core/runtime/runtimeCaller.js';
 
 let passed = 0;
 let failed = 0;
@@ -211,6 +212,73 @@ async function main() {
     const spoofed = authorizeEvent({ source: '__proto__' });
     assert(spoofed.ok === false, 'a non-registered source string must never authorize, regardless of content');
     return 'ALLOWED_SOURCES is a frozen module constant, not derived from event content; DB-level RLS (zero policies) verified separately by sql/72b_verify.sql Checks 4-6';
+  });
+
+  // ── Phase 14B additions (Objective 5: scenarios the 14A suite above
+  // did not yet cover) ──────────────────────────────────────────────
+
+  // 11. Feature disabled — the ONE stage that produces no audit trail
+  // at all, per emitEvent()'s own "Golden Rule 17 / kill switch"
+  // comment: disabled means a complete no-op, zero writes anywhere.
+  await check('feature disabled: zero writes, no lifecycle row, outcome DISABLED', async () => {
+    const fakeStore = makeFakeStore({ enabled: false });
+    const result = await emitEvent(
+      { event_type: 'error.raised', source: 'runtime', payload: {} },
+      { store: fakeStore, isEnabledOverride: false }
+    );
+    assert(result.outcome === 'DISABLED', `expected DISABLED, got ${result.outcome}`);
+    assert(fakeStore._events.size === 0, 'disabled bus must never persist an event');
+    assert(fakeStore._lifecycle.length === 0, 'disabled bus must never write even a "received" lifecycle row — the empty trace IS the correct trace');
+    return 'no sdos_events row, no sdos_event_lifecycle row';
+  });
+
+  // 12. Canonical transport (ADR-0011) — sdosEventsStore.js's contract
+  // exposes exactly one delivery function (broadcastEvent) that
+  // emitEvent() calls; there is no second "publish via postgres_changes"
+  // function in the store contract for emitEvent() to have chosen
+  // between, which is the structural proof this suite can offer that
+  // only one transport is wired into the pipeline. (sdos_events'
+  // supabase_realtime publication membership is DB-level metadata with
+  // no corresponding store-contract function — it cannot be "called"
+  // by application code at all, which is exactly ADR-0011's point:
+  // it's a standing consumption path for a future subscriber, never a
+  // second thing this pipeline writes through.)
+  await check('canonical transport: exactly one delivery path is exercised', async () => {
+    const fakeStore = makeFakeStore();
+    let broadcastCalls = 0;
+    fakeStore.broadcastEvent = async (event) => { broadcastCalls++; return { outcome: 'OK' }; };
+    const result = await emitEvent(
+      { event_type: 'error.raised', source: 'runtime', payload: {} },
+      { store: fakeStore }
+    );
+    assert(result.outcome === 'OK', `expected OK, got ${result.outcome}`);
+    assert(broadcastCalls === 1, `expected exactly one broadcast call, got ${broadcastCalls}`);
+    const storeContractFns = Object.keys(fakeStore).filter((k) => !k.startsWith('_'));
+    const deliveryFns = storeContractFns.filter((k) => /broadcast|publish|notify/i.test(k));
+    assert(deliveryFns.length === 1 && deliveryFns[0] === 'broadcastEvent', `expected exactly one delivery function in the store contract, found: ${deliveryFns.join(', ')}`);
+    return 'broadcastEvent is the only delivery function in the store contract; called exactly once';
+  });
+
+  // 13. Rollback — feature flag OFF means no event writes, no
+  // broadcasts, no business impact, verified through the actual
+  // Objective-4 controlled caller (not just a raw emitEvent() call),
+  // repeated to confirm it stays a no-op across multiple invocations.
+  await check('rollback: runtimeCaller produces zero writes across repeated calls while disabled', async () => {
+    const fakeStore = makeFakeStore({ enabled: false });
+    const results = [];
+    for (let i = 0; i < 3; i++) {
+      results.push(await invokeRuntimeCaller({ deps: { store: fakeStore, isEnabledOverride: false } }));
+    }
+    assert(results.every((r) => r.outcome === 'DISABLED'), `expected all three calls to return DISABLED, got [${results.map((r) => r.outcome).join(', ')}]`);
+    assert(fakeStore._events.size === 0, 'rollback must hold across repeated calls, not just the first');
+    assert(fakeStore._lifecycle.length === 0, 'rollback must produce zero lifecycle rows across repeated calls');
+    // Sanity: the event this caller WOULD have emitted is well-formed
+    // and passes Validate/Authorize on its own — confirms DISABLED is
+    // because of the flag, not because the caller's own event is broken.
+    const wouldBeEvent = buildVerificationEvent('rollback-test');
+    assert(validateEvent(wouldBeEvent).ok === true, 'runtimeCaller\'s own event must be valid — DISABLED must come only from the flag');
+    assert(authorizeEvent(wouldBeEvent).ok === true, 'runtimeCaller\'s own source must be authorized — DISABLED must come only from the flag');
+    return `${results.length} calls, all DISABLED, zero writes`;
   });
 
   // Bonus: validateEvent/authorizeEvent are pure and side-effect-free
