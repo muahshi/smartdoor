@@ -7,7 +7,9 @@
     "build": "node scripts/build-env.js",
     "dev": "node scripts/build-env.js && npx serve . -p 3000",
     "smoke-test": "node scripts/smoke-test.js",
-    "validate:prod-config": "node scripts/validate-production-config.js"
+    "validate:prod-config": "node scripts/validate-production-config.js",
+    "sdos-event-bus-test": "node scripts/sdos-event-bus-test.js",
+    "sdos-runtime-caller-verify": "node scripts/sdos-runtime-caller-verify.js"
   },
   "engines": {
     "node": ">=18"
