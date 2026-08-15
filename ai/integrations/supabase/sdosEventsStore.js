@@ -36,6 +36,16 @@
  * UPDATE or DELETE against either table; a bug here cannot silently
  * corrupt event history, only fail to insert.
  *
+ * PHASE 14B UPDATE: migration 73 creates the narrower role
+ * (`sdos_service`) SECURITY_IMPLEMENTATION_PLAN.md asks for, scoped to
+ * exactly these two tables via real RLS policies rather than
+ * service_role's BYPASSRLS attribute. It is NOLOGIN — dormant, cannot
+ * authenticate — because completing the cutover requires a manually
+ * issued credential/JWT outside repository SQL (see migration 73's
+ * "MANUAL DEPLOYMENT STEPS" and ai/adr/ADR-0011-Event-Bus-Hardening.md
+ * for why that step cannot be done from this file alone). This module
+ * still authenticates as service_role today; that has not changed.
+ *
  * Never imported by any SmartDoor production file — one-way dependency
  * (SECURITY_MODEL.md constraint 2). Never holds a Razorpay, Twilio,
  * Exotel, or groq-proxy credential (PRODUCTION_BOUNDARY.md).
@@ -169,6 +179,16 @@ export async function appendLifecycleStage({ event_id, stage, detail, correlatio
  * over this channel — the two are not mutually exclusive and neither
  * is authoritative; the table always is (EVENT_BUS.md Delivery
  * Contract: "Persistence remains the source of truth").
+ *
+ * PHASE 14B: this explicit-broadcast path is confirmed as SDOS's ONE
+ * canonical event-delivery mechanism (ai/adr/ADR-0011-Event-Bus-
+ * Hardening.md) — it is the only transport a caller's lifecycle trace
+ * (broadcast_attempted/succeeded/failed) reflects, and the only one
+ * emitEvent() ever awaits. sdos_events' supabase_realtime publication
+ * membership remains, unchanged, for exactly the documented reason
+ * above (a future polling/CDC consumer) and is NOT a second competing
+ * delivery path any caller relies on today — see ADR-0011 for the full
+ * comparison and why this is not "two architectures."
  */
 export async function broadcastEvent(event, deps = {}) {
   const client = deps.client || await getClient();
