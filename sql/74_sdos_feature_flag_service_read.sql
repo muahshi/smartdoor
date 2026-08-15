@@ -66,6 +66,22 @@ DROP POLICY IF EXISTS "sdos_service_select_sdos_flags" ON feature_flags;
 CREATE POLICY "sdos_service_select_sdos_flags" ON feature_flags
   FOR SELECT TO sdos_service USING (key LIKE 'sdos_%');
 
+-- ────────────────────────────────────────────────────────────────────────
+-- Verification enablement — NOT a privilege expansion. Supabase's
+-- `postgres` role (what the Dashboard SQL Editor runs as) is not a
+-- true Postgres superuser and is not automatically a member of a role
+-- it creates via CREATE ROLE — SET ROLE requires membership, so
+-- without this grant, sql/74b_verify.sql's SET LOCAL ROLE sdos_service
+-- test (the "real verification test" this phase's brief asked for)
+-- fails with 42501 before it can prove anything. `postgres` already
+-- has unrestricted DDL/admin control over sdos_service (it created the
+-- role, owns its policies, and can ALTER/DROP it at will) — this grant
+-- adds only the ability to temporarily act as sdos_service inside a
+-- SET LOCAL ROLE block for testing, nothing sdos_service itself cannot
+-- already do to its own two-table, one-flag-prefix scope.
+-- ────────────────────────────────────────────────────────────────────────
+GRANT sdos_service TO postgres;
+
 COMMENT ON TABLE feature_flags IS
   'Read-only-to-clients boolean feature toggles. anon/authenticated (via "feature_flags_select_all", sql/38+sql/73) see every key EXCEPT sdos_-prefixed ones. sdos_service (via "sdos_service_select_sdos_flags", sql/74) sees ONLY sdos_-prefixed keys, read-only — the two policies are complementary, not overlapping, and neither role can read what the other is scoped to. Change values via Supabase Dashboard > Table Editor or SQL Editor, never via the app.';
 

@@ -1,9 +1,15 @@
 -- Run AFTER 74_sdos_feature_flag_service_read.sql completes successfully.
--- Run each block separately in the Supabase Dashboard SQL Editor
--- (connected as postgres/service_role, which can SET ROLE to any
--- role including a NOLOGIN one — SET ROLE only requires membership,
--- not LOGIN privilege; this is what lets us test a NOLOGIN role's RLS
--- behavior today, before the migration-73 manual cutover ever happens).
+-- Run each block separately in the Supabase Dashboard SQL Editor.
+--
+-- The Editor connects as Supabase's `postgres` role, which is NOT a
+-- true Postgres superuser and is NOT automatically a member of a role
+-- it creates. SET ROLE only requires membership, not LOGIN privilege
+-- (which is what lets this test a NOLOGIN role's RLS behavior today,
+-- before the migration-73 manual cutover ever happens) — but that
+-- membership itself doesn't exist until migration 74's
+-- `GRANT sdos_service TO postgres;`. If Checks 3-5 below fail with
+-- `ERROR: 42501: permission denied to set role`, migration 74 was not
+-- (fully) applied — re-run it, then retry this file.
 
 -- Check 1: the new policy exists, scoped to sdos_service only
 SELECT tablename, policyname, cmd, roles, qual FROM pg_policies
