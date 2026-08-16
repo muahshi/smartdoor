@@ -80,6 +80,12 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # ── Temporary Phase 14E live verification function ─────────────────────
+      - name: Deploy sdos-verify-14e-temp
+        run: supabase functions deploy sdos-verify-14e-temp --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deploy razorpay-refund
         run: supabase functions deploy razorpay-refund --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
         env:
