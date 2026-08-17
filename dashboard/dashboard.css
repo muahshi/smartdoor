@@ -1,0 +1,141 @@
+/* SDOS Dashboard — Read-Only Foundation (Phase 15)
+ * ai/dashboard/dashboard.css
+ * Minimal, self-contained styling. Not derived from or dependent on
+ * design-system/ — this page is deliberately isolated from
+ * SmartDoor's production UI, per ai/dashboard/README.md.
+ */
+
+:root {
+  --sdos-bg: #0b0f14;
+  --sdos-panel-bg: #121822;
+  --sdos-border: #263041;
+  --sdos-text: #e6edf3;
+  --sdos-muted: #8b98a8;
+  --sdos-accent: #4c8dff;
+  --sdos-warn-bg: #3a2c08;
+  --sdos-warn-border: #7a5b0f;
+  --sdos-allowed: #2ea043;
+  --sdos-denied: #d1394a;
+  --sdos-awaiting: #d2932b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--sdos-bg);
+  color: var(--sdos-text);
+  line-height: 1.5;
+}
+
+.sdos-header {
+  padding: 24px 24px 8px;
+}
+.sdos-header h1 {
+  margin: 0;
+  font-size: 22px;
+}
+.sdos-subtitle {
+  margin: 4px 0 0;
+  color: var(--sdos-muted);
+  font-size: 14px;
+}
+
+.sdos-banner {
+  margin: 8px 24px 20px;
+  padding: 12px 16px;
+  background: var(--sdos-warn-bg);
+  border: 1px solid var(--sdos-warn-border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.sdos-banner code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+main {
+  padding: 0 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sdos-panel {
+  background: var(--sdos-panel-bg);
+  border: 1px solid var(--sdos-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.sdos-panel h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.sdos-panel-note {
+  margin: 0 0 14px;
+  color: var(--sdos-muted);
+  font-size: 13px;
+}
+.sdos-panel-note code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.sdos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sdos-table th {
+  text-align: left;
+  color: var(--sdos-muted);
+  font-weight: 600;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--sdos-border);
+  white-space: nowrap;
+}
+.sdos-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sdos-border);
+  vertical-align: top;
+}
+.sdos-table code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.sdos-cite {
+  color: var(--sdos-muted);
+  max-width: 320px;
+}
+
+.sdos-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.sdos-badge-allowed { background: rgba(46,160,67,0.15); color: var(--sdos-allowed); }
+.sdos-badge-denied { background: rgba(209,57,74,0.15); color: var(--sdos-denied); }
+.sdos-badge-awaiting { background: rgba(210,147,43,0.15); color: var(--sdos-awaiting); }
+
+.sdos-loading { color: var(--sdos-muted); font-size: 13px; }
+
+.sdos-fixture-caption {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  color: var(--sdos-muted);
+  font-style: italic;
+}
+
+.sdos-footer {
+  padding: 16px 24px 32px;
+  color: var(--sdos-muted);
+  font-size: 12px;
+}

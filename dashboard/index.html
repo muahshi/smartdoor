@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!--
+  SDOS Dashboard — Read-Only Foundation (Phase 15)
+  ai/dashboard/index.html
+
+  This is the SDOS dashboard, NOT the existing SmartDoor production
+  dashboard. It is not linked from admin.html, app.html, or any other
+  existing SmartDoor page, and nothing in SmartDoor's production code
+  links to it either — per ai/dashboard/README.md's own "What does NOT
+  go here" section and SECURITY_MODEL.md's one-way-dependency rule.
+
+  Scope, exactly:
+    - Part 1 (Permission Engine) calls the REAL, pure
+      ai/core/permissions/permissionEngine.js in-browser against a
+      small set of fixture PermissionCheck requests defined in
+      dashboard.js. The outcomes shown are genuinely computed by the
+      same engine scripts/sdos-permission-engine-test.js tests — this
+      is not an invented metric — but the *requests* themselves are
+      static fixtures chosen for this page, not live production
+      activity.
+    - Part 2 (SDOS Event Log) renders static fixture rows shaped like
+      sdos_events + sdos_event_lifecycle (sql/72_sdos_event_bus_foundation.sql)
+      so the eventual live-data version has a matching layout. No
+      network call, no Supabase client, no credential of any kind
+      exists on this page.
+
+  Read-only. No write control, no executive control, no Event Bus
+  activation control, no approval-mutation control exists anywhere on
+  this page.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SDOS Dashboard — Read-Only Foundation</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <header class="sdos-header">
+    <h1>SDOS Dashboard</h1>
+    <p class="sdos-subtitle">Read-only foundation &middot; Phase 15</p>
+  </header>
+
+  <div class="sdos-banner" role="status">
+    <strong>Fixture / Foundation Mode.</strong>
+    This page is not connected to production data, the SDOS Event Bus,
+    or any Supabase credential. The Permission Engine panel below runs
+    the real permission engine against a fixed set of sample requests
+    defined in <code>dashboard.js</code>; the Event Log panel shows
+    static, hand-authored rows shaped like <code>sdos_events</code> /
+    <code>sdos_event_lifecycle</code>, not a live feed. Nothing on this
+    page can mutate any executive, approval, or production state.
+  </div>
+
+  <main>
+    <section class="sdos-panel" aria-labelledby="permissions-heading">
+      <h2 id="permissions-heading">Permission Engine — Sample Checks</h2>
+      <p class="sdos-panel-note">
+        Computed live in your browser by the real
+        <code>ai/core/permissions/permissionEngine.js</code> against
+        the fixture requests below — no network call, no database.
+      </p>
+      <div id="permissions-table-container">
+        <p class="sdos-loading">Loading&hellip;</p>
+      </div>
+    </section>
+
+    <section class="sdos-panel" aria-labelledby="events-heading">
+      <h2 id="events-heading">SDOS Event Log — Fixture Data</h2>
+      <p class="sdos-panel-note">
+        Static sample rows only, shaped to match
+        <code>sdos_events</code> and <code>sdos_event_lifecycle</code>.
+        No live event has ever been emitted in production — the Event
+        Bus remains disabled (<code>sdos_event_bus_enabled = FALSE</code>).
+      </p>
+      <div id="events-table-container">
+        <p class="sdos-loading">Loading&hellip;</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="sdos-footer">
+    <p>SmartDoor SDOS &middot; Phase 15 &middot; Read-only, additive, isolated. See ADR-0014 for scope.</p>
+  </footer>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>
