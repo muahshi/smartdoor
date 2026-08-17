@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SDOS Dashboard — Read-Only Foundation</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>SDOS Dashboard <span class="badge inactive" style="vertical-align:middle;">Phase 15B — Foundation</span></h1>
+    <p>Standalone, read-only, observational. Not linked from admin.html, app.html, or any SmartDoor production navigation.</p>
+  </header>
+
+  <div class="banner">
+    <strong>Data access note:</strong> the Permission Runtime panel below is <strong>live</strong> — every result comes
+    from a real, in-browser call to <span class="mono">ai/core/permissions/permissionEngine.js</span>. The Event Bus
+    and Event Log panels are <strong>fixture data</strong>, clearly labeled — <span class="mono">sdos_events</span>
+    and <span class="mono">sdos_event_lifecycle</span> have no client-readable RLS policy today, so this page cannot
+    safely read real rows from the browser. See ADR-0014 / ADR-0015 for the full data-access decision.
+  </div>
+
+  <section>
+    <h2>System Status</h2>
+    <div id="system-status-grid" class="grid"></div>
+  </section>
+
+  <section>
+    <h2>Event Bus</h2>
+    <div id="event-bus-card" class="grid"></div>
+  </section>
+
+  <section>
+    <h2>Permission Runtime</h2>
+    <div id="permission-runtime-card" class="grid"></div>
+
+    <div class="panel" style="margin-top:14px;">
+      <div class="panel-head">
+        <div class="title">Live check — checkPermission()</div>
+        <span class="badge allowed">LIVE</span>
+      </div>
+      <div class="tester">
+        <div class="field">
+          <label for="exec-select">Executive</label>
+          <select id="exec-select"></select>
+        </div>
+        <div class="field">
+          <label for="category-select">Action category</label>
+          <select id="category-select"></select>
+        </div>
+        <div class="field">
+          <label for="gate-select">integrationsReady</label>
+          <select id="gate-select">
+            <option value="false" selected>false (current repo default)</option>
+            <option value="true">true (test only)</option>
+          </select>
+        </div>
+        <div class="field">
+          <button class="run" id="run-check">Run check</button>
+        </div>
+      </div>
+      <div id="permission-result" class="result"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Event Overview <span class="badge fixture">FIXTURE DATA</span></h2>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Event type</th>
+            <th>Source</th>
+            <th>Priority</th>
+            <th>Timestamp</th>
+            <th>Lifecycle</th>
+          </tr>
+        </thead>
+        <tbody id="event-log-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="foot">
+    ai/dashboard — Phase 15B. Read-only, standalone, no production writes, no credentials.
+  </footer>
+
+</div>
+<script type="module" src="dashboard.js"></script>
+</body>
+</html>
