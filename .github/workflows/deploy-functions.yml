@@ -244,5 +244,30 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # ── PHASE 17B FIX: sdos-dashboard-gateway existed in the repo (fully
+      # implemented, 79/79 tests passing) but was never added to this
+      # workflow, so it was never deployed — the "yellow/pending" state seen
+      # in the Supabase dashboard was simply GitHub source with no matching
+      # Supabase function. Same JWT model as admin-data (custom
+      # verifyAdminSession() bearer-token check inside the function, no
+      # --no-verify-jwt flag — this function is never reachable without an
+      # admin session either way).
+      #
+      # --use-api is also required specifically for this function: its own
+      # gatewayLogic.js imports ai/integrations/supabase/sdosEventsReader.js,
+      # which lives outside supabase/ entirely. The default Docker-based
+      # bundler this workflow otherwise relies on only mounts the supabase/
+      # directory, so it cannot resolve that import and deploy would fail or
+      # bundle an empty/broken function (see supabase/cli#1028,
+      # supabase/discussions#33613 for the same failure class). --use-api
+      # deploys via the Supabase Management API instead of Docker and can
+      # resolve imports anywhere in the local checkout, which is exactly
+      # this case. No other function in this workflow needs it, so it is
+      # scoped to this one step only.
+      - name: Deploy sdos-dashboard-gateway
+        run: supabase functions deploy sdos-dashboard-gateway --use-api --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Deployment complete
-        run: echo "✅ All 38 Edge Functions deployed successfully (including admin-data, commerce-engine, partner-data, validate-coupon, partner-application, log-client-error)"
+        run: echo "✅ All 39 Edge Functions deployed successfully (including admin-data, commerce-engine, partner-data, validate-coupon, partner-application, log-client-error, sdos-dashboard-gateway)"
