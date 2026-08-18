@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SDOS Dashboard — Read-Only Foundation</title>
+<title>SDOS Dashboard — Read-Only</title>
 <meta name="robots" content="noindex, nofollow" />
 <link rel="stylesheet" href="dashboard.css" />
 </head>
@@ -11,16 +11,18 @@
 <div class="wrap">
 
   <header class="top">
-    <h1>SDOS Dashboard <span class="badge inactive" style="vertical-align:middle;">Phase 15B — Foundation</span></h1>
+    <h1>SDOS Dashboard <span class="badge inactive" style="vertical-align:middle;">Phase 17 — Live Read Gateway</span></h1>
     <p>Standalone, read-only, observational. Not linked from admin.html, app.html, or any SmartDoor production navigation.</p>
   </header>
 
   <div class="banner">
     <strong>Data access note:</strong> the Permission Runtime panel below is <strong>live</strong> — every result comes
-    from a real, in-browser call to <span class="mono">ai/core/permissions/permissionEngine.js</span>. The Event Bus
-    and Event Log panels are <strong>fixture data</strong>, clearly labeled — <span class="mono">sdos_events</span>
-    and <span class="mono">sdos_event_lifecycle</span> have no client-readable RLS policy today, so this page cannot
-    safely read real rows from the browser. See ADR-0014 / ADR-0015 for the full data-access decision.
+    from a real, in-browser call to <span class="mono">ai/core/permissions/permissionEngine.js</span>. The Event Log
+    panel shows <strong>fixture data</strong> by default (clearly labeled) — real rows are only ever fetched through
+    the authenticated <span class="mono">sdos-dashboard-gateway</span> Edge Function (Phase 17), and only after you
+    explicitly paste an admin session token below and click Load. <span class="mono">sdos_events</span> and
+    <span class="mono">sdos_event_lifecycle</span> still have no client-readable RLS policy — this page never queries
+    them directly. See ADR-0014 / ADR-0015 / ADR-0017 for the full data-access history.
   </div>
 
   <section>
@@ -67,7 +69,56 @@
   </section>
 
   <section>
-    <h2>Event Overview <span class="badge fixture">FIXTURE DATA</span></h2>
+    <h2>Live SDOS Events <span class="badge inactive">Phase 17</span></h2>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="title">sdos-dashboard-gateway — sdos_events.recent</div>
+        <span class="badge inactive">AUTH REQUIRED</span>
+      </div>
+      <div class="tester">
+        <div class="field">
+          <label for="gateway-url">Gateway URL</label>
+          <input id="gateway-url" type="text" placeholder="https://&lt;project&gt;.supabase.co/functions/v1/sdos-dashboard-gateway" />
+        </div>
+        <div class="field">
+          <label for="admin-token">Admin session token</label>
+          <input id="admin-token" type="password" placeholder="paste token from admin.html login" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="live-limit">Limit (1–200)</label>
+          <input id="live-limit" type="number" min="1" max="200" placeholder="50" />
+        </div>
+        <div class="field">
+          <label for="live-event-type">event_type filter (optional)</label>
+          <input id="live-event-type" type="text" placeholder="task.created" />
+        </div>
+        <div class="field">
+          <button class="run" id="load-live-events">Load Live Events</button>
+        </div>
+      </div>
+      <div id="live-events-status" class="result"></div>
+    </div>
+
+    <div class="panel" style="margin-top:14px;">
+      <div class="panel-head">
+        <div class="title">sdos-dashboard-gateway — sdos_event_lifecycle.by_event</div>
+        <span class="badge inactive">AUTH REQUIRED</span>
+      </div>
+      <div class="tester">
+        <div class="field">
+          <label for="lifecycle-event-id">event_id</label>
+          <input id="lifecycle-event-id" type="text" placeholder="paste an event_id from the table below" />
+        </div>
+        <div class="field">
+          <button class="run" id="load-lifecycle">Load Lifecycle</button>
+        </div>
+      </div>
+      <div id="lifecycle-result" class="result"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Event Overview <span class="badge fixture" id="event-log-mode-badge">FIXTURE DATA</span></h2>
     <div class="panel">
       <table>
         <thead>
@@ -76,7 +127,7 @@
             <th>Source</th>
             <th>Priority</th>
             <th>Timestamp</th>
-            <th>Lifecycle</th>
+            <th>Lifecycle / event_id</th>
           </tr>
         </thead>
         <tbody id="event-log-body"></tbody>
@@ -85,7 +136,8 @@
   </section>
 
   <footer class="foot">
-    ai/dashboard — Phase 15B. Read-only, standalone, no production writes, no credentials.
+    ai/dashboard — Phase 15B foundation + Phase 17 live read gateway. Read-only, standalone, no production writes.
+    The only credential this page ever holds is an admin session token you paste in yourself, kept in memory only.
   </footer>
 
 </div>

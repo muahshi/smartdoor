@@ -1,25 +1,33 @@
 /**
  * ai/dashboard/dashboard.js
- * Phase 15B — Read-Only SDOS Dashboard Foundation
+ * Phase 15B foundation + Phase 17 live SDOS Event Log.
  *
  * STANDALONE. Not imported by, and does not import, any SmartDoor
- * production file (js/**, services/**). Its only import is the real
- * ai/core/permissions/permissionEngine.js + authorityData.js — no
- * database client, no network call, no credential of any kind.
+ * production file (js/**, services/**, config/**). Makes zero network
+ * call on page load — the only network call this file can ever make
+ * is the one explicit, user-initiated POST to the Phase 17
+ * `sdos-dashboard-gateway` Edge Function, and only after the founder
+ * has both pasted their own admin session token (obtained the normal
+ * way, by logging into admin.html — this page has no login form of
+ * its own and never will) and clicked "Load Live Events". The token
+ * is held in a single in-memory JS variable for this page load only —
+ * never written to localStorage/sessionStorage, never logged, never
+ * sent anywhere except as the `Authorization: Bearer` header on that
+ * one gateway call.
  *
- * Two data modes on this page, and they are never blurred:
- *   1. LIVE  — the Permission Runtime panel. Every result shown there
- *      is a real, in-browser call to checkPermission() against the
- *      real authorityData.js. Nothing here is scripted or faked.
- *   2. FIXTURE — the Event Bus / Event Log panels. sdos_events and
- *      sdos_event_lifecycle have no anon/authenticated RLS policy
- *      (sql/72–74) and no ai/integrations/ read client exists yet
- *      (READONLY_INTEGRATION_POLICY.md gates that behind its own,
- *      separately-approved phase). So this page cannot safely read
- *      real rows from the browser — see ADR-0014 "Why the Dashboard
- *      Is Fixture/Read-Only" and ADR-0015. Every fixture value is
- *      labeled FIXTURE in the UI; nothing here should be mistaken for
- *      a live production read.
+ * Three data modes on this page, and they are never blurred:
+ *   1. LIVE (Permission Runtime) — every result is a real, in-browser
+ *      call to checkPermission() against the real authorityData.js.
+ *   2. LIVE (Event Log, Phase 17) — real sdos_events /
+ *      sdos_event_lifecycle rows, read through the authenticated,
+ *      read-only sdos-dashboard-gateway Edge Function (ADR-0017).
+ *      Rendered rows are labeled LIVE, never merged with fixture rows.
+ *   3. FIXTURE (Event Log default state) — shown until the founder
+ *      explicitly loads live data; sdos_events/sdos_event_lifecycle
+ *      still have no anon/authenticated RLS policy (sql/72–74), so
+ *      this page cannot read them directly — only through the
+ *      authenticated gateway. Every fixture value stays labeled
+ *      FIXTURE; nothing here is ever mistaken for a live read.
  */
 
 import { checkPermission, OUTCOMES } from '../core/permissions/permissionEngine.js';
@@ -144,7 +152,7 @@ function renderEventBusCard() {
       el('div', { class: 'detail' }, [
         'sdos_event_bus_enabled = ',
         el('span', { class: 'mono' }, 'false'),
-        '. sdos_events / sdos_event_lifecycle have no anon/authenticated RLS policy — not reachable from this browser session at all (sql/72). ',
+        '. sdos_events / sdos_event_lifecycle still have no anon/authenticated RLS policy — not reachable directly from any browser session (sql/72). The only path in is the authenticated, read-only sdos-dashboard-gateway Edge Function below (Phase 17, ADR-0017), which does not require the bus to be enabled to read history. ',
         el('span', { class: 'badge inactive' }, 'INACTIVE'),
       ]),
     ]),
@@ -251,6 +259,129 @@ function renderEventLog() {
   }
 }
 
+// ── Phase 17 — Live Event Log (via sdos-dashboard-gateway) ──────────
+// Nothing in this section runs on page load. It runs only when the
+// founder clicks "Load Live Events" after pasting a gateway URL and
+// an admin session token obtained the normal way (logging into
+// admin.html). The token lives only in this module-scoped variable —
+// never persisted, never logged, sent only as the Authorization
+// header on the one POST this file ever makes.
+let _adminToken = '';
+
+function liveStatus(message, kind = 'inactive') {
+  const box = document.getElementById('live-events-status');
+  box.innerHTML = '';
+  box.appendChild(el('span', { class: `badge ${kind}` }, kind.toUpperCase()));
+  box.appendChild(document.createTextNode(' ' + message));
+}
+
+function renderLiveEventRows(events) {
+  const modeBadge = document.getElementById('event-log-mode-badge');
+  modeBadge.textContent = 'LIVE DATA';
+  modeBadge.className = 'badge allowed';
+
+  const tbody = document.getElementById('event-log-body');
+  tbody.innerHTML = '';
+  for (const ev of events) {
+    tbody.appendChild(
+      el('tr', {}, [
+        el('td', {}, [el('span', { class: 'badge allowed' }, 'LIVE'), ' ' + (ev.event_type ?? '')]),
+        el('td', { class: 'mono' }, ev.source ?? ''),
+        el('td', {}, ev.priority ?? ''),
+        el('td', { class: 'mono' }, ev.emitted_at ?? ''),
+        el('td', { class: 'mono' }, ev.event_id ?? ''),
+      ]),
+    );
+  }
+}
+
+async function callGateway(capability, params) {
+  const gatewayUrl = document.getElementById('gateway-url').value.trim();
+  if (!gatewayUrl) throw new Error('Gateway URL is required.');
+  if (!_adminToken) throw new Error('Admin session token is required.');
+
+  const res = await fetch(gatewayUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${_adminToken}`,
+    },
+    body: JSON.stringify({ capability, ...params }),
+  });
+
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error(`Gateway returned a non-JSON response (HTTP ${res.status}).`);
+  }
+  if (!res.ok || body.success !== true) {
+    throw new Error(body?.message || `Gateway request failed (HTTP ${res.status}).`);
+  }
+  return body.result; // IntegrationResult envelope — { outcome, data?, source, fetched_at, error? }
+}
+
+async function loadLiveEvents() {
+  _adminToken = document.getElementById('admin-token').value.trim();
+  const limitField = document.getElementById('live-limit').value.trim();
+  const eventTypeField = document.getElementById('live-event-type').value.trim();
+
+  liveStatus('Loading…', 'inactive');
+  try {
+    const params = {};
+    if (limitField) params.limit = Number(limitField);
+    if (eventTypeField) params.event_type = eventTypeField;
+
+    const result = await callGateway('sdos_events.recent', params);
+
+    if (result.outcome === 'EMPTY') {
+      renderLiveEventRows([]);
+      liveStatus(`No sdos_events rows found (source: ${result.source}, fetched_at: ${result.fetched_at}).`, 'inactive');
+      return;
+    }
+    if (result.outcome === 'INTEGRATION_ERROR') {
+      liveStatus(result.error || 'Read failed.', 'denied');
+      return;
+    }
+    renderLiveEventRows(result.data || []);
+    liveStatus(`${(result.data || []).length} live row(s) loaded (source: ${result.source}, fetched_at: ${result.fetched_at}).`, 'allowed');
+  } catch (err) {
+    liveStatus(err.message, 'denied');
+  }
+}
+
+async function loadEventLifecycle() {
+  const eventId = document.getElementById('lifecycle-event-id').value.trim();
+  const box = document.getElementById('lifecycle-result');
+  box.innerHTML = '';
+  if (!eventId) {
+    box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' event_id is required.']));
+    return;
+  }
+  _adminToken = document.getElementById('admin-token').value.trim();
+  try {
+    const result = await callGateway('sdos_event_lifecycle.by_event', { event_id: eventId });
+    if (result.outcome === 'EMPTY') {
+      box.appendChild(el('div', {}, [el('span', { class: 'badge inactive' }, 'EMPTY'), ' No lifecycle rows for this event_id.']));
+      return;
+    }
+    if (result.outcome === 'INTEGRATION_ERROR') {
+      box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' ' + result.error]));
+      return;
+    }
+    const stages = (result.data || []).map((row) => row.stage).filter(Boolean).join(' → ');
+    box.appendChild(
+      el('div', {}, [
+        el('span', { class: 'badge allowed' }, 'LIVE'),
+        ` ${(result.data || []).length} lifecycle row(s)`,
+        el('div', { class: 'rule mono' }, stages || '(no stage field on returned rows)'),
+      ]),
+    );
+  } catch (err) {
+    box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' ' + err.message]));
+  }
+}
+
 function init() {
   renderSystemStatus();
   renderEventBusCard();
@@ -264,6 +395,9 @@ function init() {
     populateCategorySelect(e.target.value);
   });
   document.getElementById('run-check').addEventListener('click', runCheck);
+
+  document.getElementById('load-live-events').addEventListener('click', loadLiveEvents);
+  document.getElementById('load-lifecycle').addEventListener('click', loadEventLifecycle);
 
   runCheck();
 }
