@@ -45,6 +45,29 @@ pass before that changes.
   reading commit/PR history) that has no present-day counterpart to
   extend.
 
+## Addendum — SDOS Phase 16: first built, read-only capability
+
+The table above indexes the eight vendor folders' *documented-only,
+future* capabilities against real SmartDoor production data — none of
+those rows have working code yet. Phase 16 is a different kind of
+entry: `ai/integrations/supabase/sdosEventsReader.js` is the first
+capability in this entire registry that is actually **built and
+executable** today, but it reads only two SDOS-internal tables
+(`sdos_events`, `sdos_event_lifecycle` — see
+`ai/docs/implementation/PRODUCTION_BOUNDARY.md`), never any production
+table. It does not fit the table's columns (there is no vendor row to
+extend — `supabase/`'s row above still describes an undocumented,
+different future capability), so it is recorded here as a note rather
+than a table row:
+
+- **Module:** `ai/integrations/supabase/sdosEventsReader.js`
+- **Capabilities:** `sdos_events.recent`, `sdos_events.by_id`,
+  `sdos_event_lifecycle.by_event` — exhaustive, capability-specific,
+  no generic query surface.
+- **Access:** read-only, two SDOS-owned tables only, never a
+  SmartDoor production table.
+- **Governed by:** `ai/adr/ADR-0016-Phase-16-Readonly-Integration-Foundation.md`.
+
 ## Adding a Future Integration
 
 A ninth (or later) integration folder is added the same way these eight
