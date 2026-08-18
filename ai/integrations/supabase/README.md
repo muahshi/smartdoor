@@ -115,3 +115,34 @@ production data; see `ai/docs/implementation/SECURITY_IMPLEMENTATION_PLAN.md`
 "Write Operations" for why this is scoped and why a narrower,
 purpose-built DB role remains a documented Phase 14B improvement over
 reusing `service_role`.
+
+## Addendum — SDOS Phase 16: a third, isolated, read-only client
+
+Phase 16 adds `sdosEventsReader.js` (this folder) — the first
+*executable* read path against `sdos_events` / `sdos_event_lifecycle`.
+It is deliberately a third, separate module from both clients
+documented above:
+
+- It does **not** import or extend `sdosEventsStore.js` (Phase 14A/
+  14E, above) — that store keeps its exact existing write/broadcast
+  behavior untouched. This isolation is intentional (see
+  `ai/adr/ADR-0016-Phase-16-Readonly-Integration-Foundation.md`), not
+  an oversight.
+- It is **not** the "future, RLS-scoped, read-only client into
+  SmartDoor production data" this file's main body above describes —
+  that capability (reading `orders`, `subscriptions`, `plates`, etc.)
+  remains undocumented-only. `sdosEventsReader.js` never reaches any
+  production table; it reads only the same two SDOS-owned,
+  non-customer tables `sdosEventsStore.js` writes to.
+
+**Supported Capabilities (built, Phase 16):**
+- `sdos_events.recent` — `getRecentSdosEvents({ limit, event_type?, correlation_id? })`
+- `sdos_events.by_id` — `getSdosEventById({ event_id })`
+- `sdos_event_lifecycle.by_event` — `getSdosEventLifecycle({ event_id })`
+
+No other capability exists. There is no generic table/column/SQL
+accessor. Credential path mirrors `sdosEventsStore.js`'s existing
+fail-closed design (`SDOS_DB_URL` direct-Postgres when configured,
+`service_role` PostgREST fallback otherwise, never the reverse on
+failure). See `sdosEventsReader.js`'s own header comment and
+`ADR-0016` for full detail.
