@@ -348,6 +348,30 @@ function renderEventLog() {
 // no token is ever held in a variable, logged, or written anywhere by
 // this file.
 
+// ── Phase 18 hotfix — 401 must never destroy the session ─────────────
+// Root cause of the reported bug: this file's first cut cleared
+// sd_admin_session and re-rendered the Authentication card to "Not
+// signed in" on the very FIRST 401 from the gateway. admin.html's own
+// adminCall() never does this — it tolerates transient 401s and only
+// treats the session as dead after 3 consecutive failures (see
+// admin.html's _authFailCount / _AUTH_FAIL_THRESHOLD). Per this
+// phase's explicit requirement, this read-only dashboard goes
+// further and never clears the session itself at all — only
+// admin.html/admin-login.html ever write or remove sd_admin_session.
+// A 401 here only produces a local, per-action message with a login
+// link; the top-level Authentication card is left untouched.
+class GatewayAuthError extends Error {}
+
+function appendAuthExpiredNotice(container, message) {
+  container.appendChild(
+    el('div', {}, [
+      el('span', { class: 'badge denied' }, 'SESSION'),
+      ' ' + message + ' ',
+      el('a', { href: '/admin-login.html', class: 'mono' }, 'Sign in again'),
+    ]),
+  );
+}
+
 function liveStatus(message, kind = 'inactive') {
   const box = document.getElementById('live-events-status');
   box.innerHTML = '';
@@ -381,8 +405,7 @@ async function callGateway(capability, params) {
 
   const session = getAdminSession();
   if (!session) {
-    renderAuthStatus();
-    throw new Error('Your admin session has expired. Please sign in again.');
+    throw new GatewayAuthError('Admin session expired. Please sign in again.');
   }
 
   const res = await fetch(url, {
@@ -394,10 +417,11 @@ async function callGateway(capability, params) {
     body: JSON.stringify({ capability, ...params }),
   });
 
+  // 401: do NOT clear sd_admin_session and do NOT touch the
+  // Authentication card here — see the block comment above
+  // GatewayAuthError. This is a per-action message only.
   if (res.status === 401) {
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    renderAuthStatus();
-    throw new Error('Your admin session has expired. Please sign in again.');
+    throw new GatewayAuthError('Admin session expired. Please sign in again.');
   }
   if (res.status === 403) {
     throw new Error('Your account does not have permission to view SDOS events.');
@@ -429,16 +453,22 @@ async function loadLiveEvents() {
 
     if (result.outcome === 'EMPTY') {
       renderLiveEventRows([]);
-      liveStatus(`No sdos_events rows found (source: ${result.source}, fetched_at: ${result.fetched_at}).`, 'inactive');
+      liveStatus('No SDOS events found.', 'inactive');
       return;
     }
     if (result.outcome === 'INTEGRATION_ERROR') {
-      liveStatus('Could not load live events. Please try again.', 'denied');
+      liveStatus('SDOS event storage could not be read.', 'denied');
       return;
     }
     renderLiveEventRows(result.data || []);
     liveStatus(`${(result.data || []).length} live row(s) loaded (source: ${result.source}, fetched_at: ${result.fetched_at}).`, 'allowed');
   } catch (err) {
+    if (err instanceof GatewayAuthError) {
+      const box = document.getElementById('live-events-status');
+      box.innerHTML = '';
+      appendAuthExpiredNotice(box, err.message);
+      return;
+    }
     liveStatus(err.message, 'denied');
   }
 }
@@ -458,7 +488,7 @@ async function loadEventLifecycle() {
       return;
     }
     if (result.outcome === 'INTEGRATION_ERROR') {
-      box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' Could not load lifecycle. Please try again.']));
+      box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' SDOS lifecycle storage could not be read.']));
       return;
     }
     const stages = (result.data || []).map((row) => row.stage).filter(Boolean).join(' → ');
@@ -470,6 +500,11 @@ async function loadEventLifecycle() {
       ]),
     );
   } catch (err) {
+    if (err instanceof GatewayAuthError) {
+      box.innerHTML = '';
+      appendAuthExpiredNotice(box, err.message);
+      return;
+    }
     box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' ' + err.message]));
   }
 }
