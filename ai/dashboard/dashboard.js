@@ -1,19 +1,30 @@
 /**
  * ai/dashboard/dashboard.js
- * Phase 15B foundation + Phase 17 live SDOS Event Log.
+ * Phase 15B foundation + Phase 17 live SDOS Event Log + Phase 18
+ * automatic admin authentication.
  *
  * STANDALONE. Not imported by, and does not import, any SmartDoor
- * production file (js/**, services/**, config/**). Makes zero network
- * call on page load — the only network call this file can ever make
- * is the one explicit, user-initiated POST to the Phase 17
- * `sdos-dashboard-gateway` Edge Function, and only after the founder
- * has both pasted their own admin session token (obtained the normal
- * way, by logging into admin.html — this page has no login form of
- * its own and never will) and clicked "Load Live Events". The token
- * is held in a single in-memory JS variable for this page load only —
- * never written to localStorage/sessionStorage, never logged, never
- * sent anywhere except as the `Authorization: Bearer` header on that
- * one gateway call.
+ * production file (js/**, services/**). This file DOES read the same
+ * build-time config file every other SmartDoor HTML entry point reads
+ * (`config/env.generated.js` → `window.__SD_CONFIG__`, loaded by
+ * index.html) and the same admin session localStorage key admin.html
+ * already writes (`sd_admin_session`) — that reuse is the entire
+ * point of Phase 18 (ADR-0017 follow-up: "make SDOS dashboard
+ * authentication automatic"). No new auth mechanism, no new session
+ * store, no second login form was created; see getAdminSession()
+ * below, which is a deliberate line-for-line copy of admin.html's own
+ * helper of the same name.
+ *
+ * Makes zero network call on page load — the only network calls this
+ * file can ever make are the explicit, user-initiated POSTs to the
+ * Phase 17 `sdos-dashboard-gateway` Edge Function, triggered only by
+ * clicking "Load Live Events" or "Load Lifecycle". The admin session
+ * token is read fresh from localStorage on each call (never copied
+ * into a page-load-scoped variable, never written anywhere by this
+ * file) and sent only as the `Authorization: Bearer` header on that
+ * one gateway call — exactly the same token shape and header
+ * admin.html's own `adminCall()`/`provisionCall()` already send to
+ * every other admin Edge Function.
  *
  * Three data modes on this page, and they are never blurred:
  *   1. LIVE (Permission Runtime) — every result is a real, in-browser
@@ -106,6 +117,75 @@ const FIXTURE_EVENTS = [
     lifecycle: 'received → authorization_failed',
   },
 ];
+
+// ── Phase 18 — automatic admin session reuse ─────────────────────────
+// Deliberate line-for-line copy of admin.html's own ADMIN_SESSION_KEY /
+// getAdminSession() (see admin.html's inline <script>). Same key, same
+// shape, same expiry check — this file must never diverge from that
+// contract, or a session admin.html considers valid could be rejected
+// here (or vice versa).
+const ADMIN_SESSION_KEY = 'sd_admin_session';
+
+function getAdminSession() {
+  try {
+    const raw = localStorage.getItem(ADMIN_SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s?.exp) return null;
+    if (Date.now() > s.exp) {
+      localStorage.removeItem(ADMIN_SESSION_KEY);
+      return null;
+    }
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+// Same window.__SD_CONFIG__.supabaseUrl convention admin.html's own
+// SUPABASE_URL()/EDGE() use — set by config/env.generated.js, loaded
+// by index.html before this module runs. No gateway URL is ever typed
+// in or hardcoded here.
+function gatewayUrl() {
+  const base = window.__SD_CONFIG__?.supabaseUrl || '';
+  if (!base) return '';
+  return base + '/functions/v1/sdos-dashboard-gateway';
+}
+
+function renderAuthStatus() {
+  const card = document.getElementById('auth-status-card');
+  card.innerHTML = '';
+  const session = getAdminSession();
+
+  if (!session) {
+    card.appendChild(
+      el('div', { class: 'card' }, [
+        el('div', { class: 'label' }, 'Admin session'),
+        el('div', { class: 'value' }, [el('span', { class: 'dot off' }), 'Not signed in']),
+        el('div', { class: 'detail' }, [
+          'Your admin session has expired or was not found. Please sign in again. ',
+          el('a', { href: '/admin-login.html', class: 'mono' }, 'Go to admin sign-in'),
+        ]),
+      ]),
+    );
+    return false;
+  }
+
+  card.appendChild(
+    el('div', { class: 'card' }, [
+      el('div', { class: 'label' }, 'Admin session'),
+      el('div', { class: 'value' }, [
+        el('span', { class: 'dot on' }),
+        'Signed in as ' + (session.full_name || session.email || 'admin'),
+      ]),
+      el('div', { class: 'detail' }, [
+        'Reusing your existing SmartDoor admin sign-in — no token entry required. ',
+        el('span', { class: 'mono' }, session.role_label || session.role || ''),
+      ]),
+    ]),
+  );
+  return true;
+}
 
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
@@ -260,13 +340,13 @@ function renderEventLog() {
 }
 
 // ── Phase 17 — Live Event Log (via sdos-dashboard-gateway) ──────────
-// Nothing in this section runs on page load. It runs only when the
-// founder clicks "Load Live Events" after pasting a gateway URL and
-// an admin session token obtained the normal way (logging into
-// admin.html). The token lives only in this module-scoped variable —
-// never persisted, never logged, sent only as the Authorization
-// header on the one POST this file ever makes.
-let _adminToken = '';
+// Phase 18: nothing in this section runs on page load, and the
+// founder no longer pastes anything. Clicking "Load Live Events" /
+// "Load Lifecycle" reads the existing admin session from localStorage
+// fresh (getAdminSession(), same contract as admin.html) and sends it
+// as the Authorization header on the one POST this file ever makes —
+// no token is ever held in a variable, logged, or written anywhere by
+// this file.
 
 function liveStatus(message, kind = 'inactive') {
   const box = document.getElementById('live-events-status');
@@ -296,33 +376,46 @@ function renderLiveEventRows(events) {
 }
 
 async function callGateway(capability, params) {
-  const gatewayUrl = document.getElementById('gateway-url').value.trim();
-  if (!gatewayUrl) throw new Error('Gateway URL is required.');
-  if (!_adminToken) throw new Error('Admin session token is required.');
+  const url = gatewayUrl();
+  if (!url) throw new Error('Configuration error: Supabase URL missing. Contact dev team.');
 
-  const res = await fetch(gatewayUrl, {
+  const session = getAdminSession();
+  if (!session) {
+    renderAuthStatus();
+    throw new Error('Your admin session has expired. Please sign in again.');
+  }
+
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${_adminToken}`,
+      'Authorization': `Bearer ${session.token}`,
     },
     body: JSON.stringify({ capability, ...params }),
   });
+
+  if (res.status === 401) {
+    localStorage.removeItem(ADMIN_SESSION_KEY);
+    renderAuthStatus();
+    throw new Error('Your admin session has expired. Please sign in again.');
+  }
+  if (res.status === 403) {
+    throw new Error('Your account does not have permission to view SDOS events.');
+  }
 
   let body;
   try {
     body = await res.json();
   } catch {
-    throw new Error(`Gateway returned a non-JSON response (HTTP ${res.status}).`);
+    throw new Error('The dashboard could not read the server response. Please try again.');
   }
   if (!res.ok || body.success !== true) {
-    throw new Error(body?.message || `Gateway request failed (HTTP ${res.status}).`);
+    throw new Error(body?.message || 'Gateway request failed. Please try again.');
   }
   return body.result; // IntegrationResult envelope — { outcome, data?, source, fetched_at, error? }
 }
 
 async function loadLiveEvents() {
-  _adminToken = document.getElementById('admin-token').value.trim();
   const limitField = document.getElementById('live-limit').value.trim();
   const eventTypeField = document.getElementById('live-event-type').value.trim();
 
@@ -340,7 +433,7 @@ async function loadLiveEvents() {
       return;
     }
     if (result.outcome === 'INTEGRATION_ERROR') {
-      liveStatus(result.error || 'Read failed.', 'denied');
+      liveStatus('Could not load live events. Please try again.', 'denied');
       return;
     }
     renderLiveEventRows(result.data || []);
@@ -358,7 +451,6 @@ async function loadEventLifecycle() {
     box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' event_id is required.']));
     return;
   }
-  _adminToken = document.getElementById('admin-token').value.trim();
   try {
     const result = await callGateway('sdos_event_lifecycle.by_event', { event_id: eventId });
     if (result.outcome === 'EMPTY') {
@@ -366,7 +458,7 @@ async function loadEventLifecycle() {
       return;
     }
     if (result.outcome === 'INTEGRATION_ERROR') {
-      box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' ' + result.error]));
+      box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' Could not load lifecycle. Please try again.']));
       return;
     }
     const stages = (result.data || []).map((row) => row.stage).filter(Boolean).join(' → ');
@@ -383,6 +475,7 @@ async function loadEventLifecycle() {
 }
 
 function init() {
+  renderAuthStatus();
   renderSystemStatus();
   renderEventBusCard();
   renderPermissionRuntimeCard();

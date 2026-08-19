@@ -6,6 +6,7 @@
 <title>SDOS Dashboard — Read-Only</title>
 <meta name="robots" content="noindex, nofollow" />
 <link rel="stylesheet" href="dashboard.css" />
+<script src="../../config/env.generated.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -19,11 +20,17 @@
     <strong>Data access note:</strong> the Permission Runtime panel below is <strong>live</strong> — every result comes
     from a real, in-browser call to <span class="mono">ai/core/permissions/permissionEngine.js</span>. The Event Log
     panel shows <strong>fixture data</strong> by default (clearly labeled) — real rows are only ever fetched through
-    the authenticated <span class="mono">sdos-dashboard-gateway</span> Edge Function (Phase 17), and only after you
-    explicitly paste an admin session token below and click Load. <span class="mono">sdos_events</span> and
+    the authenticated <span class="mono">sdos-dashboard-gateway</span> Edge Function (Phase 17), reusing your
+    existing SmartDoor admin sign-in (Phase 18) — no token entry required — and only after you explicitly click
+    Load. <span class="mono">sdos_events</span> and
     <span class="mono">sdos_event_lifecycle</span> still have no client-readable RLS policy — this page never queries
     them directly. See ADR-0014 / ADR-0015 / ADR-0017 for the full data-access history.
   </div>
+
+  <section>
+    <h2>Authentication <span class="badge inactive">Phase 18</span></h2>
+    <div id="auth-status-card" class="grid"></div>
+  </section>
 
   <section>
     <h2>System Status</h2>
@@ -77,14 +84,6 @@
       </div>
       <div class="tester">
         <div class="field">
-          <label for="gateway-url">Gateway URL</label>
-          <input id="gateway-url" type="text" placeholder="https://&lt;project&gt;.supabase.co/functions/v1/sdos-dashboard-gateway" />
-        </div>
-        <div class="field">
-          <label for="admin-token">Admin session token</label>
-          <input id="admin-token" type="password" placeholder="paste token from admin.html login" autocomplete="off" />
-        </div>
-        <div class="field">
           <label for="live-limit">Limit (1–200)</label>
           <input id="live-limit" type="number" min="1" max="200" placeholder="50" />
         </div>
@@ -136,8 +135,10 @@
   </section>
 
   <footer class="foot">
-    ai/dashboard — Phase 15B foundation + Phase 17 live read gateway. Read-only, standalone, no production writes.
-    The only credential this page ever holds is an admin session token you paste in yourself, kept in memory only.
+    ai/dashboard — Phase 15B foundation + Phase 17 live read gateway + Phase 18 automatic admin authentication.
+    Read-only, standalone, no production writes. This page never asks for a token — it reuses your existing
+    SmartDoor admin sign-in (the same <span class="mono">sd_admin_session</span> browser session admin.html uses)
+    and sends it to the gateway only when you click a Load button.
   </footer>
 
 </div>

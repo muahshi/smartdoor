@@ -124,6 +124,10 @@ section > h2 {
   line-height: 1.5;
 }
 
+.card .detail a {
+  color: var(--blue);
+}
+
 .dot {
   width: 8px;
   height: 8px;
