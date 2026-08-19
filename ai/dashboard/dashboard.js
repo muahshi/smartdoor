@@ -362,7 +362,74 @@ function renderEventLog() {
 // link; the top-level Authentication card is left untouched.
 class GatewayAuthError extends Error {}
 
-function appendAuthExpiredNotice(container, message) {
+// ── Phase 18 mobile 401 diagnostic ───────────────────────────────────
+// Founder is testing on a phone with no DevTools access, so the raw
+// server response for a 401 needs to be visible in-page. This block
+// is intentionally isolated from auth logic: it never reads
+// session.token, never touches the Authorization header, and the
+// response body is redacted before it is ever attached to an error
+// object or rendered. Nothing here changes what callGateway() does on
+// a 401 (still no localStorage.removeItem, still no renderAuthStatus)
+// — it only captures and displays extra evidence about *why*.
+const DEBUG_BUILD_TAG = 'phase18-mobile-debug-v2';
+
+// Strips anything credential-shaped out of a raw response body before
+// it is allowed anywhere near an error object or the DOM. Applied
+// unconditionally — there is no code path that attaches an
+// un-redacted body to debugInfo.
+function redactDebugText(text) {
+  if (typeof text !== 'string' || !text) return '(empty response body)';
+  let out = text;
+  // "Bearer <token>"
+  out = out.replace(/Bearer\s+[A-Za-z0-9\-_.]+/gi, 'Bearer [REDACTED]');
+  // JSON/plain key:value pairs for credential-shaped keys (token,
+  // authorization, secret, password, api_key, apikey, key, cookie).
+  out = out.replace(
+    /("?(?:token|authorization|secret|password|api[_-]?key|apikey|key|cookie)"?\s*[:=]\s*)"?[^",}\s]+"?/gi,
+    '$1"[REDACTED]"',
+  );
+  // JWT-shaped strings (header.payload.signature).
+  out = out.replace(/[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, '[REDACTED-JWT]');
+  // Long hex-looking opaque tokens (e.g. raw session_token values).
+  out = out.replace(/\b[a-f0-9]{32,}\b/gi, '[REDACTED-HEX]');
+  // Hard cap so a runaway/unexpected body can never balloon the page.
+  return out.length > 800 ? out.slice(0, 800) + ' …(truncated)' : out;
+}
+
+// Renders the visible "DEBUG — HTTP 401" block plus a Copy Debug Info
+// button. Receives only { status, url, body } — never a session
+// object, never a token, never a header.
+function renderMobileDebugBlock(debugInfo) {
+  const text = [
+    `DEBUG — HTTP ${debugInfo.status ?? 'N/A'}`,
+    `Build: ${DEBUG_BUILD_TAG}`,
+    `Status: ${debugInfo.status ?? 'N/A'}`,
+    `Gateway URL: ${debugInfo.url || '(none — request was not sent)'}`,
+    'Server response:',
+    debugInfo.body || '(none)',
+  ].join('\n');
+
+  const pre = el('div', { class: 'mono' }, text);
+  pre.style.cssText = 'margin-top:8px;padding:8px;border:1px dashed #999;font-size:12px;white-space:pre-wrap;word-break:break-all;';
+
+  const copyBtn = el('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, 'Copy Debug Info');
+  copyBtn.style.marginTop = '6px';
+  copyBtn.addEventListener('click', () => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => (copyBtn.textContent = 'Copy Debug Info'), 1500);
+        })
+        .catch(() => {});
+    }
+  });
+
+  return el('div', {}, [pre, copyBtn]);
+}
+
+function appendAuthExpiredNotice(container, message, debugInfo) {
   container.appendChild(
     el('div', {}, [
       el('span', { class: 'badge denied' }, 'SESSION'),
@@ -370,6 +437,9 @@ function appendAuthExpiredNotice(container, message) {
       el('a', { href: '/admin-login.html', class: 'mono' }, 'Sign in again'),
     ]),
   );
+  if (debugInfo) {
+    container.appendChild(renderMobileDebugBlock(debugInfo));
+  }
 }
 
 function liveStatus(message, kind = 'inactive') {
@@ -405,7 +475,11 @@ async function callGateway(capability, params) {
 
   const session = getAdminSession();
   if (!session) {
-    throw new GatewayAuthError('Admin session expired. Please sign in again.');
+    const err = new GatewayAuthError('Admin session expired. Please sign in again.');
+    // No request was ever sent — nothing to redact, but the mobile
+    // debug block still needs to be able to show that plainly.
+    err.debugInfo = { status: null, url, body: '(no local admin session found — request was not sent)' };
+    throw err;
   }
 
   const res = await fetch(url, {
@@ -420,8 +494,21 @@ async function callGateway(capability, params) {
   // 401: do NOT clear sd_admin_session and do NOT touch the
   // Authentication card here — see the block comment above
   // GatewayAuthError. This is a per-action message only.
+  //
+  // Body is read exactly once, redacted immediately, and only the
+  // redacted text is ever attached to the error or rendered.
+  // session.token itself is never read again past the fetch() call
+  // above, and is never referenced here.
   if (res.status === 401) {
-    throw new GatewayAuthError('Admin session expired. Please sign in again.');
+    let bodyText = '';
+    try {
+      bodyText = await res.text();
+    } catch {
+      bodyText = '';
+    }
+    const err = new GatewayAuthError('Admin session expired. Please sign in again.');
+    err.debugInfo = { status: res.status, url, body: redactDebugText(bodyText) };
+    throw err;
   }
   if (res.status === 403) {
     throw new Error('Your account does not have permission to view SDOS events.');
@@ -466,7 +553,7 @@ async function loadLiveEvents() {
     if (err instanceof GatewayAuthError) {
       const box = document.getElementById('live-events-status');
       box.innerHTML = '';
-      appendAuthExpiredNotice(box, err.message);
+      appendAuthExpiredNotice(box, err.message, err.debugInfo);
       return;
     }
     liveStatus(err.message, 'denied');
@@ -502,7 +589,7 @@ async function loadEventLifecycle() {
   } catch (err) {
     if (err instanceof GatewayAuthError) {
       box.innerHTML = '';
-      appendAuthExpiredNotice(box, err.message);
+      appendAuthExpiredNotice(box, err.message, err.debugInfo);
       return;
     }
     box.appendChild(el('div', {}, [el('span', { class: 'badge denied' }, 'ERROR'), ' ' + err.message]));
