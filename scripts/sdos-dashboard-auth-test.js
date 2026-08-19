@@ -173,7 +173,11 @@ await check('[HOTFIX] callGateway() exists and its 401 branch never clears sd_ad
   const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
   assert(fnMatch, 'could not locate callGateway() function body');
   const body = fnMatch[0];
-  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\}/);
+  // Match through to the outer if-block's own closing brace (2-space
+  // indented, own line) — the branch now contains a nested try/catch
+  // around res.text(), so a naive "stop at the first }" would
+  // truncate before covering the whole branch.
+  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\n  \}/);
   assert(status401Match, 'no res.status === 401 branch found in callGateway()');
   assert(!/localStorage\.removeItem/.test(status401Match[1]), 'the 401 branch still calls localStorage.removeItem — this is the exact regression reported (session destroyed on a single 401)');
 });
@@ -182,7 +186,7 @@ await check('[HOTFIX] callGateway()\u2019s 401 branch never touches the top-leve
   const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
   assert(fnMatch, 'could not locate callGateway() function body');
   const body = fnMatch[0];
-  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\}/);
+  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\n  \}/);
   assert(status401Match, 'no res.status === 401 branch found in callGateway()');
   assert(!/renderAuthStatus\(\)/.test(status401Match[1]), 'the 401 branch still calls renderAuthStatus() — a single gateway 401 must not flip the Authentication card to \u201cNot signed in\u201d');
 });
@@ -192,9 +196,23 @@ await check('[HOTFIX] a gateway 401 is raised as a distinct GatewayAuthError, no
   const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
   assert(fnMatch, 'could not locate callGateway() function body');
   const body = fnMatch[0];
-  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\}/);
+  // Phase 18 mobile-debug: the branch now contains a nested try/catch
+  // around res.text(), so the old non-greedy "stop at the first }"
+  // extraction truncates before reaching the throw. Match through to
+  // the outer if-block's own closing brace (2-space indented, on its
+  // own line) instead.
+  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\n  \}/);
   assert(status401Match, 'no res.status === 401 branch found in callGateway()');
-  assert(/throw new GatewayAuthError/.test(status401Match[1]), '401 branch does not throw GatewayAuthError');
+  // The branch now builds the error as `const err = new
+  // GatewayAuthError(...); err.debugInfo = ...; throw err;` (so
+  // debugInfo can be attached before throwing) instead of a bare
+  // `throw new GatewayAuthError(...)`. Both forms throw exactly one
+  // GatewayAuthError instance — accept either.
+  assert(
+    /throw new GatewayAuthError/.test(status401Match[1]) ||
+      (/new GatewayAuthError\(/.test(status401Match[1]) && /throw err/.test(status401Match[1])),
+    '401 branch does not throw GatewayAuthError',
+  );
 });
 
 await check('[HOTFIX] loadLiveEvents() and loadEventLifecycle() both render a login-link notice on GatewayAuthError', async () => {
@@ -206,8 +224,12 @@ await check('[HOTFIX] loadLiveEvents() and loadEventLifecycle() both render a lo
   assert(lifecycleMatch, 'could not locate loadEventLifecycle() function body');
   assert(/err instanceof GatewayAuthError/.test(liveMatch[0]), 'loadLiveEvents() does not special-case GatewayAuthError');
   assert(/err instanceof GatewayAuthError/.test(lifecycleMatch[0]), 'loadEventLifecycle() does not special-case GatewayAuthError');
-  assert(/appendAuthExpiredNotice\(box, err\.message\)/.test(liveMatch[0]), 'loadLiveEvents() does not render the login-link notice');
-  assert(/appendAuthExpiredNotice\(box, err\.message\)/.test(lifecycleMatch[0]), 'loadEventLifecycle() does not render the login-link notice');
+  // Phase 18 mobile-debug: appendAuthExpiredNotice() now takes an
+  // optional 3rd arg (err.debugInfo) so the mobile debug block can be
+  // rendered alongside the login-link notice. Accept the call with or
+  // without that 3rd arg.
+  assert(/appendAuthExpiredNotice\(box, err\.message(?:, err\.debugInfo)?\)/.test(liveMatch[0]), 'loadLiveEvents() does not render the login-link notice');
+  assert(/appendAuthExpiredNotice\(box, err\.message(?:, err\.debugInfo)?\)/.test(lifecycleMatch[0]), 'loadEventLifecycle() does not render the login-link notice');
 });
 
 await check('[HOTFIX] EMPTY / INTEGRATION_ERROR copy for live events matches the exact required strings', async () => {
@@ -221,6 +243,51 @@ await check('[HOTFIX] the only localStorage.removeItem call left is the local-ex
   const getAdminSessionMatch = jsSource.match(/function getAdminSession\(\)[\s\S]*?\n\}/);
   assert(getAdminSessionMatch, 'could not locate getAdminSession() function body');
   assert(/localStorage\.removeItem\(ADMIN_SESSION_KEY\)/.test(getAdminSessionMatch[0]), 'the single remaining removeItem call is not inside getAdminSession()');
+});
+
+await check('[MOBILE-DEBUG] build tag phase18-mobile-debug-v2 is present and rendered in the debug block', async () => {
+  assert(/const DEBUG_BUILD_TAG = 'phase18-mobile-debug-v2'/.test(jsSource), 'DEBUG_BUILD_TAG literal not found');
+  const renderMatch = jsSource.match(/function renderMobileDebugBlock\([\s\S]*?\n\}/);
+  assert(renderMatch, 'could not locate renderMobileDebugBlock() function body');
+  assert(/DEBUG_BUILD_TAG/.test(renderMatch[0]), 'renderMobileDebugBlock() does not reference DEBUG_BUILD_TAG');
+});
+
+await check('[MOBILE-DEBUG] 401 branch reads the response body exactly once and attaches redacted debugInfo', async () => {
+  const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
+  assert(fnMatch, 'could not locate callGateway() function body');
+  const status401Match = fnMatch[0].match(/if \(res\.status === 401\) \{([\s\S]*?)\n  \}/);
+  assert(status401Match, 'no res.status === 401 branch found in callGateway()');
+  const branch = status401Match[1];
+  const resTextMatches = [...branch.matchAll(/res\.text\(\)/g)];
+  assert(resTextMatches.length === 1, `expected exactly 1 res.text() call in the 401 branch, found ${resTextMatches.length}`);
+  assert(/redactDebugText\(/.test(branch), '401 branch does not pass the body through redactDebugText()');
+  assert(/err\.debugInfo\s*=/.test(branch), '401 branch does not attach debugInfo to the thrown error');
+  assert(!/session\.token/.test(branch), '401 branch reads session.token — must not, session.token is only used in the fetch() call above');
+});
+
+await check('[MOBILE-DEBUG] redactDebugText() strips Bearer tokens, JWT-shaped strings, and credential-shaped keys', async () => {
+  const fnMatch = jsSource.match(/function redactDebugText\([\s\S]*?\n\}/);
+  assert(fnMatch, 'could not locate redactDebugText() function body');
+  const body = fnMatch[0];
+  assert(/Bearer\\s\+/.test(body), 'redactDebugText() does not strip "Bearer <token>" patterns');
+  assert(/token|authorization|secret|password/i.test(body), 'redactDebugText() does not target credential-shaped keys');
+  assert(/REDACTED-JWT/.test(body), 'redactDebugText() does not strip JWT-shaped strings');
+});
+
+await check('[MOBILE-DEBUG] the debug renderer and diagnostic path never reference session.token or a raw Authorization header', async () => {
+  const renderMatch = jsSource.match(/function renderMobileDebugBlock\([\s\S]*?\n\}/);
+  assert(renderMatch, 'could not locate renderMobileDebugBlock() function body');
+  assert(!/session\.token/.test(renderMatch[0]), 'renderMobileDebugBlock() references session.token');
+  assert(!/Authorization/.test(renderMatch[0]), 'renderMobileDebugBlock() references the Authorization header directly');
+});
+
+await check('[MOBILE-DEBUG] mobile debug block renders inside #live-events-status and #lifecycle-result, no new page/modal', async () => {
+  assert(/appendAuthExpiredNotice\(box, err\.message, err\.debugInfo\)/.test(jsSource), 'debugInfo is not threaded through to appendAuthExpiredNotice() anywhere');
+  // Both call sites assign `box = document.getElementById('live-events-status' | 'lifecycle-result')`
+  // earlier in their own function bodies — checked structurally via the
+  // existing loadLiveEvents()/loadEventLifecycle() location, not re-derived here.
+  assert(/document\.getElementById\('live-events-status'\)/.test(jsSource), 'live-events-status target missing');
+  assert(/document\.getElementById\('lifecycle-result'\)/.test(jsSource), 'lifecycle-result target missing');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
