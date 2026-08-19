@@ -39,6 +39,29 @@
  *  11. gatewayUrl()/getAdminSession() never send a value the user typed
  *      into any input as the gateway base URL or token.
  *
+ * PHASE 18 HOTFIX — a 401 from the gateway must never destroy a real,
+ * valid session (root cause of the reported bug: dashboard.js cleared
+ * sd_admin_session and flipped the Authentication card to "Not signed
+ * in" on the very first 401, diverging from admin.html's own
+ * tolerance for transient 401s). Additional static checks:
+ *
+ *  12. callGateway()'s 401 branch never calls localStorage.removeItem.
+ *  13. callGateway()'s 401 branch never calls renderAuthStatus() (the
+ *      top-level Authentication card must be left alone).
+ *  14. A 401 is raised as a distinct GatewayAuthError (not a plain
+ *      Error), so callers can render a login-link notice instead of a
+ *      generic red error.
+ *  15. Both loadLiveEvents() and loadEventLifecycle() special-case
+ *      GatewayAuthError and render a login link, per Step 5's UX
+ *      requirement.
+ *  16. EMPTY / INTEGRATION_ERROR copy for the live-events capability
+ *      matches Step 5's exact required strings ("No SDOS events
+ *      found." / "SDOS event storage could not be read.").
+ *  17. The only localStorage.removeItem call left in dashboard.js is
+ *      inside getAdminSession() itself (local-expiry cleanup — the
+ *      same behavior admin.html's own getAdminSession() already has),
+ *      not inside callGateway()'s 401 handling.
+ *
  * Usage: node scripts/sdos-dashboard-auth-test.js
  * Exit code 0 = all checks passed, 1 = at least one failed.
  */
@@ -117,7 +140,7 @@ await check('dashboard.js never writes to localStorage (session is only ever rea
 });
 
 await check('an expired/missing session produces plain-language copy, not a raw technical error', async () => {
-  assert(/Your admin session has expired\. Please sign in again\./.test(jsSource), 'expected plain-language expired-session message not found');
+  assert(/Admin session expired\. Please sign in again\./.test(jsSource), 'expected plain-language expired-session message not found');
 });
 
 await check('a 403 (unauthorized) response produces plain-language permission-denied copy', async () => {
@@ -142,6 +165,62 @@ await check('callGateway() sources the token from the freshly-read session, neve
   assert(!/getElementById\('admin-token'\)/.test(body), 'callGateway() still reads an admin-token input field');
   assert(!/getElementById\('gateway-url'\)/.test(body), 'callGateway() still reads a gateway-url input field');
   assert(/session\.token/.test(body), 'callGateway() does not use session.token');
+});
+
+// ── Phase 18 hotfix checks ────────────────────────────────────────────
+
+await check('[HOTFIX] callGateway() exists and its 401 branch never clears sd_admin_session', async () => {
+  const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
+  assert(fnMatch, 'could not locate callGateway() function body');
+  const body = fnMatch[0];
+  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\}/);
+  assert(status401Match, 'no res.status === 401 branch found in callGateway()');
+  assert(!/localStorage\.removeItem/.test(status401Match[1]), 'the 401 branch still calls localStorage.removeItem — this is the exact regression reported (session destroyed on a single 401)');
+});
+
+await check('[HOTFIX] callGateway()\u2019s 401 branch never touches the top-level Authentication card', async () => {
+  const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
+  assert(fnMatch, 'could not locate callGateway() function body');
+  const body = fnMatch[0];
+  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\}/);
+  assert(status401Match, 'no res.status === 401 branch found in callGateway()');
+  assert(!/renderAuthStatus\(\)/.test(status401Match[1]), 'the 401 branch still calls renderAuthStatus() — a single gateway 401 must not flip the Authentication card to \u201cNot signed in\u201d');
+});
+
+await check('[HOTFIX] a gateway 401 is raised as a distinct GatewayAuthError, not a plain Error', async () => {
+  assert(/class GatewayAuthError extends Error/.test(jsSource), 'no GatewayAuthError class declared');
+  const fnMatch = jsSource.match(/async function callGateway\([\s\S]*?\n\}/);
+  assert(fnMatch, 'could not locate callGateway() function body');
+  const body = fnMatch[0];
+  const status401Match = body.match(/if \(res\.status === 401\) \{([\s\S]*?)\}/);
+  assert(status401Match, 'no res.status === 401 branch found in callGateway()');
+  assert(/throw new GatewayAuthError/.test(status401Match[1]), '401 branch does not throw GatewayAuthError');
+});
+
+await check('[HOTFIX] loadLiveEvents() and loadEventLifecycle() both render a login-link notice on GatewayAuthError', async () => {
+  assert(/function appendAuthExpiredNotice/.test(jsSource), 'no appendAuthExpiredNotice() helper found');
+  assert(/href: '\/admin-login\.html'/.test(jsSource), 'appendAuthExpiredNotice() does not link to /admin-login.html');
+  const liveMatch = jsSource.match(/async function loadLiveEvents\([\s\S]*?\n\}/);
+  const lifecycleMatch = jsSource.match(/async function loadEventLifecycle\([\s\S]*?\n\}/);
+  assert(liveMatch, 'could not locate loadLiveEvents() function body');
+  assert(lifecycleMatch, 'could not locate loadEventLifecycle() function body');
+  assert(/err instanceof GatewayAuthError/.test(liveMatch[0]), 'loadLiveEvents() does not special-case GatewayAuthError');
+  assert(/err instanceof GatewayAuthError/.test(lifecycleMatch[0]), 'loadEventLifecycle() does not special-case GatewayAuthError');
+  assert(/appendAuthExpiredNotice\(box, err\.message\)/.test(liveMatch[0]), 'loadLiveEvents() does not render the login-link notice');
+  assert(/appendAuthExpiredNotice\(box, err\.message\)/.test(lifecycleMatch[0]), 'loadEventLifecycle() does not render the login-link notice');
+});
+
+await check('[HOTFIX] EMPTY / INTEGRATION_ERROR copy for live events matches the exact required strings', async () => {
+  assert(/'No SDOS events found\.'/.test(jsSource), 'missing exact EMPTY copy: "No SDOS events found."');
+  assert(/'SDOS event storage could not be read\.'/.test(jsSource), 'missing exact INTEGRATION_ERROR copy: "SDOS event storage could not be read."');
+});
+
+await check('[HOTFIX] the only localStorage.removeItem call left is the local-expiry cleanup inside getAdminSession()', async () => {
+  const removeItemMatches = [...jsSource.matchAll(/localStorage\.removeItem\(ADMIN_SESSION_KEY\)/g)];
+  assert(removeItemMatches.length === 1, `expected exactly 1 localStorage.removeItem call (local-expiry cleanup in getAdminSession()), found ${removeItemMatches.length}`);
+  const getAdminSessionMatch = jsSource.match(/function getAdminSession\(\)[\s\S]*?\n\}/);
+  assert(getAdminSessionMatch, 'could not locate getAdminSession() function body');
+  assert(/localStorage\.removeItem\(ADMIN_SESSION_KEY\)/.test(getAdminSessionMatch[0]), 'the single remaining removeItem call is not inside getAdminSession()');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
